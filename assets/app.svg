@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#151d2b"/>
+      <stop offset="1" stop-color="#080c13"/>
+    </linearGradient>
+    <linearGradient id="lens" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#6db8ff"/>
+      <stop offset="1" stop-color="#3d8fe8"/>
+    </linearGradient>
+  </defs>
+
+  <!-- 底板：深海军蓝圆角方，与界面 #0a0e15 同族 -->
+  <rect x="0" y="0" width="256" height="256" rx="58" fill="url(#bg)"/>
+
+  <!-- 亮蓝描边：#4da3ff，与界面强调色一致 -->
+  <rect x="4" y="4" width="248" height="248" rx="55"
+        fill="none" stroke="#4da3ff" stroke-opacity="0.9" stroke-width="7"/>
+
+  <!-- 镜头环 -->
+  <circle cx="128" cy="128" r="62" fill="none" stroke="url(#lens)" stroke-width="12"/>
+
+  <!-- 播放三角（视觉居中，右侧留白补偿） -->
+  <path d="M 110 96 L 110 160 L 169 128 Z" fill="#f2f7ff"/>
+</svg>
