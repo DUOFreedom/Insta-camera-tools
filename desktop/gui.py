@@ -1158,7 +1158,10 @@ class App(QWidget):
             job = {"dest": dest,
                    "updated": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                    "items": [{"src": s, "status": "pending"} for s in todo]}
-            core.save_job(dest, job)
+            try:
+                core.save_job(dest, job)
+            except OSError as _e:
+                self._sig_status.emit(f"断点续跑进度保存失败: {_e}")
 
             tpl = None
             if do_index:
@@ -1179,7 +1182,10 @@ class App(QWidget):
                     self._sig_progress.emit((_i + frac) / total, label, speed, eta)
                 item_cover = covers.get(os.path.normpath(src))
                 job["items"][i]["status"] = "running"
-                core.save_job(dest, job)
+                try:
+                    core.save_job(dest, job)
+                except OSError as _e:
+                    self._sig_status.emit(f"断点续跑进度保存失败: {_e}")
                 try:
                     if do_index and tpl is not None:
                         res = _core.import_with_inst(
@@ -1226,7 +1232,10 @@ class App(QWidget):
                 else:
                     job["items"][i].pop("err", None)
                 job["updated"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                core.save_job(dest, job)
+                try:
+                    core.save_job(dest, job)
+                except OSError as _e:
+                    self._sig_status.emit(f"断点续跑进度保存失败: {_e}")
                 self._sig_progress.emit((i + 1) / total,
                                         f"已完成 {i + 1}/{total}", 0.0, 0)
 

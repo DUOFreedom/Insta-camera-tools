@@ -604,7 +604,9 @@ def _parse_hhmmss(value: str) -> float:
     except (ValueError, AttributeError):
         return 0.0
 
-def _run_ffmpeg(cmd: list[str], duration: float, progress=None, cancel=None):
+def _run_ffmpeg(cmd: list[str], duration: float, progress=None, cancel=None,
+                procs: list[subprocess.Popen] | None = None,
+                procs_lock: threading.Lock | None = None):
     """后台运行 ffmpeg，解析 -progress 输出，返回进度与速度。
 
     前置条件:
@@ -639,6 +641,9 @@ def _run_ffmpeg(cmd: list[str], duration: float, progress=None, cancel=None):
     proc = subprocess.Popen(full, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                             creationflags=_NO_WINDOW, text=True,
                             encoding="utf-8", errors="replace")
+    if procs is not None and procs_lock is not None:
+        with procs_lock:
+            procs.append(proc)
 
     stderr_chunks: list[str] = []
 
@@ -702,6 +707,10 @@ def _run_ffmpeg(cmd: list[str], duration: float, progress=None, cancel=None):
         except Exception:
             pass
     err_thread.join(timeout=2)
+    # proc 已结束，stderr 管道已关闭，err_thread 会很快退出；
+    # 超时后继续等待，保证 FFmpegError.stderr 完整不丢失。
+    if err_thread.is_alive():
+        err_thread.join()
     if canceled:
         raise CanceledError("已取消")
     if proc.returncode != 0:
@@ -1073,7 +1082,14 @@ def convert(input_path: str, output_dir: str, start_number: int | None = None,
     results: list[str | None] = [None] * n
     parts = [0.0] * n
 
+    # 并发模式下跟踪所有 ffmpeg 子进程，任一任务失败时杀掉其余进程，
+    # 避免孤儿 ffmpeg 继续写卡。
+    procs: list[subprocess.Popen] = []
+    procs_lock = threading.Lock()
+    first_error: BaseException | None = None
+
     def _run_one(idx: int, t):
+        nonlocal first_error
         (label, dst, vc, tag, w, h, fps, vh, ve, cr, pix, audio, profile, level) = t
         vf = _scale_pad(w, h)
         say(f"[{label}] 编码中 ({w}x{h},fps={fps})...")
@@ -1102,7 +1118,21 @@ def convert(input_path: str, output_dir: str, start_number: int | None = None,
                 cur = sum(weights[k] * parts[k] for k in range(n))
             progress(min(1.0, cur), _label, spd, eta)
 
-        _run_ffmpeg(cmd, dur, _job_cb if progress else None, cancel)
+        try:
+            _run_ffmpeg(cmd, dur, _job_cb if progress else None, cancel,
+                        procs, procs_lock)
+        except BaseException as e:
+            # 记录第一个真实错误，通知其他任务取消并杀掉它们的 ffmpeg
+            if first_error is None:
+                first_error = e
+            cancel.set()
+            with procs_lock:
+                for p in procs:
+                    try:
+                        p.kill()
+                    except Exception:
+                        pass
+            raise
         with lock:
             parts[idx] = 1.0
             overall = sum(weights[k] * parts[k] for k in range(n))
@@ -1113,8 +1143,16 @@ def convert(input_path: str, output_dir: str, start_number: int | None = None,
     if workers > 1 and n > 1:
         say(f"并行转码: {workers} 路")
         with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as ex:
-            for idx, dst in enumerate(ex.map(_run_one, range(n), tasks)):
-                results[idx] = dst
+            futures = [ex.submit(_run_one, i, t) for i, t in enumerate(tasks)]
+            for fut in concurrent.futures.as_completed(futures):
+                try:
+                    results[futures.index(fut)] = fut.result()
+                except BaseException:
+                    # 第一条错误已由 _run_one 记录并取消了其余任务
+                    pass
+        # 所有并发任务结束后，若有第一条错误，向上抛出，使 convert 失败
+        if first_error is not None:
+            raise first_error
     else:
         for idx, t in enumerate(tasks):
             results[idx] = _run_one(idx, t)
@@ -1812,17 +1850,43 @@ def register_to_card(card_root: str, media_paths: list[str],
 
 COVER_WIDTH, COVER_HEIGHT = 896, 512
 
-def render_cover(image_path: str, output: str) -> bytes:
+def render_cover(image_path: str, output: str,
+                 cancel: threading.Event | None = None,
+                 timeout: float = 120.0) -> bytes:
     """把任意图片渲染成相机封面用的原始帧（896x512 NV12）。
 
       同名封面图（a.mp4 → a.jpg）也走这里，不直接拿原像素。
     """
+    if not isinstance(image_path, str) or not image_path:
+        raise ValidationError("image_path 必须为非空字符串")
+    if not os.path.isfile(image_path):
+        raise FileNotFoundError(f"封面图不存在: {image_path}")
+    if not isinstance(output, str) or not output:
+        raise ValidationError("output 必须为非空字符串")
+    if cancel is not None and not isinstance(cancel, threading.Event):
+        raise ValidationError("cancel 必须为 threading.Event 或 None")
+    ff = find_ffmpeg()
+    if not ff:
+        raise ValidationError("未找到 ffmpeg，无法渲染封面")
+
     vf = (f"scale={COVER_WIDTH}:{COVER_HEIGHT}:force_original_aspect_ratio=decrease,"
           f"pad={COVER_WIDTH}:{COVER_HEIGHT}:(ow-iw)/2:(oh-ih)/2:black")
-    cmd = [find_ffmpeg(), "-hide_banner", "-loglevel", "error", "-y",
+    cmd = [ff, "-hide_banner", "-loglevel", "error", "-y",
            "-i", str(image_path), "-vf", vf, "-frames:v", "1",
            "-pix_fmt", "nv12", "-f", "rawvideo", str(output)]
-    subprocess.run(cmd, check=True, creationflags=_NO_WINDOW)
+    try:
+        subprocess.run(cmd, check=True, creationflags=_NO_WINDOW, timeout=timeout)
+    except subprocess.TimeoutExpired as e:
+        raise FFmpegError(
+            f"封面渲染超时（>{timeout}s）: {image_path}",
+            cmd=cmd, returncode=None, stderr="", retryable=False) from e
+    except subprocess.CalledProcessError as e:
+        err = (e.stderr.decode("utf-8", "replace")[:200]
+               if e.stderr else str(e))
+        raise FFmpegError(
+            f"封面渲染失败: {err}",
+            cmd=cmd, returncode=e.returncode, stderr=err,
+            retryable=False) from e
     data = Path(output).read_bytes()
     if len(data) != COVER_WIDTH * COVER_HEIGHT * 3 // 2:
         raise ValueError(f"封面尺寸异常: {len(data)} 字节")
@@ -1974,17 +2038,18 @@ def load_job(dest: str) -> dict | None:
 
 
 def save_job(dest: str, job: dict) -> None:
-    """原子写入，避免中途断电把进度文件写坏。"""
+    """原子写入，避免中途断电把进度文件写坏。
+
+    写入失败向上抛 OSError，由调用方决定是否中断主流程；
+    不再静默吞掉，避免断点续跑进度丢失而用户无感知。
+    """
     p = job_path(dest)
     tmp = p + ".tmp"
-    try:
-        with open(tmp, "w", encoding="utf-8") as f:
-            json.dump(job, f, ensure_ascii=False, indent=1)
-            f.flush()
-            os.fsync(f.fileno())
-        os.replace(tmp, p)
-    except OSError:
-        pass
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(job, f, ensure_ascii=False, indent=1)
+        f.flush()
+        os.fsync(f.fileno())
+    os.replace(tmp, p)
 
 
 _ES_CONTINUOUS = 0x80000000
@@ -2136,8 +2201,10 @@ def import_with_inst(source: str, card_root: str,
         thumbnail = None
         if cover:
             try:
-                thumbnail = render_cover(cover, str(thumb_path))
+                thumbnail = render_cover(cover, str(thumb_path), cancel=cancel)
                 say(f"封面: 使用自定义图片 {os.path.basename(cover)}")
+            except CanceledError:
+                raise
             except Exception as _ce:
                 say(f"  自定义封面处理失败，改用视频取帧: {_ce}")
         if thumbnail is None:
