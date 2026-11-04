@@ -251,10 +251,11 @@ def camera_udta(
     children = child_boxes(udta, 8, len(udta))
     amba_offset, amba_size, _ = next(box for box in children if box[2] == b"AMBA")
     nail_offset, nail_size, _ = next(box for box in children if box[2] == b"nail")
-    if amba_size < 97 or nail_size != 688144 or len(thumbnail) != 896 * 512 * 3 // 2:
+    if amba_size != 97 or nail_size != 688144 or len(thumbnail) != 896 * 512 * 3 // 2:
         raise ValueError("unexpected AMBA/nail template layout")
 
     amba = bytearray(udta[amba_offset : amba_offset + amba_size])
+    #   防止越界写导致相机无法识别。
     _amba_fields = [
         (25, stats["video_timescale"]),
         (29, 1001),
@@ -418,6 +419,9 @@ def locate_metadata(media: Path, template_metadata: bytes) -> bytes:
 
 def _tool(name: str) -> str:
     """定位 ffmpeg / ffprobe：环境变量 → exe/程序目录 → 模块附近 → PATH。
+
+      而 ffmpeg.exe 通常在 exe 同目录的 bin 子目录下；
+      旧版只查模块附近 → 找不到 → 返回裸名 → subprocess 抛 WinError 2。
     """
     env = os.environ.get(name.upper() + "_PATH")
     if env and os.path.isfile(env):
@@ -429,7 +433,6 @@ def _tool(name: str) -> str:
         os.path.join(here, "bin"),
         os.path.join(os.path.dirname(here), "bin"),
     ]
-    # 程序实际所在目录（打包后 = exe 所在目录；开发时 = 脚本目录）
     try:
         import sys as _sys
         if getattr(_sys, "frozen", False):

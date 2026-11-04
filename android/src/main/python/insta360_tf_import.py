@@ -144,7 +144,6 @@ def tailor_metadata(
     set_field(fields, 9, 0, inst_payload_offset)
     set_field(fields, 10, 0, max(1, math.floor(duration)))
     set_field(fields, 19, 2, protobuf_pair(width, height))
-    # ★ f20 = 帧率（真机 VID 为 60，LRV 为 30）；未指定时按 proxy 推断
     set_field(fields, 20, 0, int(fps) if fps else (30 if proxy else 60))
     set_field(fields, 36, 0, epoch_ms)
 
@@ -237,7 +236,6 @@ def camera_udta(
     children = child_boxes(udta, 8, len(udta))
     amba_offset, amba_size, _ = next(box for box in children if box[2] == b"AMBA")
     nail_offset, nail_size, _ = next(box for box in children if box[2] == b"nail")
-    # ★ 严格校验关键尺寸，防止写错字段导致相机无法识别
     if amba_size < 97 or nail_size != 688144 or len(thumbnail) != 896 * 512 * 3 // 2:
         raise ValueError(
             f"unexpected AMBA/nail template layout: "
@@ -247,7 +245,6 @@ def camera_udta(
         )
 
     amba = bytearray(udta[amba_offset : amba_offset + amba_size])
-    # ★ AMBA 字段偏移均相对 AMBA box 数据区开头，必须做边界检查，
     #   防止越界写导致相机无法识别。实测布局（参考 camera_moov_rewrap.py）：
     #     0x54 (84) = 音频采样率，0x5B (91) = 音频帧数
     _amba_fields = [
@@ -414,7 +411,6 @@ def locate_metadata(media: Path, template_metadata: bytes) -> bytes:
 def _tool(name: str) -> str:
     """定位 ffmpeg / ffprobe：环境变量 → exe/程序目录 → 模块附近 → PATH。
 
-    ★ 打包成单文件 exe 后，__file__ 指向 _MEIxxxx/cpvc_origin/，
       而 ffmpeg.exe 通常在 exe 同目录的 bin 子目录下；
       旧版只查模块附近 → 找不到 → 返回裸名 → subprocess 抛 WinError 2。
     """
@@ -428,7 +424,6 @@ def _tool(name: str) -> str:
         os.path.join(here, "bin"),
         os.path.join(os.path.dirname(here), "bin"),
     ]
-    # ★ 程序实际所在目录（打包后 = exe 所在目录；开发时 = 脚本目录）
     try:
         import sys as _sys
         if getattr(_sys, "frozen", False):
@@ -449,7 +444,6 @@ def _tool(name: str) -> str:
     found = shutil.which(name)
     if found:
         return found
-    # ★ 真的找不到就报错，不要返回裸名让底层抛 WinError 2
     raise FileNotFoundError(
         f"找不到 {name}（已找: 环境变量 {name.upper()}_PATH、"
         f"{os.pathsep.join(cands)}、PATH）；请把 {exe_name} 放到程序同目录的 bin 下。")

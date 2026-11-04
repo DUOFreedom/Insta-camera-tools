@@ -42,6 +42,11 @@ _MAX_32BIT = 0xFFFFFFFF
 
 
 def make_box(kind: bytes, payload: bytes) -> bytes:
+    """构造一个 MP4 box。
+
+      size=1 + kind + 8 字节 64 位长度。生成的视频一旦超过 4 GiB（1080p HEVC
+      约 30 分钟以上），mdat 必然超限，旧实现在这里静默写出非法长度。
+    """
     size = len(payload) + 8
     if size <= _MAX_32BIT:
         return struct.pack(">I4s", size, kind) + payload
@@ -49,6 +54,9 @@ def make_box(kind: bytes, payload: bytes) -> bytes:
 
 
 def _chunk_offsets(data: bytes, table: dict) -> list:
+    """读取 chunk offset 表，同时支持 32 位的 stco 与 64 位的 co64。
+
+    """
     if b"stco" in table:
         box = table[b"stco"]
         count = struct.unpack_from(">I", data, box[0] + 12)[0]
@@ -118,6 +126,10 @@ def samples(data: bytes, trak) -> list[bytes]:
 
 
 def stco_box(offsets: list) -> bytes:
+    """写出 chunk offset 表：任一偏移超 32 位时自动改用 co64。
+
+      写出静默错位的值，表现为相机能列出条目但打不开。
+    """
     if any(value > _MAX_32BIT for value in offsets):
         payload = b"\0\0\0\0" + struct.pack(">I", len(offsets))
         payload += b"".join(struct.pack(">Q", value) for value in offsets)

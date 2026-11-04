@@ -233,7 +233,6 @@ def rebuild_trak(native_data, native_trak, generated_data, generated_trak, offse
 def _scan_meta_at(inst_box: bytes, start: int) -> tuple[int, list] | None:
     """从 start 处逐字段解析 protobuf，返回 (消耗字节数, fields)。
 
-    ★ 不能用 len(reference) 切片：tailor_metadata 会改变字段宽度，
       使长度与 inst box 内实测不一致。只能按实际编码逐个解析。
     """
     pos = start
@@ -283,10 +282,9 @@ def _scan_meta_at(inst_box: bytes, start: int) -> tuple[int, list] | None:
 def metadata_in_inst(inst_box: bytes, reference: bytes) -> bytes:
     serial = bytes(insta.field_value(insta.parse_message(reference), 1))
     signature = insta.encode_field(insta.Field(1, 2, serial))
-    start = inst_box.rfind(signature)      # ★ 取最后一个（meta 在 inst box 尾部）
+    start = inst_box.rfind(signature)
     if start < 0:
         raise ValueError("cannot locate inst metadata")
-    # ★ 按实际编码长度解析，不用 len(reference)
     scanned = _scan_meta_at(inst_box, start)
     if scanned is None:
         raise ValueError("cannot parse inst metadata")
@@ -297,7 +295,6 @@ def metadata_in_inst(inst_box: bytes, reference: bytes) -> bytes:
 def patch_inst_offset(inst_box: bytes, reference: bytes, payload_offset: int):
     """把 inst box 内的元数据换成 reference（并刷新 f9 偏移与长度表）。
 
-    ★ reference 必须是【已经把路径/时间戳/规格改成目标文件自己】的 meta。
       旧实现只改 f9，会把路径等改动丢掉，导致
       inst box 内仍写着模板文件名 → 相机按该路径找不到文件。
     """

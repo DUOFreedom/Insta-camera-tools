@@ -1,26 +1,5 @@
 # CHANGELOG
 
-## 1.1.0 — 2026-11-03
-
-### 变更
-
-- **桌面版本号归一为 1.1.0**
-- **安卓版本号为 0.1.0beta**，提供未签名 APK，上传构建仓库时自行签名；从源码构建默认使用测试签名
-
-### 修复
-
-- **`desktop/core.py`**：移除强制改写视频编码器导致预览标签不匹配的问题
-- **`desktop/core.py`**：修复 `_meta_equivalent` 模块导入路径错误，修复卡片校验崩溃
-- **`desktop/core.py`**：修复 `open()` 文件句柄未关闭问题
-- **`desktop/core.py`**：`stamp_from_name` 支持带前缀的模板文件名
-- **`desktop/gui.py`**：修复 job 状态判断逻辑，不再依赖脆弱的列表末尾判断
-- **`android/src/main/python/insta_core.py`**：移除 `has_inst_box` 死代码和句柄泄漏
-- **`android/src/main/python/insta_core.py`**：跳过空 meta 登记，避免相机条目打不开
-- **`android/src/main/python/insta_core.py`**：`convert()` / `import_with_inst()` 新增 `cancel` 参数，支持取消信号
-- **`android/src/main/python/insta_core.py`**：进度条引入分段数组聚合，消除进度回退
-- **`shared/instbox/inst_transplant.py`**：AMBA 字段偏移由硬编码改为表驱动，加越界校验
-- **`shared/instbox/moov_rewrap.py`**：AMBA 音频偏移改为实测布局，加边界检查，修复 `audio_fps_field` 未定义导致的 `NameError`
-
 ## 1.0.0 — 2026-10-25
 
 ### 首个公开版本
@@ -46,6 +25,11 @@ Ace Pro 2 可识别的原生素材：转码为 VID + LRV 双文件、移植 `ins
 - 硬件加速：自动探测 QSV / NVENC / AMF，不可用回落软件编码
 - 防休眠：长片处理期间阻止系统休眠
 - 三阶段进度：转码 / 移植 / 登记分开显示
+
+### 修复（1.0.1 补丁，2026-11-01）
+
+- **`instbox/inst_transplant.py camera_udta`**：9 个硬编码 AMBA 字段偏移（25/29/41/49/53/67/71/84/91）改为表驱动 `_amba_fields`，逐字段做 `_off + 4 > amba_size` 越界校验，超界抛 `ValueError`，不再静默写错字节导致相机无法识别。
+- **`instbox/moov_rewrap.py udta_with_audio_frames`**：AMBA 音频采样率/帧数偏移由硬编码 `amba[0]+84`/`amba[0]+91` 改为按实测布局的 `amba[0]+0x20`/`amba[0]+0x5B`，并加边界检查抛 `ValueError`；同时修复 `audio_fps_field` 未定义导致的运行时 `NameError`。
 
 ## 历史版本（内部迭代，未公开发布）
 
@@ -142,4 +126,3 @@ Ace Pro 2 可识别的原生素材：转码为 VID + LRV 双文件、移植 `ins
 - 模板规格实测化：分辨率/帧率/level 全部取自卡内真机原片，不用硬编码。
 - 索引写入保留 Windows 隐藏/只读属性（`r+b` 原地改写）。
 - 界面署名：作者 B站@铎DUOFreedom。
-

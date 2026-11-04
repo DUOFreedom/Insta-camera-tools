@@ -21,14 +21,11 @@ android {
         applicationId = "com.duofreedom.instaace"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
+        versionCode = 13
         versionName = "0.1.0beta"
         resourceConfigurations += listOf("zh", "en")
         manifestPlaceholders["appLabel"] = "InstaAce 导入器"
 
-        // ★ 双 ABI：同时支持 64 位与 32 位 ARM。
-        //   只带 arm64-v8a 时，32 位设备会 INSTALL_FAILED_NO_MATCHING_ABIS，
-        //   系统界面显示成「应用未安装」——这正是早期版本装不上的最可能原因。
         ndk {
             abiFilters += listOf("arm64-v8a", "armeabi-v7a")
         }
@@ -53,7 +50,6 @@ android {
 
     packaging {
         resources.excludes += setOf("/META-INF/{AL2.0,LGPL2.1}")
-        // ★ ffmpeg/ffprobe 以 lib*.so 形式随包，必须解压到 nativeLibraryDir 才能 exec
         jniLibs {
             useLegacyPackaging = true
         }
@@ -63,8 +59,7 @@ android {
         release {
             isMinifyEnabled = false
             isShrinkResources = false
-            signingConfig = null
-            isDebuggable = false
+            isDebuggable = true
         }
     }
 
@@ -95,7 +90,6 @@ dependencies {
 
 extensions.configure<com.chaquo.python.ChaquopyExtension> {
     defaultConfig {
-        // ★ Python 3.11：3.12/3.13 没有 armeabi-v7a 构件，无法出 32 位包
         version = "3.11"
         buildPython("D:/android-build/py311/python.exe")
     }

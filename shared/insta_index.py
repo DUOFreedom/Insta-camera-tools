@@ -24,8 +24,6 @@ Insta360 相机相册不是靠"扫目录"认文件的（这点和 DJI 不同）�
     <卡根>/DCIM/fileinfo_list.list          主索引（媒体清单，含完整元数据）
     <卡根>/DCIM/.editinfo_list.list         编辑索引（"是否已编辑"标记）
 
-索引文件在 **DCIM 根目录** 下，不在 Camera01 里。
-但索引条目里记录的文件路径指向  /DCIM/Camera01/<文件名>
 
 （实测与相机原生行为一致。）
 

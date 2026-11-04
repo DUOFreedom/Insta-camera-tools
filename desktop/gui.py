@@ -1211,19 +1211,20 @@ class App(QWidget):
                             log=self._sig_status.emit, progress=_cb, spec=spec,
                             cancel=self._cancel)
                         ok.append((src, main_p, lrv_p))
-                    job["items"][i]["status"] = "done"
-                    job["items"][i].pop("err", None)
                 except _core.CanceledError:
                     self._sig_status.emit("  ⏹ {}: 已取消".format(
                         os.path.basename(src)))
-                    job["items"][i]["status"] = "canceled"
                     break
                 except Exception as exc:  # noqa: BLE001
                     self._sig_status.emit("  ✗ {}: {}: {}".format(
                         os.path.basename(src), type(exc).__name__, exc))
                     bad.append((src, "{}: {}".format(type(exc).__name__, exc)))
-                    job["items"][i]["status"] = "failed"
-                    job["items"][i]["err"] = "{}: {}".format(type(exc).__name__, exc)
+                job["items"][i]["status"] = (
+                    "failed" if (bad and bad[-1][0] == src) else "done")
+                if bad and bad[-1][0] == src:
+                    job["items"][i]["err"] = bad[-1][1]
+                else:
+                    job["items"][i].pop("err", None)
                 job["updated"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 core.save_job(dest, job)
                 self._sig_progress.emit((i + 1) / total,
@@ -1334,7 +1335,7 @@ class App(QWidget):
         self.status_label.setText("正在取消，等待 ffmpeg 退出…")
 
     def closeEvent(self, event):  # noqa: N802 (Qt 命名)
-        """关窗拦截。
+        """ 关窗拦截。
 
         旧实现没有 closeEvent：转换中点 × 后窗口直接消失，daemon 线程被
         丢弃、ffmpeg 变成孤儿进程继续往卡里写、set_awake(False) 永不执行
@@ -1403,6 +1404,7 @@ def main():
                 dcim = os.path.join(work, "DCIM")
                 cam = os.path.join(dcim, "Camera01")
                 os.makedirs(cam, exist_ok=True)
+                # 准备一张带样本索引的模拟卡（ 索引在 DCIM 下）
                 samp_fi = resource_path(os.path.join("samples", "fileinfo_list.list"))
                 samp_ei = resource_path(os.path.join("samples", ".editinfo_list.list"))
                 if os.path.isfile(samp_fi):

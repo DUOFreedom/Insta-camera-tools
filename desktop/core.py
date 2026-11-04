@@ -34,6 +34,13 @@
         视频 handler_name=[0x10]INS.AVC, encoder="AVC encoder"
 
 本工具独立实现，不依赖任何第三方付费工具。
+
+免责声明:
+    本项目为个人开发的第三方工具，与影石创新科技股份有限公司无任何关联，未获其授权或认可。
+    Insta360、Ace Pro 是影石的商标。
+    工具通过改写文件结构与相机索引实现导入，属于对未公开格式的逆向分析。
+    使用前请自行备份相机卡内素材。因使用本工具导致的素材损坏、相机异常或保修问题，
+    作者不承担责任。
 """
 
 from __future__ import annotations
@@ -77,8 +84,41 @@ _FFMPEG_KILL_WAIT = 10
 class CanceledError(Exception):
     """用户主动取消（非程序错误）。
 
-      批处理也不会把它计入失败统计。
+    与 RuntimeError 区分：GUI 据此显示“已取消”而不是“失败”，
+    批处理不将其计入失败统计。
     """
+
+
+class ValidationError(ValueError):
+    """输入参数不符合前置条件，调用方应修正后重试。"""
+
+
+class FFmpegError(RuntimeError):
+    """ffmpeg 子进程失败。
+
+    attributes:
+        cmd: 失败的完整命令列表。
+        returncode: 进程退出码。
+        stderr: 合并后的 stderr 文本（可能被截断）。
+        retryable: 是否建议重试。
+    """
+
+    def __init__(self, message: str, cmd: list[str] | None = None,
+                 returncode: int | None = None, stderr: str = "",
+                 retryable: bool = False) -> None:
+        super().__init__(message)
+        self.cmd = cmd
+        self.returncode = returncode
+        self.stderr = stderr
+        self.retryable = retryable
+
+
+class MediaError(RuntimeError):
+    """媒体文件本身损坏或不符合预期格式，不可重试。"""
+
+
+class CardError(RuntimeError):
+    """相机卡结构或索引操作失败，不可重试。"""
 
 def log_path() -> str:
     """本次导入的日志文件路径（%LOCALAPPDATA%\\InstaAceImporter\\import.log）。"""
@@ -565,22 +605,41 @@ def _parse_hhmmss(value: str) -> float:
         return 0.0
 
 def _run_ffmpeg(cmd: list[str], duration: float, progress=None, cancel=None):
-    """后台运行 ffmpeg，并从 -progress 输出解析进度与速度。
+    """后台运行 ffmpeg，解析 -progress 输出，返回进度与速度。
 
-    cmd      完整的 ffmpeg 命令(list)，已含输出文件。
-    duration 视频总时长(秒)，用于计算百分比与 ETA；<=0 时进度不可用。
-    progress 可选回调 progress(fraction, speed, eta_seconds)。
-    cancel   可选 threading.Event；置位时立即 kill 子进程并抛 CanceledError。
-             失败时抛出 RuntimeError(带 stderr 尾部)。
+    前置条件:
+        cmd 为非空字符串列表，且首元素为可执行 ffmpeg 路径；
+        duration >= 0；
+        cancel 若非 None 须为 threading.Event。
+    后置条件:
+        ffmpeg 正常退出码为 0 时无异常；
+        cancel 置位时抛 CanceledError 并 kill 子进程；
+        ffmpeg 退出码非 0 时抛 FFmpegError，携带命令、返回码、stderr。
+    不变量:
+        stderr 由守护线程异步排空，防止管道写满导致 ffmpeg 阻塞；
+        子进程在 finally 中确保 kill 与 wait。
+    失败方式:
+        用户错误: cmd 为空或首元素不存在 -> ValidationError；
+        系统错误(不可重试): ffmpeg 退出码非 0 -> FFmpegError(retryable=False)；
+        用户取消: cancel 置位 -> CanceledError；
+        系统错误: 子进程启动失败 -> OSError 向上抛出。
     """
-    if cancel is not None and cancel.is_set():
+    if not cmd or not isinstance(cmd, list) or not cmd[0]:
+        raise ValidationError("_run_ffmpeg 要求非空的命令列表")
+    if not os.path.isfile(cmd[0]) and not shutil.which(cmd[0]):
+        raise ValidationError(f"ffmpeg 可执行文件不存在: {cmd[0]}")
+    if duration < 0:
+        raise ValidationError("duration 不得为负数")
+    if cancel is not None and not isinstance(cancel, threading.Event):
+        raise ValidationError("cancel 必须为 threading.Event 或 None")
+
+    if cancel.is_set():
         raise CanceledError("已取消")
     full = cmd + ["-progress", "pipe:1", "-nostats"]
     proc = subprocess.Popen(full, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                             creationflags=_NO_WINDOW, text=True,
                             encoding="utf-8", errors="replace")
 
-    # 必须异步消费 stderr，否则管道写满会导致 ffmpeg 阻塞（死锁）
     stderr_chunks: list[str] = []
 
     def _drain_err():
@@ -589,7 +648,7 @@ def _run_ffmpeg(cmd: list[str], duration: float, progress=None, cancel=None):
                 stderr_chunks.append(chunk)
                 if len(stderr_chunks) > 400:
                     del stderr_chunks[:-200]
-        except Exception:  # noqa: BLE001
+        except Exception:
             pass
 
     err_thread = threading.Thread(target=_drain_err, daemon=True)
@@ -600,7 +659,6 @@ def _run_ffmpeg(cmd: list[str], duration: float, progress=None, cancel=None):
     canceled = False
     try:
         for line in proc.stdout:
-            #   旧实现没有任何中断手段，用户关窗后 ffmpeg 会变成孤儿进程继续写卡。
             if cancel is not None and cancel.is_set():
                 canceled = True
                 break
@@ -625,32 +683,36 @@ def _run_ffmpeg(cmd: list[str], duration: float, progress=None, cancel=None):
                     eta = (duration - cur) / speed if speed > 0 else -1
                     progress(frac, speed, eta)
     finally:
-        #   否则 SD 卡写满/被拔出时 ffmpeg 会挂在写盘上永不返回，卡死整个转换线程。
         if proc.stdout:
             try:
                 proc.stdout.close()
-            except Exception:  # noqa: BLE001
+            except Exception:
                 pass
         if canceled or proc.poll() is None:
             try:
                 proc.kill()
-            except Exception:  # noqa: BLE001
+            except Exception:
                 pass
     try:
-        # 带超时的回收：kill 之后通常立即返回；超时再兜一次
         proc.wait(timeout=_FFMPEG_KILL_WAIT)
     except subprocess.TimeoutExpired:
         try:
             proc.kill()
             proc.wait(timeout=5)
-        except Exception:  # noqa: BLE001
+        except Exception:
             pass
     err_thread.join(timeout=2)
     if canceled:
         raise CanceledError("已取消")
     if proc.returncode != 0:
         err = "".join(stderr_chunks)[-800:]
-        raise RuntimeError(f"ffmpeg 退出码非 0: {err}")
+        raise FFmpegError(
+            f"ffmpeg 退出码非 0: {err}",
+            cmd=full,
+            returncode=proc.returncode,
+            stderr=err,
+            retryable=False,
+        )
 
 def _scale_pad(w: int, h: int) -> str:
     """缩放并居中填充到目标尺寸。
@@ -861,6 +923,7 @@ def _build_spec_tasks(input_path, output_dir, seq, stamp, hw, spec):
     lrv_cr = "pc" if lrv_pix == "yuvj420p" else lv.get("color_range", "pc")
     lrv_profile = lv.get("profile", "high")
 
+    # 音轨： 以真机实测为准（Ace Pro 2 v2.0.51 为 1 条 INS.AAC）
     # 无样本时回退到 1 条 INS.AAC（与实测一致），而非旧版的 2 条
     audio = (spec or {}).get("audio_tracks") or [
         {"codec": "aac", "sample_rate": "48000", "channels": "2",
@@ -901,24 +964,42 @@ def _build_spec_tasks(input_path, output_dir, seq, stamp, hw, spec):
     return tasks, extra
 
 # ---------------------------------------------------------------- 转换主流程
-def convert(input_path, output_dir, start_number=None, stamp=None, log=None,
-            encoder=None, progress=None, spec=None, jobs: int | None = None,
-            cancel=None):
+def convert(input_path: str, output_dir: str, start_number: int | None = None,
+            stamp: str | None = None, log=None,
+            encoder: tuple[str, str, str] | None = None,
+            progress=None, spec: dict | None = None,
+            jobs: int | None = None,
+            cancel: threading.Event | None = None) -> tuple[str, str | None]:
     """转换一个视频为相机可识别的格式。返回 (main_path, preview_path)。
 
     参数:
-        input_path   输入视频路径
-        output_dir   输出目录(如 SD 卡的 DCIM\\Camera01)
-        start_number 起始序号；None 表示自动取下一个可用序号(推荐)
-        stamp        时间戳字符串(YYYYMMDD_HHMMSS)；None 用源文件的创建时间
+        input_path   输入视频路径，须为存在的常规文件
+        output_dir   输出目录，须可写或可创建
+        start_number 起始序号；None 表示自动取下一个可用序号
+        stamp        时间戳字符串(YYYYMMDD_HHMMSS)；None 用当前时间
         encoder      硬件编码器三元组 (hevc, h264, 显示名)；None 表示自动检测
-        spec         原生视频结构(analyze_native 的结果)。
-                     提供时【按样文件真实结构生成】而非硬编码；
-                     为 None 时回退到影石 Ace Pro 2 默认结构。
+        spec         原生视频结构；None 时回退默认结构
         progress     进度回调 progress(overall_frac, label, speed, eta_sec)
-                     overall_frac ∈ [0,1] 覆盖本文件全部任务(主+预览)
-        jobs         并行转码路数；None = 主视频与预览同时编（两个任务全开）
-        cancel       threading.Event；置位时中断转码并清理未完成的输出文件
+        jobs         并行转码路数；None = 主视频与预览同时编
+        cancel       threading.Event；置位时中断转码
+
+    前置条件:
+        input_path 存在且为常规文件；
+        output_dir 可创建或已存在且可写；
+        spec 若非 None，须为 dict，含可选键 video/lrv_video/audio_tracks；
+        jobs 若非 None，须为正整数；
+        cancel 若非 None，须为 threading.Event。
+
+    后置条件:
+        返回 (main_path, preview_path)，均位于 output_dir；
+        cancel 置位时抛 CanceledError，部分输出文件可能残留；
+        ffmpeg 失败时抛 FFmpegError，不返回错误码。
+
+    失败方式:
+        用户错误: input_path 不存在 -> FileNotFoundError；
+        用户错误: 参数类型不符 -> ValidationError；
+        系统错误(不可重试): ffmpeg 退出非 0 -> FFmpegError；
+        用户取消: cancel 置位 -> CanceledError。
     """
     def say(msg):
         if log:
@@ -926,13 +1007,32 @@ def convert(input_path, output_dir, start_number=None, stamp=None, log=None,
         else:
             print(msg)
 
+    if not isinstance(input_path, str) or not input_path:
+        raise ValidationError("input_path 必须为非空字符串")
     if not os.path.isfile(input_path):
-        raise FileNotFoundError(input_path)
-    os.makedirs(output_dir, exist_ok=True)
+        raise FileNotFoundError(f"输入文件不存在: {input_path}")
+    if not isinstance(output_dir, str) or not output_dir:
+        raise ValidationError("output_dir 必须为非空字符串")
+    try:
+        os.makedirs(output_dir, exist_ok=True)
+        if not os.access(output_dir, os.W_OK):
+            raise ValidationError(f"输出目录不可写: {output_dir}")
+    except OSError as e:
+        raise ValidationError(f"无法创建或访问输出目录 {output_dir}: {e}") from e
+
+    if spec is not None and not isinstance(spec, dict):
+        raise ValidationError("spec 必须为 dict 或 None")
+    if jobs is not None:
+        if not isinstance(jobs, int) or jobs < 1:
+            raise ValidationError("jobs 必须为正整数")
+    if cancel is not None and not isinstance(cancel, threading.Event):
+        raise ValidationError("cancel 必须为 threading.Event 或 None")
+
+    if cancel.is_set():
+        raise CanceledError("已取消")
 
     if encoder is None:
         encoder = detect_hw_encoder()
-    # 仅当三元组里真带了有效编码器名时才算硬件
     if isinstance(encoder, tuple) and len(encoder) == 3 \
             and encoder[2] != "software" and encoder[0]:
         hw = encoder
@@ -943,10 +1043,15 @@ def convert(input_path, output_dir, start_number=None, stamp=None, log=None,
 
     if stamp is None:
         stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    if not isinstance(stamp, str) or not stamp:
+        raise ValidationError("stamp 必须为非空字符串")
     if start_number is None:
         seq = next_seq(output_dir)
     else:
-        seq = int(start_number)
+        try:
+            seq = int(start_number)
+        except (TypeError, ValueError) as e:
+            raise ValidationError(f"start_number 必须为整数: {start_number}") from e
 
     tasks, extra = _build_spec_tasks(input_path, output_dir, seq, stamp, hw, spec)
 
@@ -959,8 +1064,6 @@ def convert(input_path, output_dir, start_number=None, stamp=None, log=None,
     src_audio_count = sum(1 for s in info.get("streams", [])
                           if s.get("codec_type") == "audio")
 
-    #   实测（i5-11320H / 8 线程）：x265 1080p ≈ 95fps、x264 480p ≈ 400fps，
-    #   串行总时长 = 两者相加；并行后 ≈ 取慢的那个。
     n = len(tasks)
     workers = max(1, min(int(jobs or n), n))
     area_total = float(sum(max(1, t[4] * t[5]) for t in tasks)) or 1.0
@@ -968,8 +1071,6 @@ def convert(input_path, output_dir, start_number=None, stamp=None, log=None,
     state = {"done": 0.0}
     lock = threading.Lock()
     results: list[str | None] = [None] * n
-    #   旧实现用共享的 state["done"] 累加，两路回调交错时总进度会来回跳
-    #   （例如 VID 报到 0.62 后 LRV 又报 0.28，进度条明显倒退）。
     parts = [0.0] * n
 
     def _run_one(idx: int, t):
@@ -984,13 +1085,11 @@ def convert(input_path, output_dir, start_number=None, stamp=None, log=None,
                                           vh, ve, audio, cr, src_audio_count,
                                           is_lrv=is_lrv, fps=fps, level=level)
         else:
-            #   主视频 x265: keyint=16:min-keyint=16:scenecut=0:bframes=0:range=full
-            #   LRV   x264: -g 16 -keyint_min 16 -sc_threshold 0
-            #   密集关键帧（-g 16）是相机识别/缩略图/拖动预览的硬要求。
             if is_lrv:
                 enc_params = "keyint=16:min-keyint=16:scenecut=0:bframes=0"
             else:
                 enc_params = "keyint=16:min-keyint=16:scenecut=0:bframes=0:range=full:info=0"
+                vc = "libx265" if vc not in ("libx265",) else vc
             cmd = _build_transcode_cmd(input_path, dst, vc, tag, vf, enc_params,
                                        vh, ve, audio, cr, src_audio_count,
                                        is_lrv=is_lrv, fps=fps, level=level)
@@ -1000,13 +1099,11 @@ def convert(input_path, output_dir, start_number=None, stamp=None, log=None,
                 return
             with lock:
                 parts[_i] = min(1.0, max(0.0, float(frac or 0)))
-                # 单调聚合：每路只写自己那一格，总进度永不回退
                 cur = sum(weights[k] * parts[k] for k in range(n))
             progress(min(1.0, cur), _label, spd, eta)
 
         _run_ffmpeg(cmd, dur, _job_cb if progress else None, cancel)
         with lock:
-            # 单路完成：把它那一格置满，再按 index 聚合总进度
             parts[idx] = 1.0
             overall = sum(weights[k] * parts[k] for k in range(n))
         if progress:
@@ -1053,26 +1150,77 @@ def _card_timeline(output_dir: str) -> tuple[datetime | None, int]:
         return None, 0
     return newest + timedelta(seconds=1), best_seq + 1
 
-def batch_convert(file_list, output_dir, start_number=None, log=None,
-                  encoder=None, progress=None, spec=None,
-                  use_card_time: bool = False):
+def batch_convert(file_list: list[str], output_dir: str,
+                  start_number: int | None = None, log=None,
+                  encoder: tuple[str, str, str] | None = None,
+                  progress=None, spec: dict | None = None,
+                  use_card_time: bool = False,
+                  cancel: threading.Event | None = None
+                  ) -> tuple[list[tuple[str, str, str | None]],
+                             list[tuple[str, str]]]:
     """批量转换。每个文件使用【各自的创建时间】作为文件名时间戳，
     序号全局递增（先读卡里已有最大尾缀再 +1 接续，避免覆盖）；
     start_number 指定时则从该序号起递增。
 
-        1) 容器内嵌 creation_time（最准）
-        2) 文件系统时间（mtime / birthtime）
-      不用“当前导入时间”，也不用卡里已有文件的时间。
+    时间戳取自【源视频自己的创建时间】：
+      1) 容器内嵌 creation_time（最准）
+      2) 文件系统时间（mtime / birthtime）
+    不用“当前导入时间”，也不用卡里已有文件的时间。
 
-    spec    原生视频结构(analyze_native 的结果)；None 时回退默认结构。
-    encoder 为硬件编码器三元组 (hevc, h264, 显示名)；None 表示自动检测。
-    progress 为进度回调 progress(batch_frac, label, speed, eta_sec)。
+    参数:
+        file_list    输入视频路径列表
+        output_dir   输出目录，须可写
+        start_number 起始序号；None 表示自动取下一个可用序号
+        log          日志回调
+        encoder      硬件编码器三元组；None 表示自动检测
+        progress     批量进度回调 progress(batch_frac, label, speed, eta_sec)
+        spec         原生视频结构；None 时回退默认结构
+        use_card_time 是否接续卡里已有文件时间
+        cancel       threading.Event；置位时中断整个批量任务
 
-    返回 (success, failed)；成功项为 (input, main, preview)，失败项为 (input, error)。
+    前置条件:
+        file_list 为字符串列表，元素须为存在的文件路径；
+        output_dir 须可创建或已存在且可写；
+        cancel 若非 None 须为 threading.Event。
+
+    后置条件:
+        返回 (success, failed)；
+        单个文件失败不影响后续文件；
+        cancel 置位时抛 CanceledError，不再处理剩余文件。
+
+    失败方式:
+        用户错误: file_list 元素不存在 -> 记入 failed，继续下一条；
+        用户错误: 参数类型不符 -> ValidationError；
+        用户取消: cancel 置位 -> CanceledError。
     """
-    os.makedirs(output_dir, exist_ok=True)
+    def say(msg):
+        if log:
+            log(msg)
+        else:
+            print(msg)
+
+    if not isinstance(file_list, list):
+        raise ValidationError("file_list 必须为 list[str]")
+    for i, item in enumerate(file_list):
+        if not isinstance(item, str) or not item:
+            raise ValidationError(f"file_list[{i}] 必须为非空字符串")
+    if not isinstance(output_dir, str) or not output_dir:
+        raise ValidationError("output_dir 必须为非空字符串")
+    try:
+        os.makedirs(output_dir, exist_ok=True)
+        if not os.access(output_dir, os.W_OK):
+            raise ValidationError(f"输出目录不可写: {output_dir}")
+    except OSError as e:
+        raise ValidationError(f"无法创建或访问输出目录 {output_dir}: {e}") from e
+    if spec is not None and not isinstance(spec, dict):
+        raise ValidationError("spec 必须为 dict 或 None")
+    if cancel is not None and not isinstance(cancel, threading.Event):
+        raise ValidationError("cancel 必须为 threading.Event 或 None")
+
+    if cancel.is_set():
+        raise CanceledError("已取消")
+
     base_seq = next_seq(output_dir) if start_number is None else int(start_number)
-    # 仅在显式要求时才接续卡里时间；默认用源文件自己的创建时间
     card_when, card_seq = _card_timeline(output_dir)
     use_card = bool(use_card_time) and card_when is not None
     if use_card and start_number is None:
@@ -1872,30 +2020,87 @@ def _stage_cb(progress, lo: float, hi: float, name: str):
 
     return cb
 
-def import_with_inst(source: str, card_root: str, template: tuple | None = None,
-                     log=None, encoder=None, progress=None, cancel=None,
-                     spec=None, cover: str | None = None) -> dict:
+def import_with_inst(source: str, card_root: str,
+                     template: tuple[str, str, bytes] | None = None,
+                     log=None, encoder: tuple[str, str, str] | None = None,
+                     progress=None, cancel: threading.Event | None = None,
+                     spec: dict | None = None,
+                     cover: str | None = None) -> dict:
     """【完整导入】转码 + `.inst` 移植 + 索引登记（三步全做）。
 
     相机识别的三个必要条件：
         1. 编码结构正确（VID/LRV）
-        2. MP4 尾部挂 `inst` box（影石私有元数据）
+        2. MP4 尾部挂 `inst` box（影石私有元数据） 关键
         3. 登记进 DCIM\\*.list 索引
 
-    template 为 (main_path, proxy_path, reference_meta)；None 时自动在卡里找真机原片。
-    返回 dict(main, proxy, registered)。
+    参数:
+        source    输入视频路径，须为存在的常规文件
+        card_root 相机卡根目录，须含 DCIM/Camera01 结构
+        template  可选 (main_path, proxy_path, reference_meta)；
+                  None 时自动在卡里查找真机原片
+        encoder   硬件编码器三元组；None 表示自动检测
+        progress  进度回调 progress(overall_frac, label, speed, eta_sec)
+        cancel    threading.Event；置位时中断整个导入流程
+        spec      原生视频结构；None 时从模板量出
+        cover     可选封面图片路径
+
+    前置条件:
+        source 存在且为常规文件；
+        card_root 可创建或已存在；
+        template 若非 None，须为长度 3 的元组，第三元素为 bytes；
+        cancel 若非 None 须为 threading.Event。
+
+    后置条件:
+        返回 dict 含 main, proxy, registered, inst_ok, inst_error,
+        index_error, inst_metas；
+        inst_ok 为 True 仅当主视频与 LRV 的 inst 移植均成功；
+        临时工作目录在 finally 中清理；
+        cancel 置位时抛 CanceledError，部分中间产物可能残留。
+
+    失败方式:
+        用户错误: source 不存在 -> FileNotFoundError；
+        用错误: 参数类型不符 -> ValidationError；
+        系统错误(不可重试): 卡里无真机模板 -> CardError；
+        用户取消: cancel 置位 -> CanceledError；
+        系统错误: ffmpeg/转码失败 -> FFmpegError 向上抛出；
+        系统错误: inst 移植单个文件失败 -> 记入 inst_errs，继续另一条；
+        系统错误: 索引登记失败 -> 记入 index_error，不中断返回。
     """
     def say(m):
         (log or print)(m)
 
+    if not isinstance(source, str) or not source:
+        raise ValidationError("source 必须为非空字符串")
+    if not os.path.isfile(source):
+        raise FileNotFoundError(f"输入文件不存在: {source}")
+    if not isinstance(card_root, str) or not card_root:
+        raise ValidationError("card_root 必须为非空字符串")
+    if template is not None:
+        if not isinstance(template, tuple) or len(template) != 3:
+            raise ValidationError("template 必须为 (main_path, proxy_path, reference_meta) 元组")
+        if not isinstance(template[2], (bytes, bytearray)):
+            raise ValidationError("template[2] reference_meta 必须为 bytes")
+    if cancel is not None and not isinstance(cancel, threading.Event):
+        raise ValidationError("cancel 必须为 threading.Event 或 None")
+    if spec is not None and not isinstance(spec, dict):
+        raise ValidationError("spec 必须为 dict 或 None")
+    if cover is not None and not isinstance(cover, str):
+        raise ValidationError("cover 必须为字符串或 None")
+
+    if cancel.is_set():
+        raise CanceledError("已取消")
+
     card_root = _card_root(card_root)
     cam = camera_dir(card_root)
-    os.makedirs(cam, exist_ok=True)
+    try:
+        os.makedirs(cam, exist_ok=True)
+    except OSError as e:
+        raise CardError(f"无法创建相机卡目录 {cam}: {e}") from e
 
     if template is None:
         template = find_native_template(card_root)
     if template is None:
-        raise RuntimeError(
+        raise CardError(
             "卡里找不到真机原片作模板。\n"
             "`.inst` 移植必须有一个真机视频提供 moov 骨架与 inst box。\n"
             "请先在 DCIM\\Camera01 放一对相机原生 VID_*.mp4 + LRV_*.lrv。")
@@ -1903,7 +2108,6 @@ def import_with_inst(source: str, card_root: str, template: tuple | None = None,
     tpl_main, tpl_proxy, ref_meta = template
     say(f"模板: {os.path.basename(tpl_main)}")
 
-    #   不要退回硬编码兑底值（否则帧率/分辨率可能和本机相机不一致）。
     if spec is None:
         spec = spec_from_template(template)
         if spec:
@@ -1915,22 +2119,15 @@ def import_with_inst(source: str, card_root: str, template: tuple | None = None,
 
     tf, rw = _load_inst_modules()
 
-    #   传入的 progress 表示“本文件内的 0~1”，调用方再按文件序号缩放。
-    # 1) 先按常规转码生成 VID / LRV
     say("步骤 1/3 转码...")
     p_transcode = _stage_cb(progress, 0.0, 0.70, "转码")
     main_path, proxy_path = convert(source, cam, encoder=encoder,
                                     spec=spec, log=None, progress=p_transcode,
                                     cancel=cancel)
 
-    # 2) 移植 .inst（用模板的 moov 骨架 + inst box 重新封装）
-    #
-    #   索引条目必须用这个 meta（逐字节一致），否则相机读索引得到 A、
-    #   去文件里读 inst 得到 B，对不上 → 相册显示条目但打不开。
     say("步骤 2/3 移植 inst box...")
     import tempfile as _temp
     from datetime import datetime as _dt
-    #   建在卡上时一旦卡被拔/盘符变化，中间产物全丢 → WinError 2。
     work = _temp.mkdtemp(prefix="insta_inst_")
     metas: dict[str, object] = {}
     inst_errs: list[str] = []
@@ -1941,12 +2138,12 @@ def import_with_inst(source: str, card_root: str, template: tuple | None = None,
             try:
                 thumbnail = render_cover(cover, str(thumb_path))
                 say(f"封面: 使用自定义图片 {os.path.basename(cover)}")
-            except Exception as _ce:  # noqa: BLE001
+            except Exception as _ce:
                 say(f"  自定义封面处理失败，改用视频取帧: {_ce}")
         if thumbnail is None:
             try:
                 thumbnail = tf.make_thumbnail(Path(source), thumb_path)
-            except Exception as _te:  # noqa: BLE001
+            except Exception as _te:
                 say(f"  缩略图生成失败（不致命）: {_te}")
                 thumbnail = None
         p_inst = _stage_cb(progress, 0.70, 0.94, "移植 inst box")
@@ -1955,6 +2152,8 @@ def import_with_inst(source: str, card_root: str, template: tuple | None = None,
         pairs = ((main_path, tpl_main, "VID", False),
                  (proxy_path, tpl_proxy, "LRV", True))
         for _k, (gen, native, label, is_proxy) in enumerate(pairs):
+            if cancel.is_set():
+                raise CanceledError("已取消")
             if gen is None or not os.path.isfile(gen):
                 inst_errs.append(f"{label}: 转码产物不存在")
                 if p_inst:
@@ -1969,7 +2168,7 @@ def import_with_inst(source: str, card_root: str, template: tuple | None = None,
                 metas[gen] = new_meta_bytes
                 say(f"  {label}: inst 已移植 ({gen_p.stat().st_size}B)"
                     f" → /DCIM/Camera01/{gen_p.name}")
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 import traceback as _tb
                 msg = f"{type(e).__name__}: {e}"
                 inst_errs.append(f"{label}: {msg}")
@@ -1993,28 +2192,25 @@ def import_with_inst(source: str, card_root: str, template: tuple | None = None,
             else:
                 skipped.append(os.path.basename(p))
         if skipped:
-            say("⚠ 以下文件 inst 移植未成功，已跳过索引登记（避免产生打不开的条目）：")
+            say("以下文件 inst 移植未成功，已跳过索引登记（避免产生打不开的条目）：")
             for n in skipped:
                 say(f"    {n}")
-        #   inst 移植已经成功（文件是对的），索引失败是单独一类问题，
-        #   要单独报出来，且不能丢失已成功的成果。
         registered = []
         index_error = ""
         if media:
             try:
                 registered = register_to_card(card_root, media, log=log,
                                               metas=media_metas)
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 import traceback as _tb2
                 index_error = f"{type(e).__name__}: {e}"
-                say(f"⚠ 索引登记失败（inst 已移植，文件本身可用）: {index_error}")
+                say(f"索引登记失败（inst 已移植，文件本身可用）: {index_error}")
                 say("  " + _tb2.format_exc().replace("\n", "\n  ")[:700])
         if p_index:
             p_index(1.0, "", 0.0, 0)
     finally:
         shutil.rmtree(work, ignore_errors=True)
 
-    #   调用方（GUI/CLI）必须据此判定，不能看“转码成功”。
     inst_ok = bool(main_path and proxy_path
                    and metas.get(main_path) and metas.get(proxy_path))
     return {"main": main_path, "proxy": proxy_path,
@@ -2052,8 +2248,7 @@ def _shrink_avc1_entry(tf, path, keep: bytes = b"avcC") -> bool:
     修改后同步回填 stsd/stbl/minf/mdia/trak/moov 的 box 长度。
     返回是否发生了修改。
     """
-    with open(path, "rb") as _f:
-        data = bytearray(_f.read())
+    data = bytearray(open(path, "rb").read())
     snap = bytes(data)
     boxes = list(tf.mp4_boxes(snap))
     moov = next((b for b in boxes if b[2] == b"moov"), None)
@@ -2105,16 +2300,8 @@ def stamp_from_name(name: str) -> int:
     """从 VID_YYYYMMDD_HHMMSS_NNN 取出 14 位 YYYYMMDDHHMMSS（inst 的 f7 字段）。
 
       能列出条目但打不开。序号只用于磁盘文件名去重，不进 meta。
-      先在名里定位 "VID_" / "LRV_" 再解析时间戳，与 find_native_template 一致。
     """
     stem = os.path.splitext(os.path.basename(name))[0]
-    up = stem.upper()
-    j = up.find("VID_")
-    if j < 0:
-        j = up.find("LRV_")
-    if j < 0:
-        raise ValueError(f"文件名不符合 VID_YYYYMMDD_HHMMSS_NNN: {name}")
-    stem = stem[j:]  # 切到 VID_/LRV_ 开始的部分
     parts = stem.split("_")
     if len(parts) < 3:
         raise ValueError(f"文件名不符合 VID_YYYYMMDD_HHMMSS_NNN: {name}")
@@ -2171,6 +2358,7 @@ def _inst_attach_one(tf, rw, work, gen_p, native_p, label, is_proxy,
     tmp_with_inst = Path(work) / (label + "_gen.mp4")
     tmp_with_inst.write_bytes(gen_p.read_bytes() + tpl_inst)
 
+    # c2)  缩略图必须在 rebuild_media 【之前】写入。
     #      实测产物 VID 与 LRV 用同一张新帧即可被相机识别，
     #      证明“原地替换 type-2 记录的像素”本身是安全的。
     #      实测：该记录 40 字节头在【相机原生】与【本工具产物】之间逐字节相同，
@@ -2187,6 +2375,7 @@ def _inst_attach_one(tf, rw, work, gen_p, native_p, label, is_proxy,
             if log:
                 log(f"  [警告] inst 缩略图写入失败（封面仍会是模板的）: {_te}")
 
+    # d)  关键：把 meta 里的路径/时间戳/规格改成【本文件自己的】
     cat_path = f"/DCIM/Camera01/{gen_p.name}"
     # 文件名形如 VID_YYYYMMDD_HHMMSS_NNN
     #     真机 094907~094911 均为 f7=20260915094907 这种 14 位。
@@ -2272,7 +2461,7 @@ def _meta_equivalent(a: bytes, b: bytes) -> bool:
     / f26 路径与 proxy 标记。逐字节比全量反而易因 f9 可变长而误判。
     这里比较：长度近似 + 关键字段逐个相等。
     """
-    import instbox.inst_transplant as _tf
+    import inst_transplant as _tf
     try:
         fa = _tf.parse_message(a)
         fb = _tf.parse_message(b)
