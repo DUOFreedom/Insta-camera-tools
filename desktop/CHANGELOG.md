@@ -31,6 +31,15 @@ Ace Pro 2 可识别的原生素材：转码为 VID + LRV 双文件、移植 `ins
 - **`instbox/inst_transplant.py camera_udta`**：9 个硬编码 AMBA 字段偏移（25/29/41/49/53/67/71/84/91）改为表驱动 `_amba_fields`，逐字段做 `_off + 4 > amba_size` 越界校验，超界抛 `ValueError`，不再静默写错字节导致相机无法识别。
 - **`instbox/moov_rewrap.py udta_with_audio_frames`**：AMBA 音频采样率/帧数偏移由硬编码 `amba[0]+84`/`amba[0]+91` 改为按实测布局的 `amba[0]+0x20`/`amba[0]+0x5B`，并加边界检查抛 `ValueError`；同时修复 `audio_fps_field` 未定义导致的运行时 `NameError`。
 
+### 修复（1.0.2，2026-11-05）
+
+基于 `instaace-fusion-modified.zip` 重建融合仓库，清理桌面/安卓/共享全部 Python 文件中 ★ AI 痕迹注释，并按【边界政策】补全 4 处边界漏洞：
+
+- **`render_cover` 输入校验与超时**：校验图片路径是否存在、输出路径非空、ffmpeg 可执行；新增 `cancel: threading.Event | None` 与 `timeout: float = 120.0`，超时抛 `FFmpegError(retryable=False)`，`CalledProcessError` 转为 `FFmpegError` 并携带 stderr。
+- **`_run_ffmpeg` stderr 完整性**：`err_thread` join 超时后若仍存活，继续等待至退出，保证 `FFmpegError.stderr` 不截断不丢失。
+- **`convert` 并发模式杀孤儿 ffmpeg**：新增 `procs` 列表与 `procs_lock` 注册所有 ffmpeg 子进程；任一任务失败时置位 `cancel` 并 kill 掉其余注册进程，避免孤儿 ffmpeg 继续写卡；所有并发任务结束后若有第一条错误，向上抛出。
+- **`save_job` 不再静默吞 `OSError`**：进度文件写入失败向上抛出；gui.py 三处调用处捕获并通过状态栏提示“断点续跑进度保存失败”，用户可感知并介入。
+
 ## 历史版本（内部迭代，未公开发布）
 
 ## 1.2.0 — 2026-10-20
