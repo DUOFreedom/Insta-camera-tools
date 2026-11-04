@@ -1,0 +1,31 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- 导入流程全部走 SAF 目录授权（相机卡经读卡器是 U 盘），
+         因此不需要 MANAGE_EXTERNAL_STORAGE / 存储权限。 -->
+    <application
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="${appLabel}"
+        android:largeHeap="true"
+        android:requestLegacyExternalStorage="false"
+        android:roundIcon="@mipmap/ic_launcher"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.InstaAce">
+
+        <activity
+            android:name=".MainActivity"
+            android:configChanges="orientation|screenSize|keyboardHidden|screenLayout|uiMode"
+            android:exported="true"
+            android:label="${appLabel}"
+            android:launchMode="singleTop"
+            android:theme="@style/Theme.InstaAce"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+
+</manifest>

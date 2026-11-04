@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- 小尺寸专用：去掉镜头环，放大播放三角，保证 16/24/32px 仍一眼可读 -->
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#151d2b"/>
+      <stop offset="1" stop-color="#080c13"/>
+    </linearGradient>
+  </defs>
+
+  <rect x="0" y="0" width="256" height="256" rx="58" fill="url(#bg)"/>
+  <rect x="5" y="5" width="246" height="246" rx="53"
+        fill="none" stroke="#4da3ff" stroke-opacity="0.92" stroke-width="8"/>
+
+  <path d="M 96 78 L 96 178 L 182 128 Z" fill="#f2f7ff"/>
+</svg>
