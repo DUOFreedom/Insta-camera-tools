@@ -108,7 +108,10 @@ def encode_message(fields: Iterable[Field]) -> bytes:
 
 
 def field_value(fields: list[Field], number: int) -> int | bytes:
-    return next(field.value for field in fields if field.number == number)
+    for field in fields:
+        if field.number == number:
+            return field.value
+    raise ValueError(f"protobuf field {number} not found")
 
 
 def set_field(fields: list[Field], number: int, wire: int, value: int | bytes) -> None:
@@ -168,6 +171,8 @@ def mp4_boxes(data: bytes) -> list[tuple[int, int, bytes]]:
             header = 16
         elif size == 0:
             size = len(data) - pos
+            boxes.append((pos, size, kind))
+            break
         if size < header or pos + size > len(data):
             raise ValueError(f"invalid MP4 box at 0x{pos:x}")
         boxes.append((pos, size, kind))
@@ -194,9 +199,15 @@ def child_boxes(data: bytes, start: int, end: int) -> list[tuple[int, int, bytes
 
 def extract_udta(path: Path) -> bytes:
     data = path.read_bytes()
-    moov_offset, moov_size, _ = next(box for box in mp4_boxes(data) if box[2] == b"moov")
+    moov_boxes = [box for box in mp4_boxes(data) if box[2] == b"moov"]
+    if not moov_boxes:
+        raise ValueError(f"{path} has no moov box")
+    moov_offset, moov_size, _ = moov_boxes[0]
     children = child_boxes(data, moov_offset + 8, moov_offset + moov_size)
-    udta_offset, udta_size, _ = next(box for box in children if box[2] == b"udta")
+    udta_boxes = [box for box in children if box[2] == b"udta"]
+    if not udta_boxes:
+        raise ValueError(f"{path} moov has no udta box")
+    udta_offset, udta_size, _ = udta_boxes[0]
     return data[udta_offset : udta_offset + udta_size]
 
 
@@ -205,10 +216,21 @@ def media_stats(path: Path) -> dict[str, int]:
         _tool("ffprobe"), "-v", "error", "-show_entries",
         "stream=codec_type,time_base,duration_ts,nb_frames,sample_rate", "-of", "json", str(path),
     ]
-    result = subprocess.run(command, check=True, capture_output=True, text=True)
+    try:
+        result = subprocess.run(command, check=True, capture_output=True, text=True, timeout=60)
+    except subprocess.TimeoutExpired as e:
+        raise ValueError(f"ffprobe 超时（>60s）: {path}") from e
+    except subprocess.CalledProcessError as e:
+        raise ValueError(f"ffprobe 读取失败: {path}") from e
     streams = json.loads(result.stdout)["streams"]
-    video = next(stream for stream in streams if stream["codec_type"] == "video")
-    audio = next(stream for stream in streams if stream["codec_type"] == "audio")
+    video_boxes = [stream for stream in streams if stream["codec_type"] == "video"]
+    audio_boxes = [stream for stream in streams if stream["codec_type"] == "audio"]
+    if not video_boxes:
+        raise ValueError(f"{path} 无视频流")
+    if not audio_boxes:
+        raise ValueError(f"{path} 无音频流")
+    video = video_boxes[0]
+    audio = audio_boxes[0]
     time_num, time_den = (int(part) for part in video["time_base"].split("/"))
     if time_num != 1:
         raise ValueError(f"unsupported video time base: {video['time_base']}")
@@ -234,8 +256,14 @@ def camera_udta(
         raise ValueError("media names must have equal lengths")
     udta = bytearray(bytes(udta).replace(old_name.encode("ascii"), new_name.encode("ascii")))
     children = child_boxes(udta, 8, len(udta))
-    amba_offset, amba_size, _ = next(box for box in children if box[2] == b"AMBA")
-    nail_offset, nail_size, _ = next(box for box in children if box[2] == b"nail")
+    amba_boxes = [box for box in children if box[2] == b"AMBA"]
+    nail_boxes = [box for box in children if box[2] == b"nail"]
+    if not amba_boxes:
+        raise ValueError("udta has no AMBA box")
+    if not nail_boxes:
+        raise ValueError("udta has no nail box")
+    amba_offset, amba_size, _ = amba_boxes[0]
+    nail_offset, nail_size, _ = nail_boxes[0]
     if amba_size < 97 or nail_size != 688144 or len(thumbnail) != 896 * 512 * 3 // 2:
         raise ValueError(
             f"unexpected AMBA/nail template layout: "
@@ -273,7 +301,10 @@ def camera_udta(
 def inject_udta(path: Path, udta: bytes) -> None:
     data = path.read_bytes()
     boxes = mp4_boxes(data)
-    moov_offset, moov_size, _ = next(box for box in boxes if box[2] == b"moov")
+    moov_boxes = [box for box in boxes if box[2] == b"moov"]
+    if not moov_boxes:
+        raise ValueError(f"{path} has no moov box")
+    moov_offset, moov_size, _ = moov_boxes[0]
     moov_end = moov_offset + moov_size
     children = child_boxes(data, moov_offset + 8, moov_end)
     kept = [data[offset : offset + size] for offset, size, kind in children if kind != b"udta"]
@@ -455,7 +486,12 @@ def ffprobe(path: Path) -> dict:
         "format=duration:stream=codec_type,codec_name,width,height,has_b_frames,level,bit_rate,nb_frames",
         "-of", "json", str(path),
     ]
-    result = subprocess.run(command, check=True, capture_output=True, text=True)
+    try:
+        result = subprocess.run(command, check=True, capture_output=True, text=True, timeout=60)
+    except subprocess.TimeoutExpired as e:
+        raise ValueError(f"ffprobe 超时（>60s）: {path}") from e
+    except subprocess.CalledProcessError as e:
+        raise ValueError(f"ffprobe 读取失败: {path}") from e
     return json.loads(result.stdout)
 
 
@@ -479,7 +515,12 @@ def run_ffmpeg(
 ) -> None:
     info = ffprobe(source)
     has_audio = any(stream.get("codec_type") == "audio" for stream in info.get("streams", []))
-    source_video = next(stream for stream in info.get("streams", []) if stream.get("codec_type") == "video")
+    source_video_boxes = [
+        stream for stream in info.get("streams", []) if stream.get("codec_type") == "video"
+    ]
+    if not source_video_boxes:
+        raise ValueError(f"{source} 无视频流")
+    source_video = source_video_boxes[0]
     vf = (
         f"scale={width}:{height}:force_original_aspect_ratio=decrease,"
         f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2:black,setsar=1,format=yuv420p,setrange=full"
@@ -595,7 +636,9 @@ def run_ffmpeg(
         "-metadata:s:a:0", "language=eng", "-f", "mp4", str(output),
     ]
     try:
-        subprocess.run(command, check=True)
+        subprocess.run(command, check=True, timeout=600)
+    except subprocess.TimeoutExpired as e:
+        raise ValueError(f"ffmpeg 转码超时（>600s）: {source}") from e
     except subprocess.CalledProcessError:
         if use_gpu:
             print("GPU encode failed; retrying with software encoders.", file=sys.stderr)
@@ -617,7 +660,12 @@ def make_thumbnail(source: Path, output: Path, at_seconds: float = 10.0) -> byte
         _tool("ffmpeg"), "-hide_banner", "-loglevel", "error", "-y", "-ss", f"{seek:.6f}", "-i", str(source),
         "-vf", vf, "-frames:v", "1", "-pix_fmt", "nv12", "-f", "rawvideo", str(output),
     ]
-    subprocess.run(command, check=True)
+    try:
+        subprocess.run(command, check=True, timeout=120)
+    except subprocess.TimeoutExpired as e:
+        raise ValueError(f"ffmpeg 封面截取超时（>120s）: {source}") from e
+    except subprocess.CalledProcessError as e:
+        raise ValueError(f"ffmpeg 封面截取失败: {source}") from e
     thumbnail = output.read_bytes()
     if len(thumbnail) != 896 * 512 * 3 // 2:
         raise ValueError(f"unexpected thumbnail size: {len(thumbnail)}")
@@ -653,13 +701,24 @@ def patch_inst_thumbnail(path: Path, thumbnail: bytes) -> None:
 
 def patch_nail_thumbnail(path: Path, thumbnail: bytes) -> None:
     data = bytearray(path.read_bytes())
-    moov = next(box for box in mp4_boxes(data) if box[2] == b"moov")
-    udta = next(
-        box for box in child_boxes(data, moov[0] + 8, moov[0] + moov[1]) if box[2] == b"udta"
-    )
-    nail = next(
-        box for box in child_boxes(data, udta[0] + 8, udta[0] + udta[1]) if box[2] == b"nail"
-    )
+    moov_boxes = [box for box in mp4_boxes(data) if box[2] == b"moov"]
+    if not moov_boxes:
+        raise ValueError(f"{path} has no moov box")
+    moov = moov_boxes[0]
+    udta_boxes = [
+        box for box in child_boxes(data, moov[0] + 8, moov[0] + moov[1])
+        if box[2] == b"udta"
+    ]
+    if not udta_boxes:
+        raise ValueError(f"{path} moov has no udta box")
+    udta = udta_boxes[0]
+    nail_boxes = [
+        box for box in child_boxes(data, udta[0] + 8, udta[0] + udta[1])
+        if box[2] == b"nail"
+    ]
+    if not nail_boxes:
+        raise ValueError(f"{path} udta has no nail box")
+    nail = nail_boxes[0]
     if nail[1] != 16 + len(thumbnail):
         raise ValueError("unexpected nail box size")
     data[nail[0] + 16:nail[0] + nail[1]] = thumbnail
@@ -683,14 +742,20 @@ CAMERA_MP4A_ENTRY = bytes.fromhex(
 
 
 def direct_child(data: bytes, parent: tuple[int, int, bytes], kind: bytes) -> tuple[int, int, bytes]:
-    return next(
+    boxes = [
         box for box in child_boxes(data, parent[0] + 8, parent[0] + parent[1])
         if box[2] == kind
-    )
+    ]
+    if not boxes:
+        raise ValueError(f"box {kind!r} not found in parent")
+    return boxes[0]
 
 
 def audio_sample_entry(data: bytes) -> tuple[tuple[int, int, bytes], list[tuple[int, int, bytes]]]:
-    moov = next(box for box in mp4_boxes(data) if box[2] == b"moov")
+    moov_boxes = [box for box in mp4_boxes(data) if box[2] == b"moov"]
+    if not moov_boxes:
+        raise ValueError("data has no moov box")
+    moov = moov_boxes[0]
     for trak in (box for box in child_boxes(data, moov[0] + 8, moov[0] + moov[1]) if box[2] == b"trak"):
         mdia = direct_child(data, trak, b"mdia")
         hdlr = direct_child(data, mdia, b"hdlr")
@@ -731,7 +796,10 @@ def install_camera_mp4a(path: Path, reference_meta: bytes) -> bytes:
 
 def remove_audio_edts(path: Path, reference_meta: bytes) -> bytes:
     data = path.read_bytes()
-    moov = next(box for box in mp4_boxes(data) if box[2] == b"moov")
+    moov_boxes = [box for box in mp4_boxes(data) if box[2] == b"moov"]
+    if not moov_boxes:
+        raise ValueError("data has no moov box")
+    moov = moov_boxes[0]
     audio_trak = None
     for trak in (box for box in child_boxes(data, moov[0] + 8, moov[0] + moov[1]) if box[2] == b"trak"):
         mdia = direct_child(data, trak, b"mdia")
@@ -741,10 +809,11 @@ def remove_audio_edts(path: Path, reference_meta: bytes) -> bytes:
             break
     if audio_trak is None:
         raise ValueError("audio track not found")
-    edts = next(
-        (box for box in child_boxes(data, audio_trak[0] + 8, audio_trak[0] + audio_trak[1]) if box[2] == b"edts"),
-        None,
-    )
+    edts_boxes = [
+        box for box in child_boxes(data, audio_trak[0] + 8, audio_trak[0] + audio_trak[1])
+        if box[2] == b"edts"
+    ]
+    edts = edts_boxes[0] if edts_boxes else None
     if edts is None:
         return locate_metadata(path, reference_meta)
     out = bytearray(data[:edts[0]] + data[edts[0] + edts[1]:])
@@ -780,7 +849,10 @@ def video_template(template_root: Path, requested_name: str | None) -> tuple[str
 
 def video_profile(path: Path) -> dict[str, int]:
     info = ffprobe(path)
-    video = next(stream for stream in info["streams"] if stream["codec_type"] == "video")
+    video_boxes = [stream for stream in info["streams"] if stream["codec_type"] == "video"]
+    if not video_boxes:
+        raise ValueError(f"{path} 无视频流")
+    video = video_boxes[0]
     return {
         "width": int(video["width"]),
         "height": int(video["height"]),
@@ -951,7 +1023,10 @@ def even_dimension(value: str) -> int:
 def validate_output(path: Path, *, proxy: bool, width: int, height: int, frames: int | None) -> float:
     info = ffprobe(path)
     duration = float(info["format"]["duration"])
-    video = next(stream for stream in info["streams"] if stream["codec_type"] == "video")
+    video_boxes = [stream for stream in info["streams"] if stream["codec_type"] == "video"]
+    if not video_boxes:
+        raise ValueError(f"{path} 无视频流")
+    video = video_boxes[0]
     expected = (("h264" if proxy else "hevc"), width, height)
     actual = (video.get("codec_name"), video.get("width"), video.get("height"))
     if actual != expected:

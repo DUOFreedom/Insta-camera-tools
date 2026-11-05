@@ -34,11 +34,17 @@ def children(data: bytes, box):
 
 
 def child(data: bytes, box, kind: bytes):
-    return next(item for item in children(data, box) if item[2] == kind)
+    items = [item for item in children(data, box) if item[2] == kind]
+    if not items:
+        raise ValueError(f"box {kind!r} not found")
+    return items[0]
 
 
 def tracks(data: bytes):
-    moov = next(item for item in insta.mp4_boxes(data) if item[2] == b"moov")
+    moov_boxes = [item for item in insta.mp4_boxes(data) if item[2] == b"moov"]
+    if not moov_boxes:
+        raise ValueError("data has no moov box")
+    moov = moov_boxes[0]
     result = {}
     for trak in (item for item in children(data, moov) if item[2] == b"trak"):
         mdia = child(data, trak, b"mdia")
@@ -133,7 +139,10 @@ def udta_with_audio_frames(data: bytes, udta_box, audio_frames: int) -> bytes:
     若偏移超出 box 范围则抛异常，避免静默写错字节。
     """
     udta = bytearray(box_bytes(data, udta_box))
-    amba = next(item for item in insta.child_boxes(udta, 8, len(udta)) if item[2] == b"AMBA")
+    amba_boxes = [item for item in insta.child_boxes(udta, 8, len(udta)) if item[2] == b"AMBA"]
+    if not amba_boxes:
+        raise ValueError("udta has no AMBA box")
+    amba = amba_boxes[0]
     amba_start = amba[0] + 8  # AMBA box 数据区起始（跳过 8 字节 box header）
     if amba[0] + 92 > len(udta):
         raise ValueError(f"AMBA box too small: size={amba[1]}, offset={amba[0]}")
@@ -312,7 +321,12 @@ def rebuild_media(generated: Path, native: Path, output: Path, reference_meta: b
     gen_moov, gen_tracks = tracks(generated_data)
     native_moov, native_tracks = tracks(native_data)
     generated_probe = insta.ffprobe(generated)
-    generated_video = next(stream for stream in generated_probe["streams"] if stream["codec_type"] == "video")
+    generated_video_boxes = [
+        stream for stream in generated_probe["streams"] if stream["codec_type"] == "video"
+    ]
+    if not generated_video_boxes:
+        raise ValueError(f"{generated} 无视频流")
+    generated_video = generated_video_boxes[0]
     is_hevc = generated_video["codec_name"] == "hevc"
     video_samples = [strip_sei(item, hevc=is_hevc) for item in samples(generated_data, gen_tracks[b"vide"])]
     video_sizes = [len(item) for item in video_samples]
@@ -380,7 +394,10 @@ def rebuild_media(generated: Path, native: Path, output: Path, reference_meta: b
 
 def visual_entry(data: bytes):
     """定位视频 sample entry：返回 (entry, ancestors)。"""
-    moov = next(item for item in insta.mp4_boxes(data) if item[2] == b"moov")
+    moov_boxes = [item for item in insta.mp4_boxes(data) if item[2] == b"moov"]
+    if not moov_boxes:
+        raise ValueError("data has no moov box")
+    moov = moov_boxes[0]
     for trak in insta.child_boxes(data, moov[0] + 8, moov[0] + moov[1]):
         mdia = insta.direct_child(data, trak, b"mdia")
         hdlr = insta.direct_child(data, mdia, b"hdlr")
@@ -437,8 +454,14 @@ def main() -> int:
 
     generated_camera = args.generated_card / "DCIM" / "Camera01"
     native_camera = args.native_root / "DCIM" / "Camera01"
-    generated_main = next(generated_camera.glob("VID_*.mp4"))
-    generated_proxy = next(generated_camera.glob("LRV_*.lrv"))
+    generated_mains = list(generated_camera.glob("VID_*.mp4"))
+    generated_proxies = list(generated_camera.glob("LRV_*.lrv"))
+    if not generated_mains:
+        raise FileNotFoundError(f"{generated_camera} 缺少 VID_*.mp4 模板")
+    if not generated_proxies:
+        raise FileNotFoundError(f"{generated_camera} 缺少 LRV_*.lrv 模板")
+    generated_main = generated_mains[0]
+    generated_proxy = generated_proxies[0]
     native_main = native_camera / args.native_video
     native_proxy = native_main.with_name(args.native_video.replace("VID_", "LRV_", 1)).with_suffix(".lrv")
 
