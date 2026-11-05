@@ -121,18 +121,31 @@ Rectangle {
 
                 Text {
                     anchors.horizontalCenter: parent.horizontalCenter
-                    width: Math.min(320, parent.width)
                     horizontalAlignment: Text.AlignHCenter
-                    wrapMode: Text.Wrap
                     text: root.state === "empty" ? "暂无待转换视频"
                         : root.state === "loading" ? "正在读取…"
-                        : root.errorText
+                        : "出错了"
                     color: root.state === "error" ? Theme.error : Theme.textSecondary
                     font.family: Theme.fontFamily
                     font.pixelSize: Theme.fontBodySize
                     font.weight: Font.Normal
                     lineHeightMode: Text.FixedHeight
                     lineHeight: Theme.fontBodyLine
+                }
+
+                Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    visible: root.state === "error"
+                    width: 280
+                    horizontalAlignment: Text.AlignHCenter
+                    wrapMode: Text.Wrap
+                    text: root.errorText
+                    color: Theme.textSecondary
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.fontAuxSize
+                    font.weight: Font.Normal
+                    lineHeightMode: Text.FixedHeight
+                    lineHeight: Theme.fontAuxLine
                 }
 
                 AppButton {

@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Window
 
 Rectangle {
     id: root
@@ -95,62 +96,13 @@ Rectangle {
                 font.weight: Font.Normal
             }
 
-            Item {
+            AppButton {
+                id: encoderTrigger
                 width: 160
-                height: 36
-
-                AppButton {
-                    id: encoderTrigger
-                    width: parent.width
-                    text: root.encoder
-                    btnHeight: 36
-                    accent: false
-                    onClicked: encoderPopover.open = !encoderPopover.open
-                }
-
-                Popover {
-                    id: encoderPopover
-                    anchors.top: encoderTrigger.bottom
-                    anchors.topMargin: 4
-                    width: parent.width
-
-                    Repeater {
-                        model: root.encoders
-
-                        delegate: Item {
-                            width: parent.width
-                            height: 32
-
-                            Rectangle {
-                                anchors.fill: parent
-                                radius: 8
-                                color: hover.containsMouse ? Theme.divider : "transparent"
-                            }
-
-                            Text {
-                                anchors.left: parent.left
-                                anchors.leftMargin: 8
-                                anchors.verticalCenter: parent.verticalCenter
-                                text: modelData
-                                color: Theme.textPrimary
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fontBodySize
-                                font.weight: Font.Normal
-                            }
-
-                            MouseArea {
-                                id: hover
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                onClicked: {
-                                    root.encoder = modelData
-                                    encoderPopover.open = false
-                                    root.encoderSelected(modelData)
-                                }
-                            }
-                        }
-                    }
-                }
+                text: root.encoder
+                btnHeight: 36
+                accent: false
+                onClicked: encoderPopover.open = !encoderPopover.open
             }
         }
 
@@ -178,6 +130,56 @@ Rectangle {
             Avatar {
                 size: 40
                 fallback: "封"
+            }
+        }
+    }
+
+    Popover {
+        id: encoderPopover
+        parent: encoderTrigger
+        width: encoderTrigger.width
+
+        readonly property real winY: encoderTrigger.mapToItem(null, 0, 0).y
+        readonly property real winH: encoderTrigger.Window ? encoderTrigger.Window.height : 720
+        readonly property bool flipUp: winY + encoderTrigger.height + 8 + height > winH
+
+        x: 0
+        y: flipUp ? -height - 4 : encoderTrigger.height + 4
+
+        Repeater {
+            model: root.encoders
+
+            delegate: Item {
+                width: encoderPopover.width - 16
+                height: 32
+
+                Rectangle {
+                    anchors.fill: parent
+                    radius: 8
+                    color: hover.containsMouse ? Theme.divider : "transparent"
+                }
+
+                Text {
+                    anchors.left: parent.left
+                    anchors.leftMargin: 8
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: modelData
+                    color: Theme.textPrimary
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.fontBodySize
+                    font.weight: Font.Normal
+                }
+
+                MouseArea {
+                    id: hover
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    onClicked: {
+                        root.encoder = modelData
+                        encoderPopover.open = false
+                        root.encoderSelected(modelData)
+                    }
+                }
             }
         }
     }
