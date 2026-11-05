@@ -8,6 +8,7 @@ from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtQuickControls2 import QQuickStyle
 
 from bridge import Bridge
+from updater import Updater
 
 
 def base_dir() -> str:
@@ -49,6 +50,8 @@ def main() -> int:
     context.setContextProperty("selfTest", self_test)
     context.setContextProperty("loadedFonts", load_fonts(root))
     context.setContextProperty("bridge", Bridge(engine))
+    context.setContextProperty("updater", Updater(engine))
+    context.setContextProperty("updateDemo", os.environ.get("INSTA_UPDATE_DEMO") == "1")
 
     engine.load(QUrl.fromLocalFile(entry))
 

@@ -4,10 +4,10 @@ Item {
     id: root
     property bool open: false
     property string title: ""
+    property bool dismissOnBackdrop: true
     default property alias content: body.data
 
     visible: overlay.opacity > 0
-    anchors.fill: parent
     z: 100
 
     Rectangle {
@@ -25,10 +25,16 @@ Item {
         }
     }
 
+    MouseArea {
+        anchors.fill: parent
+        enabled: root.open && root.dismissOnBackdrop
+        onClicked: root.open = false
+    }
+
     Rectangle {
         id: panel
         anchors.centerIn: parent
-        width: 320
+        width: Math.min(360, parent.width - 48)
         height: body.implicitHeight + 32
         radius: 16
         color: Theme.card
@@ -55,7 +61,9 @@ Item {
 
         Column {
             id: body
-            anchors.fill: parent
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: parent.top
             anchors.margins: 16
             spacing: 12
 
@@ -72,11 +80,5 @@ Item {
                 elide: Text.ElideRight
             }
         }
-    }
-
-    MouseArea {
-        anchors.fill: parent
-        enabled: root.open
-        onClicked: root.open = false
     }
 }

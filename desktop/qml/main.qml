@@ -15,7 +15,22 @@ Window {
     flags: Qt.Window | Qt.FramelessWindowHint
     color: "transparent"
 
-    Component.onCompleted: Theme.dark = systemDark
+    Component.onCompleted: {
+        Theme.dark = systemDark
+        if (selfTest)
+            return
+        updater.check()
+        if (updateDemo)
+            updateModal.open = true
+    }
+
+    Connections {
+        target: updater
+        function onStateChanged() {
+            if (updater.updateAvailable && !updateModal.open)
+                updateModal.open = true
+        }
+    }
 
     FileDialog {
         id: sampleDialog
@@ -135,6 +150,64 @@ Window {
                             outputView.autoSequence,
                             outputView.encoder)
                         onCancel: bridge.cancel()
+                    }
+                }
+            }
+        }
+    }
+
+    Modal {
+        id: updateModal
+        anchors.fill: parent
+        title: "发现新版本"
+        dismissOnBackdrop: false
+
+        Column {
+            width: parent.width
+            spacing: 12
+
+            Text {
+                width: parent.width
+                text: "当前版本 " + updater.currentVersion
+                    + "，最新版本 " + (updater.latestTag !== "" ? updater.latestTag
+                        : (updateDemo ? "v1.2.0" : "未知")) + "。"
+                wrapMode: Text.Wrap
+                color: Theme.textSecondary
+                font.family: Theme.fontFamily
+                font.pixelSize: Theme.fontBodySize
+                font.weight: Font.Normal
+                lineHeightMode: Text.FixedHeight
+                lineHeight: Theme.fontBodyLine
+            }
+
+            Row {
+                width: parent.width
+                spacing: 8
+                layoutDirection: Qt.RightToLeft
+
+                AppButton {
+                    text: "前往下载"
+                    btnHeight: 36
+                    onClicked: {
+                        Qt.openUrlExternally(updater.releaseUrl)
+                        updateModal.open = false
+                    }
+                }
+
+                AppButton {
+                    text: "稍后"
+                    btnHeight: 36
+                    accent: false
+                    onClicked: updateModal.open = false
+                }
+
+                AppButton {
+                    text: "关闭"
+                    btnHeight: 36
+                    accent: false
+                    onClicked: {
+                        updater.ignore(updater.latestTag)
+                        updateModal.open = false
                     }
                 }
             }
