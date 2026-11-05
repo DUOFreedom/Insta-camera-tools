@@ -7,6 +7,7 @@ Rectangle {
     property string errorText: "转换失败：无法访问输出目录，请检查路径权限。"
 
     signal start()
+    signal cancel()
 
     radius: 12
     color: Theme.card
@@ -36,17 +37,16 @@ Rectangle {
             layoutDirection: Qt.RightToLeft
 
             AppButton {
-                text: "开始转换"
+                text: root.running ? "取消转换" : "开始转换"
                 btnHeight: 36
-                accent: true
-                loading: root.running
-                onClicked: root.start()
+                accent: !root.running
+                onClicked: root.running ? root.cancel() : root.start()
             }
         }
 
         Text {
             width: parent.width
-            visible: root.hasError
+            visible: root.hasError && !root.running
             text: root.errorText
             color: Theme.error
             font.family: Theme.fontFamily

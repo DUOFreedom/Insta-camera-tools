@@ -4,9 +4,11 @@ Rectangle {
     id: root
     property string state: "empty"
     property string errorText: "无法访问所选文件，请检查路径是否存在。"
+    property var files: []
 
     signal addVideo()
     signal addFolder()
+    signal clearAll()
 
     radius: 12
     color: Theme.card
@@ -20,20 +22,77 @@ Rectangle {
         anchors.margins: 16
         spacing: 12
 
-        Text {
+        Row {
             width: parent.width
-            text: "待转换视频"
-            color: Theme.textPrimary
-            font.family: Theme.fontFamily
-            font.pixelSize: Theme.fontTitleSize
-            font.weight: Font.DemiBold
-            lineHeightMode: Text.FixedHeight
-            lineHeight: Theme.fontTitleLine
+
+            Text {
+                text: "待转换视频"
+                color: Theme.textPrimary
+                font.family: Theme.fontFamily
+                font.pixelSize: Theme.fontTitleSize
+                font.weight: Font.DemiBold
+                lineHeightMode: Text.FixedHeight
+                lineHeight: Theme.fontTitleLine
+            }
+
+            Item {
+                width: Math.max(0, parent.width - 120)
+                height: 1
+            }
+
+            Text {
+                anchors.verticalCenter: parent.verticalCenter
+                visible: root.files.length > 0
+                text: root.files.length + " 个"
+                color: Theme.textSecondary
+                font.family: Theme.fontFamily
+                font.pixelSize: Theme.fontAuxSize
+                font.weight: Font.Normal
+            }
+        }
+
+        ListView {
+            id: fileList
+            width: parent.width
+            height: Math.min(contentHeight, 168)
+            visible: root.files.length > 0
+            clip: true
+            model: root.files
+            spacing: 4
+            boundsBehavior: Flickable.StopAtBounds
+
+            delegate: Rectangle {
+                width: fileList.width
+                height: 32
+                radius: 8
+                color: hover.containsMouse ? Theme.divider : "transparent"
+
+                Text {
+                    anchors.left: parent.left
+                    anchors.leftMargin: 8
+                    anchors.right: parent.right
+                    anchors.rightMargin: 8
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: modelData
+                    elide: Text.ElideMiddle
+                    color: Theme.textPrimary
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.fontBodySize
+                    font.weight: Font.Normal
+                }
+
+                MouseArea {
+                    id: hover
+                    anchors.fill: parent
+                    hoverEnabled: true
+                }
+            }
         }
 
         Item {
             width: parent.width
-            height: stateArea.implicitHeight + 32
+            height: root.files.length > 0 ? 0 : stateArea.implicitHeight + 32
+            visible: root.files.length === 0
 
             Column {
                 id: stateArea
@@ -62,30 +121,18 @@ Rectangle {
 
                 Text {
                     anchors.horizontalCenter: parent.horizontalCenter
+                    width: Math.min(320, parent.width)
+                    horizontalAlignment: Text.AlignHCenter
+                    wrapMode: Text.Wrap
                     text: root.state === "empty" ? "暂无待转换视频"
                         : root.state === "loading" ? "正在读取…"
-                        : "读取失败"
+                        : root.errorText
                     color: root.state === "error" ? Theme.error : Theme.textSecondary
                     font.family: Theme.fontFamily
                     font.pixelSize: Theme.fontBodySize
                     font.weight: Font.Normal
                     lineHeightMode: Text.FixedHeight
                     lineHeight: Theme.fontBodyLine
-                }
-
-                Text {
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    visible: root.state === "error"
-                    width: 280
-                    text: root.errorText
-                    horizontalAlignment: Text.AlignHCenter
-                    wrapMode: Text.Wrap
-                    color: Theme.textSecondary
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontAuxSize
-                    font.weight: Font.Normal
-                    lineHeightMode: Text.FixedHeight
-                    lineHeight: Theme.fontAuxLine
                 }
 
                 AppButton {
@@ -114,6 +161,14 @@ Rectangle {
                 btnHeight: 36
                 accent: false
                 onClicked: root.addFolder()
+            }
+
+            AppButton {
+                text: "清空"
+                btnHeight: 36
+                accent: false
+                visible: root.files.length > 0
+                onClicked: root.clearAll()
             }
         }
     }

@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Window
 import QtQuick.Controls.Basic
+import QtQuick.Dialogs
 
 Window {
     id: win
@@ -14,10 +15,39 @@ Window {
     flags: Qt.Window | Qt.FramelessWindowHint
     color: "transparent"
 
-    property string statusText: "就绪。添加视频后点击「开始转换」。"
-    property real progressValue: 0
-
     Component.onCompleted: Theme.dark = systemDark
+
+    FileDialog {
+        id: sampleDialog
+        title: "选择原生录制视频"
+        nameFilters: ["视频文件 (*.mp4 *.mov *.lrv *.insv *.ins)"]
+        onAccepted: bridge.setSample(selectedFile.toString().replace("file:///", ""))
+    }
+
+    FileDialog {
+        id: videoDialog
+        title: "选择视频"
+        nameFilters: ["视频文件 (*.mp4 *.mov *.mkv *.avi *.ts *.flv *.wmv *.m4v)"]
+        fileMode: FileDialog.OpenFiles
+        onAccepted: {
+            var paths = []
+            for (var i = 0; i < selectedFiles.length; ++i)
+                paths.push(selectedFiles[i].toString().replace("file:///", ""))
+            bridge.addFiles(paths)
+        }
+    }
+
+    FolderDialog {
+        id: folderDialog
+        title: "选择包含视频的文件夹"
+        onAccepted: bridge.addFolder(selectedFolder.toString().replace("file:///", ""))
+    }
+
+    FolderDialog {
+        id: outputDialog
+        title: "选择输出目录"
+        onAccepted: outputView.outputDir = selectedFolder.toString().replace("file:///", "")
+    }
 
     Rectangle {
         id: surface
@@ -45,52 +75,69 @@ Window {
                 ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
                 ScrollBar.vertical.policy: ScrollBar.AsNeeded
 
-                    Column {
-                        x: 24
-                        y: 24
-                        width: scroll.availableWidth - 48
-                        spacing: 12
+                Column {
+                    x: 24
+                    y: 24
+                    width: scroll.availableWidth - 48
+                    spacing: 12
 
-                        Text {
-                            width: parent.width
-                            text: "影石相机工具"
-                            color: Theme.textPrimary
-                            font.family: Theme.fontDisplayFamily
-                            font.pixelSize: Theme.fontDisplaySize
-                            font.weight: Font.DemiBold
-                            lineHeightMode: Text.FixedHeight
-                            lineHeight: Theme.fontDisplayLine
-                        }
+                    Text {
+                        width: parent.width
+                        text: "影石相机工具"
+                        color: Theme.textPrimary
+                        font.family: Theme.fontDisplayFamily
+                        font.pixelSize: Theme.fontDisplaySize
+                        font.weight: Font.DemiBold
+                        lineHeightMode: Text.FixedHeight
+                        lineHeight: Theme.fontDisplayLine
+                    }
 
-                        CameraSampleView {
-                            width: parent.width
-                            status: "未设置样本（回退到影石默认结构）"
-                        }
+                    CameraSampleView {
+                        width: parent.width
+                        status: bridge.sample !== ""
+                                ? "样本：" + bridge.sample
+                                : "未设置样本（回退到影石默认结构）"
+                        onPickSample: sampleDialog.open()
+                        onAutoDetect: bridge.setStatusHint("请手动选择卡内的 VID_*.mp4 作为样本")
+                    }
 
-                        InputFileView {
-                            width: parent.width
-                            state: "empty"
-                        }
+                    InputFileView {
+                        width: parent.width
+                        files: bridge.files
+                        state: bridge.lastError !== "" ? "error" : (bridge.busy ? "loading" : "empty")
+                        errorText: bridge.lastError
+                        onAddVideo: videoDialog.open()
+                        onAddFolder: folderDialog.open()
+                        onClearAll: bridge.clearFiles()
+                    }
 
-                        OutputOptionView {
-                            width: parent.width
-                        }
+                    OutputOptionView {
+                        id: outputView
+                        width: parent.width
+                        onBrowseOutput: outputDialog.open()
+                    }
 
-                        ProgressView {
-                            width: parent.width
-                            value: win.progressValue
-                            status: win.statusText
-                        }
+                    ProgressView {
+                        width: parent.width
+                        value: bridge.progress
+                        eta: bridge.eta
+                        status: bridge.status
+                    }
 
-                        ActionView {
-                            width: parent.width
-                            onStart: {
-                                win.statusText = "正在转换…"
-                                win.progressValue = 0.35
-                            }
-                        }
+                    ActionView {
+                        width: parent.width
+                        running: bridge.busy
+                        hasError: bridge.lastError !== ""
+                        errorText: bridge.lastError
+                        onStart: bridge.start(
+                            outputView.outputDir,
+                            outputView.registerIndex,
+                            outputView.autoSequence,
+                            outputView.encoder)
+                        onCancel: bridge.cancel()
                     }
                 }
             }
         }
     }
+}

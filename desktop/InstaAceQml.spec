@@ -17,10 +17,10 @@ EXCLUDE = (
 
 a = Analysis(
     ['main.py'],
-    pathex=[],
+    pathex=['../shared', '../shared/instbox'],
     binaries=[],
     datas=[('qml', 'qml'), ('assets', 'assets')],
-    hiddenimports=[],
+    hiddenimports=['insta_index', 'instbox', 'instbox.inst_transplant', 'instbox.moov_rewrap'],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

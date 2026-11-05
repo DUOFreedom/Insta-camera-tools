@@ -7,6 +7,8 @@ from PySide6.QtGui import QFontDatabase, QGuiApplication
 from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtQuickControls2 import QQuickStyle
 
+from bridge import Bridge
+
 
 def base_dir() -> str:
     if getattr(sys, "frozen", False):
@@ -46,6 +48,7 @@ def main() -> int:
     context.setContextProperty("systemDark", app.styleHints().colorScheme() == Qt.ColorScheme.Dark)
     context.setContextProperty("selfTest", self_test)
     context.setContextProperty("loadedFonts", load_fonts(root))
+    context.setContextProperty("bridge", Bridge(engine))
 
     engine.load(QUrl.fromLocalFile(entry))
 

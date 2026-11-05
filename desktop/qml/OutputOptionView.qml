@@ -53,6 +53,7 @@ Rectangle {
                 width: parent.width - 64 - 8 - 64 - 16
                 text: root.outputDir
                 placeholder: "建议存储卡 DCIM\\Camera01"
+                onTextChanged: root.outputDir = text
             }
 
             AppButton {
