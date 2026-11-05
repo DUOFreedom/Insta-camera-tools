@@ -800,8 +800,11 @@ def _build_transcode_cmd(src, dst, vcodec, tag, vf, enc_params,
                          fps: str = FPS, level: int | None = None,
                          bitrate: int | None = None) -> list[str]:
     """软件编码命令。"""
+    ff = find_ffmpeg()
+    if not ff:
+        raise ValidationError("未找到 ffmpeg，无法构建转码命令")
     extra_in = audio_inputs(audio_tracks, src_audio_count)
-    cmd = [find_ffmpeg(), "-hide_banner", "-y", "-i", src]
+    cmd = [ff, "-hide_banner", "-y", "-i", src]
     if extra_in:
         cmd += extra_in
         audio_src = "1:a:0"
@@ -848,7 +851,10 @@ def _build_hw_transcode_cmd(src, dst, vcodec, tag, vf, extra_args,
                   -udu_sei 0 -c:a aac 192k 48k 2ch + bt709 + 30000/1001 cfr
     """
     extra_in = audio_inputs(audio_tracks, src_audio_count)
-    cmd = [find_ffmpeg(), "-hide_banner", "-y", "-i", src]
+    ff = find_ffmpeg()
+    if not ff:
+        raise ValidationError("未找到 ffmpeg，无法构建硬件转码命令")
+    cmd = [ff, "-hide_banner", "-y", "-i", src]
     if extra_in:
         cmd += extra_in
         audio_src = "1:a:0"

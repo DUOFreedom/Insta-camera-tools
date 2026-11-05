@@ -1070,80 +1070,83 @@ class App(QWidget):
         return "software"
 
     def start(self):
-        #   而按钮禁用与线程启动之间存在空窗，连点两次会起两个 _run_all。
         if self._busy:
             return
-        if not self.files:
-            QMessageBox.warning(self, "提示", "请先添加要转换的视频。")
-            return
-        out = self.out_edit.text().strip()
-        if not out:
-            r = QMessageBox.question(self, "提示",
-                                     "未设置输出目录，是否输出到每个视频所在目录？")
-            if r != QMessageBox.Yes:
-                return
-            out = ""
-        else:
-            os.makedirs(out, exist_ok=True)
-            self.output_dir = out
-
-        do_index = self.index_chk.isChecked()
-        dest_chk = out or os.path.dirname(self.files[0])
-        try:
-            chk = core.preflight(dest_chk, self.files, do_index=do_index)
-        except Exception:  # noqa: BLE001
-            chk = {"blocking": [], "warnings": []}
-        if chk.get("blocking"):
-            QMessageBox.critical(
-                self, "开始前检查未通过",
-                "\n\n".join("• " + b for b in chk["blocking"]))
-            return
-        if chk.get("warnings"):
-            est = chk.get("estimate_bytes") or 0
-            free = chk.get("free_bytes") or 0
-            extra = ""
-            if est:
-                extra = "\n\n预计输出约 {:.0f} MB，可用 {:.0f} MB".format(
-                    est / 1e6, free / 1e6)
-            QMessageBox.information(
-                self, "开始前检查",
-                "\n\n".join("• " + w for w in chk["warnings"]) + extra)
-
-        todo = list(self.files)
-        job = core.load_job(dest_chk)
-        if job:
-            done_src = {os.path.normpath(it.get("src", ""))
-                        for it in job.get("items", [])
-                        if it.get("status") == "done"}
-            cur = {os.path.normpath(f): f for f in self.files}
-            remain = [cur[k] for k in cur if k not in done_src]
-            if done_src & set(cur) and remain:
-                r = QMessageBox.question(
-                    self, "继续上次导入",
-                    "发现同一输出目录上次的记录：已完成 {} 条，未完成 {} 条。\n\n"
-                    "是 = 只跑未完成的 {} 条\n否 = 全部重跑".format(
-                        len(done_src & set(cur)), len(remain), len(remain)))
-                if r == QMessageBox.Yes:
-                    todo = remain
-
-        for r in range(self.table.rowCount()):
-            item = self.table.item(r, 1)
-            if item:
-                p = self.table.item(r, 0).data(Qt.UserRole) if self.table.item(r, 0) else None
-                if p and os.path.normpath(str(p)) in {os.path.normpath(x) for x in todo}:
-                    item.setText("待转换")
         self._busy = True
-        self._cancel.clear()
-        self.go_btn.setEnabled(False)
-        auto = self.auto_chk.isChecked()
-        enc = self._resolve_encoder(self.hw_combo.currentText())
-        spec = self.spec
-        #   避免关窗后线程被直接丢弃、ffmpeg 变孤儿继续写卡。
-        self._worker = threading.Thread(target=self._run_all,
-                                        args=(out, auto, enc, spec, do_index,
-                                              dict(self.covers), todo),
-                                        daemon=False)
-        self._worker.start()
+        try:
+            if not self.files:
+                QMessageBox.warning(self, "提示", "请先添加要转换的视频。")
+                return
+            out = self.out_edit.text().strip()
+            if not out:
+                r = QMessageBox.question(self, "提示",
+                                         "未设置输出目录，是否输出到每个视频所在目录？")
+                if r != QMessageBox.Yes:
+                    return
+                out = ""
+            else:
+                os.makedirs(out, exist_ok=True)
+                self.output_dir = out
+
+            do_index = self.index_chk.isChecked()
+            dest_chk = out or os.path.dirname(self.files[0])
+            try:
+                chk = core.preflight(dest_chk, self.files, do_index=do_index)
+            except Exception:  # noqa: BLE001
+                chk = {"blocking": [], "warnings": []}
+            if chk.get("blocking"):
+                QMessageBox.critical(
+                    self, "开始前检查未通过",
+                    "\n\n".join("• " + b for b in chk["blocking"]))
+                return
+            if chk.get("warnings"):
+                est = chk.get("estimate_bytes") or 0
+                free = chk.get("free_bytes") or 0
+                extra = ""
+                if est:
+                    extra = "\n\n预计输出约 {:.0f} MB，可用 {:.0f} MB".format(
+                        est / 1e6, free / 1e6)
+                QMessageBox.information(
+                    self, "开始前检查",
+                    "\n\n".join("• " + w for w in chk["warnings"]) + extra)
+
+            todo = list(self.files)
+            job = core.load_job(dest_chk)
+            if job:
+                done_src = {os.path.normpath(it.get("src", ""))
+                            for it in job.get("items", [])
+                            if it.get("status") == "done"}
+                cur = {os.path.normpath(f): f for f in self.files}
+                remain = [cur[k] for k in cur if k not in done_src]
+                if done_src & set(cur) and remain:
+                    r = QMessageBox.question(
+                        self, "继续上次导入",
+                        "发现同一输出目录上次的记录：已完成 {} 条，未完成 {} 条。\n\n"
+                        "是 = 只跑未完成的 {} 条\n否 = 全部重跑".format(
+                            len(done_src & set(cur)), len(remain), len(remain)))
+                    if r == QMessageBox.Yes:
+                        todo = remain
+
+            for r in range(self.table.rowCount()):
+                item = self.table.item(r, 1)
+                if item:
+                    p = self.table.item(r, 0).data(Qt.UserRole) if self.table.item(r, 0) else None
+                    if p and os.path.normpath(str(p)) in {os.path.normpath(x) for x in todo}:
+                        item.setText("待转换")
+            self._cancel.clear()
+            self.go_btn.setEnabled(False)
+            auto = self.auto_chk.isChecked()
+            enc = self._resolve_encoder(self.hw_combo.currentText())
+            spec = self.spec
+            #   避免关窗后线程被直接丢弃、ffmpeg 变孤儿继续写卡。
+            self._worker = threading.Thread(target=self._run_all,
+                                            args=(out, auto, enc, spec, do_index,
+                                                  dict(self.covers), todo),
+                                            daemon=False)
+            self._worker.start()
+        finally:
+            if not self._worker or not self._worker.is_alive():
+                self._busy = False
 
     def _run_all(self, out, auto, enc, spec, do_index=False, covers=None, todo=None):
         covers = covers or {}
