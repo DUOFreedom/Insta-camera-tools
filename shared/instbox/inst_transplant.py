@@ -279,7 +279,7 @@ def camera_udta(
         raise ValueError("udta has no nail box")
     amba_offset, amba_size, _ = amba_boxes[0]
     nail_offset, nail_size, _ = nail_boxes[0]
-    if amba_size != 97 or nail_size != 688144 or len(thumbnail) != 896 * 512 * 3 // 2:
+    if amba_size < 97 or nail_size != 688144 or len(thumbnail) != 896 * 512 * 3 // 2:
         raise ValueError("unexpected AMBA/nail template layout")
 
     amba = bytearray(udta[amba_offset : amba_offset + amba_size])
