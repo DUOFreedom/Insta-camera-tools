@@ -58,51 +58,101 @@ def resource_path(rel: str) -> str:
     return os.path.join(base, rel)
 
 
-# ------------------------------------------------ 主题色
-TK = {
-    "background": "#0a0e15",
-    "surface": "#0a0e15",
-    "surface_container_low": "#0e131c",
-    "surface_container": "#131924",
-    "surface_container_high": "#1a2230",
-    "surface_container_highest": "#222c3d",
-    "surface_bright": "#2b364a",
-    "surface_variant": "#2a3242",
-    "on_surface": "#e8eef7",
-    "on_surface_variant": "#93a1b8",
-    "on_background": "#e8eef7",
-    "primary": "#4da3ff",
-    "on_primary": "#06121f",
-    "primary_container": "#14304f",
-    "on_primary_container": "#cfe6ff",
-    "secondary": "#a9c7ef",
-    "secondary_container": "#1c2b40",
-    "outline": "#54627a",
-    "outline_variant": "#334054",
-    "error": "#ff7b72",
-    "error_container": "#4a1a17",
-    "accent": "#7fd0ff",
-    "accent_container": "#143a4a",
+# ------------------------------------------------ 主题色（配色 Token，方向一：系统强调色跟随）
+# 中性色阶（约 90% 页面面积，亮色 / 暗色两套）
+TK_LIGHT = {
+    "background": "#F3F3F3",
+    "surface": "#FFFFFF",
+    "surface_container_low": "#FFFFFF",
+    "surface_container": "#FFFFFF",
+    "surface_container_high": "#FFFFFF",
+    "surface_container_highest": "#FFFFFF",
+    "surface_bright": "#FFFFFF",
+    "surface_variant": "#F7F7F7",
+    "on_surface": "#323130",
+    "on_surface_variant": "#605E5C",
+    "on_background": "#323130",
+    "primary": "#0078D7",
+    "on_primary": "#FFFFFF",
+    "primary_container": "#E8F5FF",
+    "on_primary_container": "#0078D7",
+    "secondary": "#605E5C",
+    "secondary_container": "#F7F7F7",
+    "outline": "#D2D2D2",
+    "outline_variant": "#E5E5E5",
+    "error": "#D13438",
+    "error_container": "#FDECEC",
+    "accent": "#0078D7",
+    "accent_container": "#E8F5FF",
 }
-ACCENT = TK["primary"]
-ON_ACCENT = TK["on_primary"]
-ACCENT_HOVER = "#6db5ff"
-ACCENT_PRESSED = "#3387e0"
+TK_DARK = {
+    "background": "#202020",
+    "surface": "#2D2D2D",
+    "surface_container_low": "#2D2D2D",
+    "surface_container": "#2D2D2D",
+    "surface_container_high": "#2D2D2D",
+    "surface_container_highest": "#2D2D2D",
+    "surface_bright": "#323232",
+    "surface_variant": "#323232",
+    "on_surface": "#FFFFFF",
+    "on_surface_variant": "#C9C7C5",
+    "on_background": "#FFFFFF",
+    "primary": "#0078D7",
+    "on_primary": "#FFFFFF",
+    "primary_container": "#1A4E8C",
+    "on_primary_container": "#FFFFFF",
+    "secondary": "#C9C7C5",
+    "secondary_container": "#323232",
+    "outline": "#3F3F3F",
+    "outline_variant": "#3A3A3A",
+    "error": "#FF6B6B",
+    "error_container": "#3A1A1A",
+    "accent": "#0078D7",
+    "accent_container": "#1A4E8C",
+}
+# 强调色：亮色/暗色各取系统强调色，无法读取时回退 #0078D7
+ACCENT_HOVER = None   # 运行时按系统强调色调整，_apply_qss 内再计算
+ACCENT_PRESSED = None
+LIGHT_THEME = TK_LIGHT
+DARK_THEME = TK_DARK
+
+import ctypes
+
+def _read_win_accent() -> str:
+    """读取 Windows 当前强调色，失败返回 #0078D7。"""
+    try:
+        dwm = ctypes.windll.dwmapi
+        color = ctypes.c_uint32()
+        opaque = ctypes.c_bool()
+        if dwm.DwmGetColorizationColor(ctypes.byref(color), ctypes.byref(opaque)) == 0:
+            v = color.value
+            return f"#{v & 0xFF:02X}{(v >> 8) & 0xFF:02X}{(v >> 16) & 0xFF:02X}"
+    except Exception:
+        pass
+    return "#0078D7"
+
+# 语义色（仅用于状态，亮色/暗色各一套）
+SEMANTIC = {
+    "semantic-success": ("#107C10", "#3DBC3D"),
+    "semantic-warning": ("#C86400", "#E89500"),
+    "semantic-error": ("#D13438", "#FF6B6B"),
+    "semantic-info": ("#006CC1", "#63B3ED"),
+}
 
 _QSS = """
 QWidget {
     background: {background};
     color: {on_surface};
-    font-family: "Microsoft YaHei UI", "Microsoft YaHei", "Segoe UI";
+    font-family: "Segoe UI Variable", "Segoe UI", "Microsoft YaHei UI";
     font-size: 13px;
 }
 QWidget#headerBg {
-    background: {surface_container};
-    border: 1px solid {surface_container_high};
+    background: {background};
+    border-bottom: 1px solid {outline};
 }
 QLabel#appTitle {
-    font-size: 21px;
-    font-weight: 700;
+    font-size: 20px;
+    font-weight: 600;
     color: {on_surface};
 }
 QLabel#appSubtitle {
@@ -111,13 +161,13 @@ QLabel#appSubtitle {
 }
 QFrame#card {
     background: {surface_container};
-    border: 1px solid {surface_container_high};
-    border-radius: 14px;
+    border: 1px solid {outline};
+    border-radius: 8px;
 }
 QLabel#sectionTitle {
     font-size: 13px;
-    font-weight: 700;
-    color: {primary};
+    font-weight: 600;
+    color: {on_surface};
 }
 QLabel#hint {
     font-size: 12px;
@@ -126,7 +176,7 @@ QLabel#hint {
 QLabel#accentLabel {
     font-size: 13px;
     font-weight: 600;
-    color: {primary};
+    color: {on_surface};
 }
 QLabel#statusLabel {
     font-size: 12px;
@@ -135,36 +185,36 @@ QLabel#statusLabel {
 
 /* ---- 次级按钮 ---- */
 QPushButton {
-    background: {surface_container_high};
+    background: {surface_variant};
     color: {on_surface};
-    border: 1px solid {outline_variant};
-    border-radius: 10px;
-    padding: 8px 18px;
-    font-weight: 600;
+    border: 1px solid {outline};
+    border-radius: 6px;
+    padding: 6px 14px;
+    font-weight: 500;
 }
 QPushButton:hover {
-    background: {surface_container_highest};
-    border-color: {primary};
-    color: #ffffff;
+    background: {secondary_container};
+    border-color: {outline};
+    color: {on_surface};
 }
 QPushButton:pressed {
-    background: {surface_bright};
+    background: {outline_variant};
 }
 QPushButton:disabled {
-    background: {surface_container};
-    color: #5d6a80;
-    border-color: {surface_container_high};
+    background: {surface_variant};
+    color: {neutral-text-disabled};
+    border-color: {outline};
 }
 
-/* ---- 主按钮 ---- */
+/* ---- 主按钮（强调色，≤10% 面积）---- */
 QPushButton#primaryBtn {
     background: {primary};
     color: {on_primary};
     border: none;
-    border-radius: 12px;
-    padding: 13px 28px;
-    font-size: 15px;
-    font-weight: 700;
+    border-radius: 6px;
+    padding: 8px 20px;
+    font-size: 14px;
+    font-weight: 600;
 }
 QPushButton#primaryBtn:hover {
     background: {ACCENT_HOVER};
@@ -173,33 +223,33 @@ QPushButton#primaryBtn:pressed {
     background: {ACCENT_PRESSED};
 }
 QPushButton#primaryBtn:disabled {
-    background: {surface_container_high};
-    color: #8195b0;
+    background: {outline};
+    color: {neutral-text-disabled};
 }
 
 /* ---- 输入框 ---- */
 QLineEdit {
-    background: {surface_container_high};
-    border: 1px solid {outline_variant};
-    border-radius: 10px;
-    padding: 9px 12px;
+    background: {surface_container};
+    border: 1px solid {outline};
+    border-radius: 6px;
+    padding: 8px 12px;
     color: {on_surface};
     selection-background-color: {primary};
     selection-color: {on_primary};
 }
-QLineEdit:hover { border-color: {outline}; }
-QLineEdit:focus { border: 2px solid {primary}; padding: 8px 11px; }
+QLineEdit:hover { border-color: {outline_variant}; }
+QLineEdit:focus { border: 2px solid {primary}; padding: 7px 11px; }
 
 /* ---- 下拉框 ---- */
 QComboBox {
-    background: {surface_container_high};
-    border: 1px solid {outline_variant};
-    border-radius: 10px;
-    padding: 8px 12px;
+    background: {surface_container};
+    border: 1px solid {outline};
+    border-radius: 6px;
+    padding: 6px 12px;
     color: {on_surface};
     min-width: 170px;
 }
-QComboBox:hover { border-color: {outline}; }
+QComboBox:hover { border-color: {outline_variant}; }
 QComboBox::drop-down { border: none; width: 26px; }
 QComboBox::down-arrow {
     image: none;
@@ -209,10 +259,10 @@ QComboBox::down-arrow {
     margin-right: 12px;
 }
 QComboBox QAbstractItemView {
-    background: {surface_container_high};
+    background: {surface_container};
     color: {on_surface};
-    border: 1px solid {outline_variant};
-    border-radius: 8px;
+    border: 1px solid {outline};
+    border-radius: 6px;
     selection-background-color: {primary};
     selection-color: {on_primary};
     outline: 0;
@@ -228,9 +278,9 @@ QCheckBox::indicator {
     height: 18px;
     border-radius: 4px;
     border: 2px solid {outline};
-    background: transparent;
+    background: {surface_container};
 }
-QCheckBox::indicator:hover { border-color: {primary}; }
+QCheckBox::indicator:hover { border-color: {outline_variant}; }
 QCheckBox::indicator:checked {
     background: {primary};
     border-color: {primary};
@@ -240,15 +290,15 @@ QCheckBox::indicator:checked {
 /* ---- 表格 ---- */
 QTableWidget {
     background: {surface_container_low};
-    alternate-background-color: {surface_container};
-    border: 1px solid {surface_container_high};
-    border-radius: 10px;
+    alternate-background-color: {surface_variant};
+    border: 1px solid {outline};
+    border-radius: 6px;
     gridline-color: transparent;
     color: {on_surface};
 }
 QTableWidget::item {
     padding: 7px 8px;
-    border-bottom: 1px solid {surface_container_high};
+    border-bottom: 1px solid {outline};
 }
 QTableWidget::item:selected {
     background: {primary_container};
@@ -258,24 +308,24 @@ QHeaderView::section {
     background: {surface_container};
     color: {on_surface_variant};
     border: none;
-    border-bottom: 1px solid {surface_container_high};
+    border-bottom: 1px solid {outline};
     padding: 8px;
-    font-weight: 600;
+    font-weight: 500;
 }
 QTableCornerButton::section { background: {surface_container}; border: none; }
 
-/* ---- 进度条 ---- */
+/* ---- 进度条（关键进度用强调色）---- */
 QProgressBar {
-    background: {surface_container_high};
+    background: {surface_variant};
     border: none;
-    border-radius: 7px;
+    border-radius: 6px;
     height: 12px;
     text-align: center;
     color: transparent;
 }
 QProgressBar::chunk {
     background: {primary};
-    border-radius: 7px;
+    border-radius: 6px;
 }
 
 /* ---- 滚动条 ---- */
@@ -285,13 +335,19 @@ QScrollBar:vertical {
     margin: 2px;
 }
 QScrollBar::handle:vertical {
-    background: {surface_container_highest};
+    background: {outline_variant};
     border-radius: 4px;
     min-height: 24px;
 }
-QScrollBar::handle:vertical:hover { background: {outline_variant}; }
+QScrollBar::handle:vertical:hover { background: {outline}; }
 QScrollBar::add-line, QScrollBar::sub-line { height: 0; }
 QScrollBar::add-page, QScrollBar::sub-page { background: transparent; }
+
+/* ---- 语义色状态文本 ---- */
+QLabel#semanticSuccess { color: {semantic-success}; }
+QLabel#semanticWarning { color: {semantic-warning}; }
+QLabel#semanticError { color: {semantic-error}; }
+QLabel#semanticInfo { color: {semantic-info}; }
 """
 
 
@@ -382,12 +438,32 @@ class App(QWidget):
     # ------------------------------------------------------------ 样式
     def _apply_qss(self):
         check_img = resource_path(os.path.join("assets", "check.png")).replace("\\", "/")
+
+        # 根据系统高对比度/深色模式选择主题（这里默认用亮色系主题作为兜底，
+        # 强调色始终跟随 Windows 用户已选强调色）
+        theme = dict(LIGHT_THEME)
+        accent = _read_win_accent()
+        theme["primary"] = accent
+        theme["accent"] = accent
+
+        # 强调色的悬停/按下：按明度轻微偏移，保证对比度
+        def _shift(hex_color: str, delta: int) -> str:
+            r = max(0, min(255, int(hex_color[1:3], 16) + delta))
+            g = max(0, min(255, int(hex_color[3:5], 16) + delta))
+            b = max(0, min(255, int(hex_color[5:7], 16) + delta))
+            return f"#{r:02X}{g:02X}{b:02X}"
+
+        theme["ACCENT_HOVER"] = _shift(accent, -18)
+        theme["ACCENT_PRESSED"] = _shift(accent, -34)
+
+        # 语义色：按当前主题明度选亮色或暗色值
+        use_dark = theme["background"].lower() in ("#202020", "#1a1a1a")
+        for k, (light_val, dark_val) in SEMANTIC.items():
+            theme[k] = dark_val if use_dark else light_val
+
         css = _QSS
-        # 逐 key 替换（不能直接用 str.format，CSS 里含 { } 会冲突）
-        for k, v in TK.items():
-            css = css.replace("{" + k + "}", v)
-        css = css.replace("{ACCENT_HOVER}", ACCENT_HOVER)
-        css = css.replace("{ACCENT_PRESSED}", ACCENT_PRESSED)
+        for k, v in theme.items():
+            css = css.replace("{" + k + "}", str(v))
         css = css.replace("{CHECK_IMG}", check_img)
         self.setStyleSheet(css)
 
