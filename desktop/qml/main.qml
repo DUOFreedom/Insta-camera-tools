@@ -14,7 +14,6 @@ Window {
     flags: Qt.Window | Qt.FramelessWindowHint
     color: "transparent"
 
-    property bool sidebarCollapsed: width < 900
     property string statusText: "就绪。添加视频后点击「开始转换」。"
     property real progressValue: 0
 
@@ -38,25 +37,13 @@ Window {
                 title: "影石相机工具"
             }
 
-            Row {
+            ScrollView {
+                id: scroll
                 width: parent.width
                 height: parent.height - 40
-                spacing: 12
-
-                Sidebar {
-                    id: sidebar
-                    height: parent.height
-                    collapsed: win.sidebarCollapsed
-                    currentIndex: 0
-                }
-
-                ScrollView {
-                    id: scroll
-                    width: parent.width - sidebar.width - 12
-                    height: parent.height
-                    clip: true
-                    ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
-                    ScrollBar.vertical.policy: ScrollBar.AsNeeded
+                clip: true
+                ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+                ScrollBar.vertical.policy: ScrollBar.AsNeeded
 
                     Column {
                         x: 24
@@ -96,4 +83,3 @@ Window {
             }
         }
     }
-}
