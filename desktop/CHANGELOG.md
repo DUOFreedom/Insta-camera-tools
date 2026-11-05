@@ -33,7 +33,7 @@ Ace Pro 2 可识别的原生素材：转码为 VID + LRV 双文件、移植 `ins
 
 ### 修复（1.0.2，2026-11-05）
 
-基于 `instaace-fusion-modified.zip` 重建融合仓库，清理桌面/安卓/共享全部 Python 文件中 ★ AI 痕迹注释，并按【边界政策】补全 4 处边界漏洞：
+基于 `instaace-fusion-modified.zip` 重建融合仓库，清理桌面/安卓/共享全部 Python 文件中 AI 痕迹注释，并按【边界政策】补全 4 处边界漏洞：
 
 - **`render_cover` 输入校验与超时**：校验图片路径是否存在、输出路径非空、ffmpeg 可执行；新增 `cancel: threading.Event | None` 与 `timeout: float = 120.0`，超时抛 `FFmpegError(retryable=False)`，`CalledProcessError` 转为 `FFmpegError` 并携带 stderr。
 - **`_run_ffmpeg` stderr 完整性**：`err_thread` join 超时后若仍存活，继续等待至退出，保证 `FFmpegError.stderr` 不截断不丢失。
