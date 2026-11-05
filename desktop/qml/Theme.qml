@@ -52,7 +52,8 @@ QtObject {
     readonly property color iconPrimary: textPrimary
     readonly property color iconSecondary: textSecondary
 
-    readonly property string fontFamily: "Segoe UI Variable"
+    readonly property string fontFamily: "Microsoft YaHei UI"
+    readonly property string fontDisplayFamily: "Lenovo-XiaoxinChaokuGB"
 
     readonly property int fontDisplaySize: 22
     readonly property int fontDisplayLine: 28

@@ -1,8 +1,9 @@
+import glob
 import os
 import sys
 
 from PySide6.QtCore import Qt, QUrl
-from PySide6.QtGui import QGuiApplication
+from PySide6.QtGui import QFontDatabase, QGuiApplication
 from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtQuickControls2 import QQuickStyle
 
@@ -11,6 +12,18 @@ def base_dir() -> str:
     if getattr(sys, "frozen", False):
         return getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(sys.executable)))
     return os.path.dirname(os.path.abspath(__file__))
+
+
+def load_fonts(root: str) -> list[str]:
+    """注册 assets/fonts 下的字体，返回加载成功的 family 名。"""
+    loaded: list[str] = []
+    pattern = os.path.join(root, "assets", "fonts", "*.ttf")
+    for path in sorted(glob.glob(pattern)):
+        font_id = QFontDatabase.addApplicationFont(path)
+        if font_id < 0:
+            continue
+        loaded.extend(QFontDatabase.applicationFontFamilies(font_id))
+    return loaded
 
 
 def main() -> int:
@@ -32,6 +45,7 @@ def main() -> int:
     context = engine.rootContext()
     context.setContextProperty("systemDark", app.styleHints().colorScheme() == Qt.ColorScheme.Dark)
     context.setContextProperty("selfTest", self_test)
+    context.setContextProperty("loadedFonts", load_fonts(root))
 
     engine.load(QUrl.fromLocalFile(entry))
 

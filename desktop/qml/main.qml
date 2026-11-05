@@ -51,6 +51,17 @@ Window {
                         width: scroll.availableWidth - 48
                         spacing: 12
 
+                        Text {
+                            width: parent.width
+                            text: "影石相机工具"
+                            color: Theme.textPrimary
+                            font.family: Theme.fontDisplayFamily
+                            font.pixelSize: Theme.fontDisplaySize
+                            font.weight: Font.DemiBold
+                            lineHeightMode: Text.FixedHeight
+                            lineHeight: Theme.fontDisplayLine
+                        }
+
                         CameraSampleView {
                             width: parent.width
                             status: "未设置样本（回退到影石默认结构）"
