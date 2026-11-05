@@ -1,0 +1,22 @@
+singleton Theme Theme.qml
+AppIcon AppIcon.qml
+AppButton AppButton.qml
+IconButton IconButton.qml
+TextField TextField.qml
+TextArea TextArea.qml
+Switch Switch.qml
+Avatar Avatar.qml
+Divider Divider.qml
+Popover Popover.qml
+Tooltip Tooltip.qml
+Toast Toast.qml
+Modal Modal.qml
+Card Card.qml
+Sidebar Sidebar.qml
+ListItem ListItem.qml
+TitleBar TitleBar.qml
+CameraSampleView CameraSampleView.qml
+InputFileView InputFileView.qml
+OutputOptionView OutputOptionView.qml
+ProgressView ProgressView.qml
+ActionView ActionView.qml
