@@ -520,7 +520,9 @@ def _parse_hhmmss(value: str) -> float:
     except (ValueError, AttributeError):
         return 0.0
 
-def _run_ffmpeg(cmd: list[str], duration: float, progress=None, cancel=None):
+def _run_ffmpeg(cmd: list[str], duration: float, progress=None, cancel=None,
+                procs: list[subprocess.Popen] | None = None,
+                procs_lock: threading.Lock | None = None):
     """后台运行 ffmpeg，解析 -progress 输出，返回进度与速度。
 
     前置条件:
@@ -555,6 +557,9 @@ def _run_ffmpeg(cmd: list[str], duration: float, progress=None, cancel=None):
     proc = subprocess.Popen(full, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                             creationflags=_NO_WINDOW, text=True,
                             encoding="utf-8", errors="replace")
+    if procs is not None and procs_lock is not None:
+        with procs_lock:
+            procs.append(proc)
 
     stderr_chunks: list[str] = []
 
@@ -618,6 +623,10 @@ def _run_ffmpeg(cmd: list[str], duration: float, progress=None, cancel=None):
         except Exception:
             pass
     err_thread.join(timeout=2)
+    # proc 已结束，stderr 管道已关闭，err_thread 会很快退出；
+    # 超时后继续等待，保证 FFmpegError.stderr 完整不丢失。
+    if err_thread.is_alive():
+        err_thread.join()
     if canceled:
         raise CanceledError("已取消")
     if proc.returncode != 0:
@@ -1013,7 +1022,14 @@ def convert(input_path: str, output_dir: str, start_number: int | None = None,
     lock = threading.Lock()
     results: list[str | None] = [None] * n
 
+    # 并发模式下跟踪所有 ffmpeg 子进程，任一任务失败时杀掉其余进程，
+    # 避免孤儿 ffmpeg 继续写卡。
+    procs: list[subprocess.Popen] = []
+    procs_lock = threading.Lock()
+    first_error: BaseException | None = None
+
     def _run_one(idx: int, t):
+        nonlocal first_error
         (label, dst, vc, tag, w, h, fps, vh, ve, cr, pix, audio, profile, level) = t
         vf = _scale_pad(w, h)
         say(f"[{label}] 编码中 ({w}x{h},fps={fps})...")
@@ -1042,13 +1058,14 @@ def convert(input_path: str, output_dir: str, start_number: int | None = None,
             progress(min(1.0, cur), _label, spd, eta)
 
         try:
-            _run_ffmpeg(cmd, dur, _job_cb if progress else None, cancel)
-        except RuntimeError as _hw_err:
+            _run_ffmpeg(cmd, dur, _job_cb if progress else None, cancel,
+                        procs, procs_lock)
+        except BaseException as e:
             # MediaCodec 硬编码已知缺陷：i-frame-interval 只能整数秒，
             # 拿不到相机要求的 16 帧密集关键帧；失败时自动回退到
             # libx265/libx264 软件编码，与桌面端 GPU 失败重试逻辑一致。
             if "mediacodec" in str(vc):
-                say(f"[回退] {vc} 编码失败（{_hw_err}），改用软件编码重试")
+                say(f"[回退] {vc} 编码失败（{e}），改用软件编码重试")
                 fallback_vc = "libx265" if ("265" in str(vc) or "hevc" in str(vc)) else "libx264"
                 fallback_tag = "hvc1" if fallback_vc == "libx265" else "avc1"
                 if is_lrv:
@@ -1058,8 +1075,30 @@ def convert(input_path: str, output_dir: str, start_number: int | None = None,
                 cmd = _build_transcode_cmd(input_path, dst, fallback_vc, fallback_tag, vf, enc_params,
                                            vh, ve, audio, cr, src_audio_count,
                                            is_lrv=is_lrv, fps=fps, level=level)
-                _run_ffmpeg(cmd, dur, _job_cb if progress else None, cancel)
+                try:
+                    _run_ffmpeg(cmd, dur, _job_cb if progress else None, cancel,
+                                procs, procs_lock)
+                except BaseException as _e2:
+                    if first_error is None:
+                        first_error = _e2
+                    cancel.set()
+                    with procs_lock:
+                        for p in procs:
+                            try:
+                                p.kill()
+                            except Exception:
+                                pass
+                    raise
             else:
+                if first_error is None:
+                    first_error = e
+                cancel.set()
+                with procs_lock:
+                    for p in procs:
+                        try:
+                            p.kill()
+                        except Exception:
+                            pass
                 raise
         if cancel is not None and cancel.is_set():
             raise CanceledError("已取消")
@@ -1072,9 +1111,16 @@ def convert(input_path: str, output_dir: str, start_number: int | None = None,
 
     if workers > 1 and n > 1:
         say(f"并行转码: {workers} 路")
+        import concurrent.futures as _cf
         with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as ex:
-            for idx, dst in enumerate(ex.map(_run_one, range(n), tasks)):
-                results[idx] = dst
+            futures = [ex.submit(_run_one, i, t) for i, t in enumerate(tasks)]
+            for fut in _cf.as_completed(futures):
+                try:
+                    results[futures.index(fut)] = fut.result()
+                except BaseException:
+                    pass
+        if first_error is not None:
+            raise first_error
     else:
         for idx, t in enumerate(tasks):
             results[idx] = _run_one(idx, t)
