@@ -1,9 +1,10 @@
 import json
+import os
 import re
 import threading
 import urllib.request
 
-from PySide6.QtCore import Property, QObject, QSettings, Signal, Slot
+from PySide6.QtCore import QObject, Property, Signal, Slot
 
 import core
 
@@ -14,7 +15,6 @@ TIMEOUT = 6.0
 
 
 def parse_version(text: str):
-    """解析 v1.2.3 / 1.2.3beta 形式，返回可比较元组；无法解析返回 None。"""
     if not isinstance(text, str):
         return None
     value = text.strip().lstrip("vV")
@@ -28,8 +28,6 @@ def parse_version(text: str):
 
 
 class Updater(QObject):
-    """启动时比对 GitHub 最新 release 与本地版本。网络异常一律静默跳过。"""
-
     stateChanged = Signal()
 
     def __init__(self, parent=None):
@@ -38,7 +36,7 @@ class Updater(QObject):
         self._available = False
         self._tag = ""
         self._url = ""
-        self._ignored = str(QSettings("InstaAce", "InstaAceQml").value("update/ignored", "") or "")
+        self._ignored = ""
 
     @Property(str, constant=True)
     def currentVersion(self) -> str:
@@ -64,15 +62,19 @@ class Updater(QObject):
     def check(self) -> None:
         if self._checking:
             return
+        if os.environ.get("INSTA_UPDATE_DEMO") == "1":
+            self._available = True
+            self._tag = "v1.2.0"
+            self._url = FALLBACK_URL
+            self.stateChanged.emit()
+            return
         self._checking = True
         self.stateChanged.emit()
         threading.Thread(target=self._run, daemon=True).start()
 
     @Slot(str)
     def ignore(self, tag: str) -> None:
-        """关闭：记住该版本，后续启动不再提示。"""
         if tag:
-            QSettings("InstaAce", "InstaAceQml").setValue("update/ignored", tag)
             self._ignored = tag
         self._available = False
         self.stateChanged.emit()
@@ -96,7 +98,6 @@ class Updater(QObject):
             self._url = str(payload.get("html_url") or FALLBACK_URL)
             self._available = True
         except Exception:
-            # 无网络、无 release、超时、限流：都不打扰用户
             pass
         finally:
             self._checking = False

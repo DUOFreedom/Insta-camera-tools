@@ -17,6 +17,8 @@ class Bridge(QObject):
     filesChanged = Signal()
     sampleChanged = Signal()
     errorChanged = Signal()
+    ffmpegMissingChanged = Signal()
+    ffmpegProgressChanged = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -30,6 +32,9 @@ class Bridge(QObject):
         self._error = ""
         self._cancel = threading.Event()
         self._worker: threading.Thread | None = None
+        self._ffmpeg_missing = False
+        self._ffmpeg_downloading = False
+        self._ffmpeg_progress = 0.0
 
     @Property(bool, notify=busyChanged)
     def busy(self) -> bool:
@@ -59,6 +64,18 @@ class Bridge(QObject):
     def lastError(self) -> str:
         return self._error
 
+    @Property(bool, notify=ffmpegMissingChanged)
+    def ffmpegMissing(self) -> bool:
+        return self._ffmpeg_missing
+
+    @Property(bool, notify=ffmpegMissingChanged)
+    def ffmpegDownloading(self) -> bool:
+        return self._ffmpeg_downloading
+
+    @Property(float, notify=ffmpegProgressChanged)
+    def ffmpegProgress(self) -> float:
+        return self._ffmpeg_progress
+
     def _set_status(self, text: str) -> None:
         self._status = str(text)
         self.statusChanged.emit()
@@ -70,7 +87,40 @@ class Bridge(QObject):
     @Slot(result=str)
     def ffmpegState(self) -> str:
         ok, msg = core.ffmpeg_available()
+        self._ffmpeg_missing = not ok
+        self.ffmpegMissingChanged.emit()
         return "ok" if ok else str(msg)
+
+    @Slot()
+    def downloadFfmpeg(self) -> None:
+        if self._ffmpeg_downloading:
+            return
+        self._ffmpeg_downloading = True
+        self._ffmpeg_progress = 0.0
+        self.ffmpegMissingChanged.emit()
+        self.ffmpegProgressChanged.emit()
+        self._set_status("正在下载 ffmpeg，请稍候…")
+        threading.Thread(target=self._download_ffmpeg, daemon=True).start()
+
+    def _download_ffmpeg(self) -> None:
+        def stage(frac, msg):
+            self._ffmpeg_progress = max(0.0, min(1.0, float(frac or 0.0)))
+            self.ffmpegProgressChanged.emit()
+            self._set_status(str(msg or "下载中…"))
+        try:
+            ok, msg = core.download_and_install_ffmpeg(stage)
+        except Exception as exc:
+            ok, msg = False, str(exc)
+        self._ffmpeg_downloading = False
+        self._ffmpeg_progress = 1.0 if ok else 0.0
+        self.ffmpegMissingChanged.emit()
+        self.ffmpegProgressChanged.emit()
+        if ok:
+            self._ffmpeg_missing = False
+            self.ffmpegMissingChanged.emit()
+            self._set_status("ffmpeg 安装完成，可开始转换")
+        else:
+            self._set_error("ffmpeg 下载失败：%s" % msg)
 
     @Slot(str)
     def setStatusHint(self, text: str) -> None:
