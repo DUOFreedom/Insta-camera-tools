@@ -142,3 +142,94 @@ def self_check():
         return True, "OK %s / %s" % (getattr(_core, "__version__", "?"), msg)
     except Exception as e:  # noqa: BLE001
         return False, "%s: %s" % (type(e).__name__, e)
+
+
+# ============== 启动更新检查（与桌面端 updater.py 对齐） ==============
+import threading
+import urllib.request
+import json
+import re
+
+_REPO = "duofreedom/Insta-camera-tools"
+_API_URL = "https://api.github.com/repos/%s/releases/latest" % _REPO
+_FALLBACK_URL = "https://github.com/%s/releases" % _REPO
+_TIMEOUT = 6.0
+
+
+def _parse_version(text: str):
+    if not isinstance(text, str):
+        return None
+    value = text.strip().lstrip("vV")
+    match = re.match(r"^(\d+)\.(\d+)\.(\d+)(.*)$", value)
+    if not match:
+        return None
+    major, minor, patch = (int(match.group(i)) for i in (1, 2, 3))
+    suffix = match.group(4) or ""
+    stable = 1 if suffix == "" else 0
+    return major, minor, patch, stable
+
+
+class _Updater:
+    """后台检查 GitHub latest release，结果通过回调返回给 Kotlin。"""
+
+    def __init__(self):
+        self._checking = False
+        self._available = False
+        self._tag = ""
+        self._url = ""
+        self._ignored_tag = ""
+
+    def check(self, callback):
+        """启动一次检查。callback(tag, url) 在有新版本时调用。"""
+        if self._checking:
+            return
+        # Demo mode via env var (for testing)
+        if os.environ.get("INSTA_UPDATE_DEMO") == "1":
+            if callback:
+                callback("v1.2.0", _FALLBACK_URL)
+            return
+        self._checking = True
+        threading.Thread(target=self._run, args=(callback,), daemon=True).start()
+
+    def ignore(self, tag: str):
+        if tag:
+            self._ignored_tag = tag
+        self._available = False
+
+    def _run(self, callback):
+        try:
+            request = urllib.request.Request(_API_URL, headers={
+                "User-Agent": "InstaAceAndroid/%s" % __version__,
+                "Accept": "application/vnd.github+json",
+            })
+            with urllib.request.urlopen(request, timeout=_TIMEOUT) as resp:
+                payload = json.loads(resp.read().decode("utf-8", "replace"))
+            tag = str(payload.get("tag_name") or "")
+            latest = _parse_version(tag)
+            current = _parse_version(__version__)
+            if not tag or latest is None or current is None:
+                return
+            if tag == self._ignored_tag or latest <= current:
+                return
+            self._tag = tag
+            self._url = str(payload.get("html_url") or _FALLBACK_URL)
+            self._available = True
+            if callback:
+                callback(tag, self._url)
+        except Exception:
+            pass
+        finally:
+            self._checking = False
+
+
+_updater = _Updater()
+
+
+def check_update(callback):
+    """Kotlin 调用：启动后台更新检查。callback(tag: str, url: str) 有新版本时回调。"""
+    _updater.check(callback)
+
+
+def ignore_update(tag: str):
+    """Kotlin 调用：忽略某版本（写入内存，进程重启失效；若需持久化由 Kotlin 落 SharedPreferences）。"""
+    _updater.ignore(tag)

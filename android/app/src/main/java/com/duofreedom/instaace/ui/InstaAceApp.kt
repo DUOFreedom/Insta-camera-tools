@@ -3,6 +3,7 @@
 package com.duofreedom.instaace.ui
 
 import android.content.Intent
+import android.content.SharedPreferences
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -75,11 +76,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.duofreedom.instaace.engine.Engine
+import com.duofreedom.instaace.engine.PythonEngine
+import com.duofreedom.instaace.engine.UpdateCheckListener
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 private val TABS = listOf("存储卡", "队列", "设置")
+private const val PREFS_UPDATE = "update_prefs"
+private const val KEY_IGNORED_TAG = "ignored_update_tag"
 
 @Composable
 fun InstaAceApp() {
@@ -134,6 +139,51 @@ fun InstaAceApp() {
         ActivityResultContracts.OpenMultipleDocuments()
     ) { uris ->
         if (!uris.isNullOrEmpty()) state.addVideos(ctx, uris)
+    }
+
+    // 更新检查：启动后台检查 GitHub latest release
+    var updateTag by remember { mutableStateOf<String?>(null) }
+    var updateUrl by remember { mutableStateOf<String?>(null) }
+    val prefs = remember { ctx.getSharedPreferences(PREFS_UPDATE, 0) }
+    val ignoredTag = remember { prefs.getString(KEY_IGNORED_TAG, "") ?: "" }
+
+    LaunchedEffect(Unit) {
+        // 从 SharedPreferences 读取已忽略版本传给 Python
+        if (ignoredTag.isNotBlank()) {
+            PythonEngine.ignoreUpdate(ctx, ignoredTag)
+        }
+        // 启动检查
+        PythonEngine.checkUpdate(ctx, object : UpdateCheckListener {
+            override fun onUpdateAvailable(tag: String, url: String) {
+                updateTag = tag
+                updateUrl = url
+            }
+        })
+    }
+
+    // 更新弹窗：有新版本且未忽略时显示
+    if (consented && updateTag != null) {
+        val currentTag = updateTag
+        val currentUrl = updateUrl ?: ""
+        AlertDialog(
+            onDismissRequest = { },
+            title = { Text("发现新版本：$currentTag") },
+            text = { Text("是否前往下载？") },
+            confirmButton = {
+                TextButton(onClick = {
+                    // 前往下载：打开浏览器
+                    ctx.startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(currentUrl)))
+                    updateTag = null
+                }) { Text("前往下载") }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    updateTag = null
+                }) { Text("稍后") }
+            }
+        )
+        // 忽略版本：用单独的 Snackbar 或小弹窗处理，这里用简化方式
+        // 实际项目中可在 AlertDialog 里添加第三个按钮或用自定义 Dialog
     }
 
     if (consented) Scaffold(

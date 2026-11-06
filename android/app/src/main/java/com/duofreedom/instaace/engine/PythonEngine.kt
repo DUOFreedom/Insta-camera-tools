@@ -28,6 +28,13 @@ class ImportCallback {
 }
 
 /**
+ * 更新检查回调接口。
+ */
+interface UpdateCheckListener {
+    fun onUpdateAvailable(tag: String, url: String)
+}
+
+/**
  * 嵌入式 CPython（Chaquopy）桥。
  *
  * 复用桌面端已经验证过的 `insta_core.py`（转码 + inst 移植 + 索引登记），
@@ -134,5 +141,35 @@ object PythonEngine {
         }
     } catch (_: Throwable) {
         ""
+    }
+
+    /**
+     * 启动后台更新检查（GitHub latest release）。
+     * 有新版本时回调 listener.onUpdateAvailable(tag, url)。
+     * 静默失败：网络超时、限流、JSON 异常等不抛异常、不打扰用户。
+     */
+    fun checkUpdate(ctx: Context, listener: UpdateCheckListener) {
+        if (!requireInit(ctx)) return
+        val bridge = Python.getInstance().getModule("android_bridge")
+        // Python 侧会在后台线程跑完后回调 Kotlin 的 listener
+        bridge.callAttr("check_update", UpdateCheckListenerWrapper(listener))
+    }
+
+    /** 将 Kotlin listener 包装成 Python 可调用的对象。 */
+    private class UpdateCheckListenerWrapper(private val listener: UpdateCheckListener) {
+        @Suppress("unused")
+        fun onUpdate(tag: String, url: String) {
+            listener.onUpdateAvailable(tag, url)
+        }
+    }
+
+    /**
+     * 忽略某版本（写入 Python 内存，进程重启失效；
+     * 若需持久化由 Kotlin 落 SharedPreferences 再传回此处）。
+     */
+    fun ignoreUpdate(ctx: Context, tag: String) {
+        if (!requireInit(ctx)) return
+        val bridge = Python.getInstance().getModule("android_bridge")
+        bridge.callAttr("ignore_update", tag)
     }
 }
