@@ -81,7 +81,6 @@ import struct
 from dataclasses import dataclass, field
 
 
-# ---------------------------------------------------------------- protobuf 原语
 def _read_varint(buf: bytes, i: int) -> tuple[int, int]:
     result = 0
     shift = 0
@@ -151,7 +150,6 @@ def _enc_dbl(fnum: int, v: float) -> bytes:
     return _write_varint((fnum << 3) | 1) + struct.pack("<d", v)
 
 
-# ---------------------------------------------------------------- 数据模型
 @dataclass
 class Dim:
     width: int
@@ -370,7 +368,6 @@ class EditEntry:
         return e
 
 
-# ---------------------------------------------------------------- 文件级 API
 def parse_fileinfo(data: bytes) -> list[FileEntry]:
     return [FileEntry.parse(v) for f, wt, v in _parse_fields(data)
             if f == 1 and wt == 2]
@@ -390,7 +387,6 @@ def build_editinfo(entries: list[EditEntry]) -> bytes:
     return b"".join(e.to_bytes() for e in entries)
 
 
-# ---------------------------------------------------------------- 便捷操作
 # editinfo 条目的 flag：作者 build_indexes 写作 encode_message([Field(1,0,0)]) = b'\x08\x00'
 # （真机样本里也常见 b'\x08\x00'；完全空 b'' 是另一类残缺条目）
 EDIT_FLAG_UNEDITED = b"\x08\x00"

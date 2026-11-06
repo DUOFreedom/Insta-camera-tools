@@ -60,10 +60,8 @@ from pathlib import Path
 import zipfile
 from datetime import datetime, timedelta
 
-# ---------------------------------------------------------------- 版本
 __version__ = "1.1.0"
 
-# ---------------------------------------------------------------- 常量
 # 以下仅为【无真机模板时】的兜底值。
 # 有真机原片时，一律以 analyze_native() 实测结果为准（见 _build_spec_tasks）。
 VID_WIDTH, VID_HEIGHT = 1920, 1080
@@ -138,7 +136,6 @@ def append_log(text: str) -> None:
     except OSError:
         pass
 
-# ---------------------------------------------------------------- ffmpeg 定位
 def _tool_base_dir() -> str:
     """可执行程序根目录: 打包后为 exe 所在目录，开发时为脚本所在目录。"""
     if getattr(sys, "frozen", False):
@@ -216,7 +213,6 @@ def ffmpeg_install_dir() -> str:
         os.makedirs(d, exist_ok=True)
         return d
 
-# ---------------------------------------------------------------- ffmpeg 下载
 _FFMPEG_SOURCES = {
     "Gitee 镜像 (otreee/ffmpeg_build)": {
         "kind": "single-exe-zip",
@@ -356,7 +352,6 @@ def download_and_install_ffmpeg(stage_cb=None):
     emit(1.0, f"自动下载失败: {last_err}")
     return False, last_err
 
-# ---------------------------------------------------------------- 硬件编码器
 _HW_ENCODERS = [
     ("hevc_amf", "h264_amf", "AMD"),
     ("hevc_nvenc", "h264_nvenc", "NVIDIA"),
@@ -400,7 +395,6 @@ def _hw_extra_args(hevc: str) -> list[str]:
     """
     return []
 
-# ---------------------------------------------------------------- 探测
 def probe(filepath: str) -> dict:
     """用 ffprobe 读出流信息，返回 dict。"""
     fp = find_ffprobe()
@@ -554,7 +548,6 @@ def _strip_prefix(name: str) -> str:
         return name
     return name.replace("[0x10]", "").replace("\x10", "").strip()
 
-# ---------------------------------------------------------------- 文件名/序号
 _NAME_RE = re.compile(r"^(?:VID|LRV)_(\d{8}_\d{6})_(\d{3})\.(?:mp4|lrv)$", re.IGNORECASE)
 
 def max_seq(output_dir: str) -> int:
@@ -595,7 +588,6 @@ def format_duration(seconds) -> str:
         return f"{m}分{sec}秒"
     return f"{sec}秒"
 
-# ---------------------------------------------------------------- ffmpeg 运行
 def _parse_hhmmss(value: str) -> float:
     """解析 ffmpeg -progress 输出里的 out_time=HH:MM:SS.mmm → 秒。"""
     try:
@@ -819,7 +811,7 @@ def _build_transcode_cmd(src, dst, vcodec, tag, vf, enc_params,
                 "keyint=16:min-keyint=16:scenecut=0:bframes=0:range=full:info=0"]
     else:
         # LRV: libx264
-        #     注意：不加 -b:v 等码率参数 —— 与密集关键帧叠加会让码率失控。
+        # 不加 -b:v 等码率参数 —— 与密集关键帧叠加会让码率失控。
         cmd += ["-c:v", "libx264", "-preset", "veryfast", "-profile:v", "high",
                 "-tag:v", tag, "-g", "16", "-keyint_min", "16", "-sc_threshold", "0",
                 "-bf", "0"]
@@ -978,7 +970,6 @@ def _build_spec_tasks(input_path, output_dir, seq, stamp, hw, spec):
     ]
     return tasks, extra
 
-# ---------------------------------------------------------------- 转换主流程
 def convert(input_path: str, output_dir: str, start_number: int | None = None,
             stamp: str | None = None, log=None,
             encoder: tuple[str, str, str] | None = None,
@@ -1378,7 +1369,6 @@ def _unique_stamp(stamp: str, output_dir: str, used: set) -> str:
         return s
     return stamp
 
-# ---------------------------------------------------------------- 索引表登记
 # 相机认卡的关键：除了文件名/结构正确，还必须把文件登记进两个 protobuf 索引。
 #
 #       <卡根>\DCIM\fileinfo_list.list
@@ -1430,7 +1420,6 @@ def has_inst_box(path: str) -> tuple[bool, int]:
         pass
     return False, 0
 
-# ---------------------------------------------------------------- .inst 移植
 # 相机识别视频的【第三层】：MP4 尾部必须挂一个 `inst` box，
 # 内部是影石私有的传感器/元数据（含 protobuf 元数据记录）。
 #
@@ -2714,7 +2703,6 @@ def _inst_offset(path: str) -> int | None:
         return None
     return None
 
-# ---------------------------------------------------------------- CLI
 def _cli_progress(frac, label, speed, eta):
     """命令行进度条（单行刷新，配 ETA）。"""
     bar_w = 28

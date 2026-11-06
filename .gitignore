@@ -135,3 +135,6 @@ $RECYCLE.BIN/
 *.temp
 /bin/
 /obj/
+
+# Android 原生引擎二进制（92MB，见 docs/BUILD.md 重建方式）
+android/app/src/main/jniLibs/

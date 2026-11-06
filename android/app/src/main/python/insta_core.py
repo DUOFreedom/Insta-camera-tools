@@ -37,10 +37,8 @@ from pathlib import Path
 import zipfile
 from datetime import datetime, timedelta
 
-# ---------------------------------------------------------------- 版本
 __version__ = "1.1.0"
 
-# ---------------------------------------------------------------- 常量
 # 以下仅为【无真机模板时】的兜底值。
 # 有真机原片时，一律以 analyze_native() 实测结果为准（见 _build_spec_tasks）。
 VID_WIDTH, VID_HEIGHT = 1920, 1080
@@ -116,7 +114,6 @@ def append_log(text: str) -> None:
     except OSError:
         pass
 
-# ---------------------------------------------------------------- ffmpeg 定位
 def _tool_base_dir() -> str:
     """可执行程序根目录: 打包后为 exe 所在目录，开发时为脚本所在目录。"""
     if getattr(sys, "frozen", False):
@@ -194,9 +191,7 @@ def ffmpeg_install_dir() -> str:
         os.makedirs(d, exist_ok=True)
         return d
 
-# ---------------------------------------------------------------- ffmpeg 下载
 
-# ---------------------------------------------------------------- 编码器能力
 #   - Android 上走【软件编码】libx265(主) + libx264(预览)，
 #     与桌面端验证过的流水线完全一致，输出参数可精确控制，相机识别最可靠。
 #   - 桌面端才使用硬件编码器（AMF/NVENC/QSV）加速。
@@ -218,6 +213,23 @@ _ANDROID_HW_ENCODERS = [
 
 # 是否优先使用硬件编码（默认关闭，由 UI/桥接层设置）
 _PREFER_HW = False
+
+# 硬件解码映射：输出编码侧仍为 libx265/libx264（相机兼容性不依赖解码路径），
+# 解码失败有自动回退，默认启用让 SoC 视频引擎承担 4K/8K 源解码。
+_ANDROID_HW_DECODERS = {"hevc": "hevc_mediacodec", "h264": "h264_mediacodec"}
+_HWDECODE_ENABLED = True
+_hw_decoder_list: set[str] | None = None
+_hw_dec_alive: dict[str, bool] = {}
+
+
+def set_hwdecode(enabled: bool) -> None:
+    """设置是否使用 Android MediaCodec 硬件解码源视频。"""
+    global _HWDECODE_ENABLED
+    _HWDECODE_ENABLED = bool(enabled)
+
+
+def hwdecode() -> bool:
+    return _HWDECODE_ENABLED
 
 
 def set_prefer_hardware(enabled: bool) -> None:
@@ -271,6 +283,103 @@ def check_encoding_capability() -> tuple[bool, str]:
     return True, "libx265 + libx264 就绪"
 
 
+def available_decoders() -> set[str]:
+    """返回 ffmpeg 实际编入的解码器名集合（小写）。查询失败返回空集合。"""
+    ff = find_ffmpeg()
+    if not ff:
+        return set()
+    try:
+        r = subprocess.run([ff, "-hide_banner", "-decoders"],
+                           capture_output=True, creationflags=_NO_WINDOW,
+                           timeout=30)
+    except (subprocess.TimeoutExpired, OSError):
+        return set()
+    text = (r.stdout or b"").decode("utf-8", "replace")
+    names = set()
+    for line in text.splitlines():
+        parts = line.strip().split(None, 1)
+        if len(parts) == 2 and len(parts[0]) >= 6:
+            names.add(parts[1].split()[0].lower())
+    return names
+
+
+def _probe_hw_decoder_alive(decoder: str, sw_encoder: str) -> bool:
+    """真实回环探测：软编 0.3 秒测试片段，用目标解码器解回 null 输出。
+
+    列表里存在只证明"编进去了"，实测通过才证明"这台芯片能跑"。
+    结果进程内缓存；任何失败返回 False，不抛错（调用方回退软解码）。
+    """
+    cached = _hw_dec_alive.get(decoder)
+    if cached is not None:
+        return cached
+    ff = find_ffmpeg()
+    if not ff:
+        return False
+    ok = False
+    try:
+        enc = subprocess.Popen(
+            [ff, "-v", "quiet",
+             "-f", "lavfi", "-i", "testsrc=size=320x240:rate=30:duration=0.3",
+             "-c:v", sw_encoder, "-preset", "ultrafast",
+             "-f", "mpegts", "pipe:1"],
+            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+            creationflags=_NO_WINDOW)
+        try:
+            dec = subprocess.Popen(
+                [ff, "-v", "error", "-c:v", decoder, "-i", "pipe:0",
+                 "-f", "null", "-"],
+                stdin=enc.stdout, stdout=subprocess.DEVNULL,
+                stderr=subprocess.PIPE, creationflags=_NO_WINDOW)
+            if enc.stdout is not None:
+                enc.stdout.close()
+            try:
+                dec.communicate(timeout=30)
+                enc.wait(timeout=30)
+                ok = dec.returncode == 0 and enc.returncode == 0
+            except subprocess.TimeoutExpired:
+                dec.kill()
+                enc.kill()
+        except OSError:
+            ok = False
+            if enc.poll() is None:
+                enc.kill()
+            try:
+                enc.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                pass
+    except OSError:
+        ok = False
+    _hw_dec_alive[decoder] = ok
+    return ok
+
+
+def probe_hw_decoder(source_codec: str) -> str:
+    """按源视频编码返回可用的 MediaCodec 解码器名；不可用返回 ""。
+
+    source_codec: ffprobe 的 codec_name（hevc/h265 → hevc；h264/avc → h264）。
+    结果含一次真实解码回环（约 1-2 秒），进程内缓存，只探测一次。
+    """
+    global _hw_decoder_list
+    if not _HWDECODE_ENABLED or not _is_android():
+        return ""
+    c = (source_codec or "").lower()
+    if c in ("hevc", "h265"):
+        key = "hevc"
+    elif c in ("h264", "avc"):
+        key = "h264"
+    else:
+        return ""
+    dec = _ANDROID_HW_DECODERS[key]
+    if _hw_decoder_list is None:
+        _hw_decoder_list = available_decoders()
+    if dec not in _hw_decoder_list:
+        _hw_dec_alive[dec] = False
+        return ""
+    if not _probe_hw_decoder_alive(dec, "libx265" if key == "hevc" else "libx264"):
+        return ""
+    return dec
+
+
 def detect_hw_encoder():
     """探测可用的硬件编码器，返回 (hevc, h264, 显示名) 或 None。
 
@@ -316,7 +425,6 @@ def _hw_extra_args(hevc: str) -> list[str]:
     """
     return []
 
-# ---------------------------------------------------------------- 探测
 def probe(filepath: str) -> dict:
     """用 ffprobe 读出流信息，返回 dict。"""
     fp = find_ffprobe()
@@ -470,7 +578,6 @@ def _strip_prefix(name: str) -> str:
         return name
     return name.replace("[0x10]", "").replace("\x10", "").strip()
 
-# ---------------------------------------------------------------- 文件名/序号
 _NAME_RE = re.compile(r"^(?:VID|LRV)_(\d{8}_\d{6})_(\d{3})\.(?:mp4|lrv)$", re.IGNORECASE)
 
 def max_seq(output_dir: str) -> int:
@@ -511,7 +618,6 @@ def format_duration(seconds) -> str:
         return f"{m}分{sec}秒"
     return f"{sec}秒"
 
-# ---------------------------------------------------------------- ffmpeg 运行
 def _parse_hhmmss(value: str) -> float:
     """解析 ffmpeg -progress 输出里的 out_time=HH:MM:SS.mmm → 秒。"""
     try:
@@ -720,10 +826,18 @@ def _build_transcode_cmd(src, dst, vcodec, tag, vf, enc_params,
                          video_handler, video_encoder, audio_tracks,
                          color_range, src_audio_count=0, is_lrv=False,
                          fps: str = FPS, level: int | None = None,
-                         bitrate: int | None = None) -> list[str]:
-    """软件编码命令（对齐 CPVC run_ffmpeg 的 use_gpu=False 分支）。"""
+                         bitrate: int | None = None, hw_decoder: str = "") -> list[str]:
+    """软件编码命令（对齐 CPVC run_ffmpeg 的 use_gpu=False 分支）。
+
+    hw_decoder 非空时，输入侧用 MediaCodec 解码（帧为 surface），
+    滤镜链最前面加 hwdownload,format=nv12 拉回系统内存。
+    """
     extra_in = audio_inputs(audio_tracks, src_audio_count)
-    cmd = [find_ffmpeg(), "-hide_banner", "-y", "-i", src]
+    if hw_decoder:
+        cmd = [find_ffmpeg(), "-hide_banner", "-y", "-c:v", hw_decoder, "-i", src]
+        vf = "hwdownload,format=nv12," + vf
+    else:
+        cmd = [find_ffmpeg(), "-hide_banner", "-y", "-i", src]
     if extra_in:
         cmd += extra_in
         audio_src = "1:a:0"
@@ -738,7 +852,7 @@ def _build_transcode_cmd(src, dst, vcodec, tag, vf, enc_params,
                 "keyint=16:min-keyint=16:scenecut=0:bframes=0:range=full:info=0"]
     else:
         # LRV: libx264
-        #     注意：不加 -b:v 等码率参数 —— 与密集关键帧叠加会让码率失控。
+        # 不加 -b:v 等码率参数 —— 与密集关键帧叠加会让码率失控。
         cmd += ["-c:v", "libx264", "-preset", "veryfast", "-profile:v", "high",
                 "-tag:v", tag, "-g", "16", "-keyint_min", "16", "-sc_threshold", "0",
                 "-bf", "0"]
@@ -763,7 +877,7 @@ def _build_hw_transcode_cmd(src, dst, vcodec, tag, vf, extra_args,
                             video_handler, video_encoder, audio_tracks,
                             color_range, src_audio_count=0, is_lrv=False,
                             fps: str = FPS, level: int | None = None,
-                            bitrate: int | None = None) -> list[str]:
+                            bitrate: int | None = None, hw_decoder: str = "") -> list[str]:
     """硬件编码命令（桌面端 AMF/NVENC/QSV，或 Android MediaCodec）。
 
     CPVC 关键参数：-g 16 -keyint_min 16 -sc_threshold 0 -bf 0 -extra_sei 0
@@ -777,8 +891,12 @@ def _build_hw_transcode_cmd(src, dst, vcodec, tag, vf, extra_args,
         拿不到相机要求的 16 帧密集关键帧 —— 这是硬编的已知取舍。
     """
     extra_in = audio_inputs(audio_tracks, src_audio_count)
-    cmd = [find_ffmpeg(), "-hide_banner", "-y"]
-    cmd += ["-i", src]
+    if hw_decoder:
+        cmd = [find_ffmpeg(), "-hide_banner", "-y", "-c:v", hw_decoder, "-i", src]
+        vf = "hwdownload,format=nv12," + vf
+    else:
+        cmd = [find_ffmpeg(), "-hide_banner", "-y"]
+        cmd += ["-i", src]
     if extra_in:
         cmd += extra_in
         audio_src = "1:a:0"
@@ -795,7 +913,7 @@ def _build_hw_transcode_cmd(src, dst, vcodec, tag, vf, extra_args,
     elif "mediacodec" in vcodec:
         # MediaCodec：软件帧输入 + 显式码率 + 无 B 帧 + 密集关键帧请求
         #     只取整数秒（≈30 帧），达不到相机要求的 16 帧密集关键帧。
-        #     注意：-g 16 在 mediacodec 下实际会被取整为 1 秒，这是已知取舍；
+        # -g 16 在 mediacodec 下实际会被取整为 1 秒，这是已知取舍；
         #     若相机不认，请切回「自动」软件编码。
         br = bitrate or (4_000_000 if is_lrv else 20_000_000)
         cmd += ["-pix_fmt", "yuv420p", "-b:v", str(br),
@@ -914,7 +1032,6 @@ def _build_spec_tasks(input_path, output_dir, seq, stamp, hw, spec):
     ]
     return tasks, extra
 
-# ---------------------------------------------------------------- 转换主流程
 def convert(input_path: str, output_dir: str, start_number: int | None = None,
             stamp: str | None = None, log=None,
             encoder: tuple[str, str, str] | None = None,
@@ -1022,6 +1139,13 @@ def convert(input_path: str, output_dir: str, start_number: int | None = None,
     lock = threading.Lock()
     results: list[str | None] = [None] * n
 
+    # 硬件解码探测一次（进程内缓存）：可用则所有任务走 MediaCodec 解码，
+    # 输出编码侧不变；每个任务失败时单独回退软件解码。
+    src_vcodec = info.get("video", {}).get("codec_name") or ""
+    hwdec = probe_hw_decoder(src_vcodec)
+    if hwdec:
+        say(f"[硬件解码] 源 {src_vcodec} 使用 {hwdec}（失败自动软解）")
+
     # 并发模式下跟踪所有 ffmpeg 子进程，任一任务失败时杀掉其余进程，
     # 避免孤儿 ffmpeg 继续写卡。
     procs: list[subprocess.Popen] = []
@@ -1036,19 +1160,23 @@ def convert(input_path: str, output_dir: str, start_number: int | None = None,
         if hw:
             say(f"[硬件加速] 使用 {hw_label}")
         is_lrv = dst.lower().endswith(".lrv")
-        if hw and not str(vc).startswith("lib"):
-            cmd = _build_hw_transcode_cmd(input_path, dst, vc, tag, vf, extra,
-                                          vh, ve, audio, cr, src_audio_count,
-                                          is_lrv=is_lrv, fps=fps, level=level)
-        else:
+
+        def _build_cmd(hwdec_name: str):
+            """组一条转码命令。hwdec_name 非空走 MediaCodec 解码，空则软解码。"""
+            if hw and not str(vc).startswith("lib"):
+                return _build_hw_transcode_cmd(input_path, dst, vc, tag, vf, extra,
+                                               vh, ve, audio, cr, src_audio_count,
+                                               is_lrv=is_lrv, fps=fps, level=level,
+                                               hw_decoder=hwdec_name)
             if is_lrv:
                 enc_params = "keyint=16:min-keyint=16:scenecut=0:bframes=0"
             else:
                 enc_params = "keyint=16:min-keyint=16:scenecut=0:bframes=0:range=full:info=0"
                 vc = "libx265" if vc not in ("libx265",) else vc
-            cmd = _build_transcode_cmd(input_path, dst, vc, tag, vf, enc_params,
-                                       vh, ve, audio, cr, src_audio_count,
-                                       is_lrv=is_lrv, fps=fps, level=level)
+            return _build_transcode_cmd(input_path, dst, vc, tag, vf, enc_params,
+                                        vh, ve, audio, cr, src_audio_count,
+                                        is_lrv=is_lrv, fps=fps, level=level,
+                                        hw_decoder=hwdec_name)
 
         def _job_cb(frac, spd, eta, _i=idx, _label=label):
             if not progress:
@@ -1057,49 +1185,58 @@ def convert(input_path: str, output_dir: str, start_number: int | None = None,
                 cur = state["done"] + weights[_i] * min(1.0, max(0.0, float(frac or 0)))
             progress(min(1.0, cur), _label, spd, eta)
 
-        try:
+        def _fail(e):
+            if first_error is None:
+                first_error = e
+            cancel.set()
+            with procs_lock:
+                for p in procs:
+                    try:
+                        p.kill()
+                    except Exception:
+                        pass
+
+        def _exec(cmd):
             _run_ffmpeg(cmd, dur, _job_cb if progress else None, cancel,
                         procs, procs_lock)
-        except BaseException as e:
-            # MediaCodec 硬编码已知缺陷：i-frame-interval 只能整数秒，
-            # 拿不到相机要求的 16 帧密集关键帧；失败时自动回退到
-            # libx265/libx264 软件编码，与桌面端 GPU 失败重试逻辑一致。
-            if "mediacodec" in str(vc):
-                say(f"[回退] {vc} 编码失败（{e}），改用软件编码重试")
-                fallback_vc = "libx265" if ("265" in str(vc) or "hevc" in str(vc)) else "libx264"
-                fallback_tag = "hvc1" if fallback_vc == "libx265" else "avc1"
-                if is_lrv:
-                    enc_params = "keyint=16:min-keyint=16:scenecut=0:bframes=0"
+
+        def _run_transcode(cmd_builder):
+            """执行一次转码；MediaCodec 硬件【编码】失败时回退软件编码。"""
+            try:
+                _exec(cmd_builder())
+            except BaseException as e:
+                # MediaCodec 编码 i-frame-interval 只能整数秒，拿不到相机要求的
+                # 16 帧密集关键帧；失败时用 libx265/libx264 软编重试。
+                if "mediacodec" in str(vc):
+                    say(f"[回退] {vc} 编码失败（{e}），改用软件编码重试")
+                    fallback_vc = "libx265" if ("265" in str(vc) or "hevc" in str(vc)) else "libx264"
+                    fallback_tag = "hvc1" if fallback_vc == "libx265" else "avc1"
+                    if is_lrv:
+                        enc_params = "keyint=16:min-keyint=16:scenecut=0:bframes=0"
+                    else:
+                        enc_params = "keyint=16:min-keyint=16:scenecut=0:bframes=0:range=full:info=0"
+                    cmd_sw = _build_transcode_cmd(input_path, dst, fallback_vc,
+                                                  fallback_tag, vf, enc_params,
+                                                  vh, ve, audio, cr,
+                                                  src_audio_count,
+                                                  is_lrv=is_lrv, fps=fps,
+                                                  level=level)
+                    try:
+                        _exec(cmd_sw)
+                    except BaseException as _e2:
+                        _fail(_e2)
+                        raise
                 else:
-                    enc_params = "keyint=16:min-keyint=16:scenecut=0:bframes=0:range=full:info=0"
-                cmd = _build_transcode_cmd(input_path, dst, fallback_vc, fallback_tag, vf, enc_params,
-                                           vh, ve, audio, cr, src_audio_count,
-                                           is_lrv=is_lrv, fps=fps, level=level)
-                try:
-                    _run_ffmpeg(cmd, dur, _job_cb if progress else None, cancel,
-                                procs, procs_lock)
-                except BaseException as _e2:
-                    if first_error is None:
-                        first_error = _e2
-                    cancel.set()
-                    with procs_lock:
-                        for p in procs:
-                            try:
-                                p.kill()
-                            except Exception:
-                                pass
+                    _fail(e)
                     raise
-            else:
-                if first_error is None:
-                    first_error = e
-                cancel.set()
-                with procs_lock:
-                    for p in procs:
-                        try:
-                            p.kill()
-                        except Exception:
-                            pass
+
+        try:
+            _run_transcode(lambda: _build_cmd(hwdec))
+        except BaseException as e:
+            if not hwdec:
                 raise
+            say(f"[回退] {hwdec} 硬件解码失败（{e}），改用软件解码重试")
+            _run_transcode(lambda: _build_cmd(""))
         if cancel is not None and cancel.is_set():
             raise CanceledError("已取消")
         with lock:
@@ -1258,7 +1395,6 @@ def _unique_stamp(stamp: str, output_dir: str, used: set) -> str:
         return s
     return stamp
 
-# ---------------------------------------------------------------- 索引表登记
 # 相机认卡的关键：除了文件名/结构正确，还必须把文件登记进两个 protobuf 索引。
 #
 #       <卡根>\DCIM\fileinfo_list.list
@@ -1309,7 +1445,6 @@ def has_inst_box(path: str) -> tuple[bool, int]:
         pass
     return False, 0
 
-# ---------------------------------------------------------------- .inst 移植
 # 相机识别视频的【第三层】：MP4 尾部必须挂一个 `inst` box，
 # 内部是影石私有的传感器/元数据（含 protobuf 元数据记录）。
 #
@@ -2559,7 +2694,6 @@ def _inst_offset(path: str) -> int | None:
         return None
     return None
 
-# ---------------------------------------------------------------- CLI
 def _cli_progress(frac, label, speed, eta):
     """命令行进度条（单行刷新，配 ETA）。"""
     bar_w = 28

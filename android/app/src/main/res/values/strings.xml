@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">InstaAce 导入器</string>
+    <string name="app_subtitle">影石 Ace Pro 2 · 素材导入</string>
+    <string name="tab_card">存储卡</string>
+    <string name="tab_queue">队列</string>
+    <string name="tab_settings">设置</string>
+    <string name="pick_card">选择存储卡</string>
+    <string name="pick_card_again">重新选择</string>
+    <string name="add_videos">添加视频</string>
+    <string name="start_import">开始导入</string>
+    <string name="importing">导入中…</string>
+    <string name="need_card">请先选择存储卡</string>
+    <string name="preflight_title">三层识别前置条件</string>
+    <string name="empty_queue">还没有添加视频\n支持从「文件」里多选，或从相册选</string>
+</resources>

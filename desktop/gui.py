@@ -58,7 +58,6 @@ def resource_path(rel: str) -> str:
     return os.path.join(base, rel)
 
 
-# ------------------------------------------------ 主题色
 TK = {
     "background": "#0a0e15",
     "surface": "#0a0e15",
@@ -1205,7 +1204,7 @@ class App(QWidget):
                             if idx_err:
                                 idx_err_log.append(idx_err)
                                 self._sig_status.emit(
-                                    "  ⚠ {}: inst 已移植，但索引未写入 — {}".format(
+                                    "  [警告] {}: inst 已移植，但索引未写入 — {}".format(
                                         os.path.basename(src), idx_err))
                             ok.append((src, res.get("main"), res.get("proxy")))
                         else:
