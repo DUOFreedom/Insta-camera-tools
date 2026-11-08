@@ -106,9 +106,10 @@ python -m pytest desktop\tests -q
 
 - 位置：`desktop/core.py:63`、`android/app/src/main/python/insta_core.py:40`、
   `android/app/build.gradle.kts:24-25`
-- 问题：CHANGELOG 写 1.0.2、gradle 写 0.7.1、Python 写 1.1.0，而前身 v0.7.1 包里是 1.3.0
-  —— 1.1.0 相对 1.3.0 是**倒退**。
-- 修复：Python `__version__` 统一为 `1.3.0`；gradle `versionCode` 13→14、`versionName` 0.7.1→0.7.2。
+- 问题：四处版本号互不相同（CHANGELOG 写 1.0.2、gradle 写 0.7.1、Python 写 1.1.0），
+  且桌面端 Python 与安卓端 gradle 用的是两套编号体系，用户无法判断哪个更新。
+- 修复：桌面端 `__version__`、安卓端 `__version__`、gradle `versionName`、安卓关于页文案
+  统一为 `1.2.0`；`versionCode` 13→14。
 
 **10. 联想商业字体随 GPL 项目分发**
 
@@ -178,7 +179,7 @@ export GRADLE_USER_HOME=/d/android-build/.gradle
 ```
 
 产物 `android/app/build/outputs/apk/release/app-release.apk`，72,830,835 B，
-`versionCode 14 / versionName 0.7.2`，双 ABI 均含 `libffmpeg.so` + `libffprobe.so`。
+`versionCode 14 / versionName 1.2.0`，双 ABI 均含 `libffmpeg.so` + `libffprobe.so`。
 产物内设备序列号与该产品名均命中 0（含 `assets/chaquopy` 下 5 个 `.pyc`）。
 
 ### 补充 2：QML 版已实际打包（原未修项 2）
@@ -271,7 +272,7 @@ instaace-fusion/
     ├── app/src/main/java/       （Kotlin，未改）
     ├── app/src/main/res/  AndroidManifest.xml（已补 INTERNET）
     ├── app/src/main/jniLibs/    （4 个 .so，约 92 MB）
-    ├── app/build.gradle.kts     （versionCode 14 / 0.7.2）
+    ├── app/build.gradle.kts     （versionCode 14 / 1.2.0）
     ├── build.gradle.kts  settings.gradle.kts  gradle.properties
     └── LICENSE
 ```

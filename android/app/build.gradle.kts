@@ -24,7 +24,7 @@ android {
         minSdk = 26
         targetSdk = 34
         versionCode = 14
-        versionName = "0.7.2"
+        versionName = "1.2.0"
         resourceConfigurations += listOf("zh", "en")
         manifestPlaceholders["appLabel"] = "InstaAce 导入器"
 

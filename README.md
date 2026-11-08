@@ -97,7 +97,7 @@ instaace-fusion/
 - 语言：Python 3.11（Chaquopy）+ Kotlin（Compose）
 - 构建：Gradle，双 ABI `arm64-v8a` + `armeabi-v7a`
 - 签名：默认 `~/.android/debug.keystore`，**对外分发前须换成正式签名**
-- APK：`versionCode 14 / versionName 0.7.2`
+- APK：`versionCode 14 / versionName 1.2.0`
 
 ## 快速开始
 

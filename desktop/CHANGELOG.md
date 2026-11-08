@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## 1.3.0 — 2026-11-08
+## 1.2.0 — 2026-11-08
 
 ### 修复（全量审查后的整改）
 
@@ -17,7 +17,7 @@
 - **依赖补全**：`requirements.txt` / `requirements-dev.txt` 补 `PySide6>=6.5` —— `main.py` + `bridge.py` + `qml/` 这套 QML 界面依赖它，原先只列了 PyQt5。
 - **QML 版构建/运行脚本**：新增 `build_qml.bat`、`run_qml.bat`（原先 `build.bat`/`run.bat` 只覆盖 PyQt5 版）。
 - **AndroidManifest 补 `INTERNET`**：更新检查需要该权限，此前完全缺失（`AndroidManifest.xml:10`）。
-- **版本号统一**：`desktop/core.py:63` 与 `android/.../insta_core.py:40` 的 `__version__` 由 1.1.0 改回 1.3.0（1.1.0 相对 v0.7.1 包内的 1.3.0 是倒退）；gradle `versionCode` 13→14、`versionName` 0.7.1→0.7.2。
+- **版本号统一**：桌面端与安卓端统一为 `1.2.0`（`desktop/core.py`、`android/.../insta_core.py` 的 `__version__`，gradle 的 `versionName`，以及安卓关于页文案）；`versionCode` 13→14。
 - **移除联想商业字体**：删除 `assets/fonts/Lenovo-XiaoxinChaokuGB.ttf`（商业授权不允许随 GPL 项目分发）；`qml/Theme.qml` 改为探测 `loadedFonts`，没有则回退系统「Microsoft YaHei UI」。
 - **补 AMBA 回归测试**：`desktop/tests/test_insta.py` 新增 3 条（帧率分母不被覆写、AMBA 过短抛错、九个字段偏移逐一核对），此前对 AMBA 零覆盖，正是 P0 能被带进发布的原因。
 - **QML spec 补图标**：`InstaAceQml.spec:57` 补 `icon=['assets/app.ico']`。
@@ -31,7 +31,7 @@
 
 ### 第二轮补充（同日，具备完整构建环境后）
 
-- **APK 已重打**：`versionCode 14 / versionName 0.7.2`，双 ABI，72,830,835 B。产物内设备序列号与第三方产品名均 0 命中（含 `assets/chaquopy` 下 5 个 `.pyc`）。
+- **APK 已重打**：`versionCode 14 / versionName 1.2.0`，双 ABI，72,830,835 B。产物内设备序列号与第三方产品名均 0 命中（含 `assets/chaquopy` 下 5 个 `.pyc`）。
 - **QML 版已实际打包**：`InstaAceQml.exe --self-test` 输出 `QML_OK roots=1`、退出码 0，产物 205 MB。
 - **第三方产品名引用清零**：原 16 处注释（`insta_core.py` 12、`insta_index.py` 4）全部改为「真机原片」等中性表述；技术内容（偏移、参数、字节布局）未动，只去掉产品名与溯源表述。
 - **`release` 关掉 `isDebuggable`**：原为 `true`，正式包不允许（会放行调试器 attach、堆栈导出与 `run-as`）。
@@ -74,7 +74,7 @@ Ace Pro 2 可识别的原生素材：转码为 VID + LRV 双文件、移植 `ins
 
 - **`instbox/inst_transplant.py camera_udta`**：9 个硬编码 AMBA 字段偏移（25/29/41/49/53/67/71/84/91）改为表驱动 `_amba_fields`，逐字段做 `_off + 4 > amba_size` 越界校验，超界抛 `ValueError`，不再静默写错字节导致相机无法识别。
 - **`instbox/moov_rewrap.py udta_with_audio_frames`**：AMBA 音频采样率/帧数偏移改为 `amba[0]+0x54`（音频采样率，写 `frames * 4`）/`amba[0]+0x5B`（音频帧数），并加边界检查抛 `ValueError`；同时修复 `audio_fps_field` 未定义导致的运行时 `NameError`。
-  - ⚠️ 该条目最初误写成 `amba[0]+0x20`：0x20 是**视频帧率**（fps_num/fps_den），并非音频采样率。0x20 与 `camera_udta` 的 `(29, 1001)`（视频帧率分母）在 AMBA 内字节 32 处重叠，会把帧率分母写成 `frames*4`。已在 1.3.0 修正为 0x54。
+  - ⚠️ 该条目最初误写成 `amba[0]+0x20`：0x20 是**视频帧率**（fps_num/fps_den），并非音频采样率。0x20 与 `camera_udta` 的 `(29, 1001)`（视频帧率分母）在 AMBA 内字节 32 处重叠，会把帧率分母写成 `frames*4`。已在 1.2.0 修正为 0x54。
 
 ### 修复（1.0.2，2026-11-05）
 

@@ -612,7 +612,7 @@ private fun SettingsScreen(state: AppState, onOpenDoc: (String) -> Unit, modifie
                     Spacer(Modifier.size(8.dp))
                     Text("关于", style = MaterialTheme.typography.titleSmall)
                 }
-                Text("版本 0.7.1 · 预览版", style = MaterialTheme.typography.bodyMedium)
+                Text("版本 1.2.0", style = MaterialTheme.typography.bodyMedium)
 
                 val ctx = LocalContext.current
                 var engineLine by remember { mutableStateOf("检测中…") }
