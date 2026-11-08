@@ -885,6 +885,31 @@ pre {
 }
 
 /* 11. 下载 =============================================================== */
+/* 双平台并列：宽屏两列，窄屏堆叠 */
+.platform-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+  margin-top: 32px;
+}
+
+@media (min-width: 1024px) {
+  .platform-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 24px;
+  }
+}
+
+/* platform-grid 内的 release 卡自带 margin-top，去掉避免双倍间距 */
+.platform-grid > .release {
+  margin-top: 0;
+}
+
+.platform-grid > .card {
+  margin-top: 0;
+}
+
+
 .release {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -963,6 +988,21 @@ pre {
 .code--wrap {
   white-space: pre-wrap;
   word-break: break-all;
+}
+
+/* 行内代码：.code 默认是块级（用于命令行/SHA 展示），
+   正文里提及文件名或路径时需要行内形态，否则整段会被拆成多行 */
+.code--inline {
+  display: inline;
+  padding: 1px 6px;
+  border: 0;
+  border-radius: var(--md-sys-shape-corner-small);
+  background-color: var(--md-sys-color-surface-container);
+  font-size: 0.92em;
+  line-height: inherit;
+  white-space: normal;
+  overflow-x: visible;
+  overflow-wrap: anywhere;
 }
 
 @media (max-width: 767px) {

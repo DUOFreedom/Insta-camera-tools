@@ -1,10 +1,10 @@
 <!doctype html>
 <!--
-  影石相机工具（InstaAceImporter）· 项目介绍页
+  影石相机工具 · 项目介绍页（桌面端 + 安卓端）
   版式参考 Theme Plume 文档站首页：64px 导航 / 左文右图首屏 / 3×2 特性卡片 / 蓝白配色
   ------------------------------------------------------------------
   部署：GitHub 仓库 Settings → Pages → Source = Deploy from a branch
-        → Branch = main，Folder = /docs
+        → Branch = main，Folder = / (root)
   依赖：零。只有 index.html + style.css，字体走 Google Fonts（Inter）。
   改色 / 改圆角：只改 style.css 第 1 节令牌。
   上一版（MD3 橙色）留在 archive/md3-orange/，不进部署目录。
@@ -58,10 +58,11 @@
             <circle cx="12" cy="13" r="3.6" />
           </svg>
           <span>影石相机工具</span>
-          <span class="brand__sub">InstaAceImporter</span>
+          <span class="brand__sub">桌面端 + 安卓端</span>
         </a>
 
         <nav class="nav__links" aria-label="主导航">
+          <a class="nav__link" href="#platforms">双端</a>
           <a class="nav__link" href="#features">功能</a>
           <a class="nav__link" href="#tech">技术原理</a>
           <a class="nav__link" href="#faq">常见问题</a>
@@ -107,6 +108,7 @@
       <div class="mobile-nav" id="mobile-nav" hidden>
         <nav aria-label="移动端导航">
           <ul class="mobile-nav__list">
+            <li><a class="mobile-nav__link" href="#platforms">双端</a></li>
             <li><a class="mobile-nav__link" href="#features">功能</a></li>
             <li><a class="mobile-nav__link" href="#tech">技术原理</a></li>
             <li><a class="mobile-nav__link" href="#faq">常见问题</a></li>
@@ -126,7 +128,7 @@
               把普通视频变成影石 Ace Pro 2 的「原生」素材
             </h1>
             <p class="hero__tagline">
-              转码成相机原生结构（VID + LRV）、移植 inst box、登记相机索引。插回相机，相册里能识别、能播放、封面正确。
+              转码成相机原生结构（VID + LRV）、移植 inst box、登记相机索引。Windows 桌面端与安卓端同源，插回相机，相册里能识别、能播放、封面正确。
             </p>
             <div class="hero__actions">
               <a
@@ -138,7 +140,7 @@
                 <svg class="btn__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
                   <path d="M12 4v11" /><path d="M7 11l5 5 5-5" /><path d="M4 19h16" />
                 </svg>
-                下载 for Windows
+                下载
               </a>
               <a
                 class="btn btn--alt btn--lg"
@@ -157,8 +159,8 @@
             <ul class="hero__meta" aria-label="项目基本信息">
               <li class="tag">GPL-3.0</li>
               <li class="tag">Windows 10 / 11</li>
-              <li class="tag">Python 3.10+</li>
-              <li class="tag">FFmpeg required</li>
+              <li class="tag">Android 8.0+</li>
+              <li class="tag">双端同源</li>
             </ul>
           </div>
 
@@ -198,6 +200,79 @@
           </figure>
         </div>
       </section>
+
+      <!-- 双端架构 -->
+      <section class="section" id="platforms" aria-labelledby="platforms-title">
+        <div class="container">
+          <div class="section__head">
+            <h2 class="section__title" id="platforms-title">两端同源，一套核心</h2>
+            <p class="section__lead">
+              转码、inst box 移植、索引登记这三件事由同一份 Python 核心实现，桌面端与安卓端各自套一层界面。
+            </p>
+          </div>
+
+          <div class="platform-grid">
+            <article class="card">
+              <span class="card__icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                  <rect x="2.5" y="4" width="19" height="12.5" rx="2" />
+                  <path d="M8 20.5h8" /><path d="M12 16.5v4" />
+                </svg>
+              </span>
+              <h3 class="card__title">Windows 桌面端</h3>
+              <p class="card__text">
+                两套界面共用同一份转码核心：经典版基于 PyQt5，QML 版基于 PySide6 / Qt Quick，界面更现代。
+              </p>
+              <dl class="dl">
+                <div class="dl__row">
+                  <dt class="dl__key">QML 版</dt>
+                  <dd class="dl__value">PySide6 + Qt Quick，单文件 exe 约 75 MB</dd>
+                </div>
+                <div class="dl__row">
+                  <dt class="dl__key">经典版</dt>
+                  <dd class="dl__value dl__value--muted">PyQt5，单文件 exe 约 39 MB</dd>
+                </div>
+                <div class="dl__row">
+                  <dt class="dl__key">硬件加速</dt>
+                  <dd class="dl__value dl__value--muted">自动探测 AMF / NVENC / QSV</dd>
+                </div>
+              </dl>
+            </article>
+
+            <article class="card">
+              <span class="card__icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                  <rect x="6.5" y="2.5" width="11" height="19" rx="2.5" />
+                  <path d="M10.5 5.5h3" /><circle cx="12" cy="18.5" r="0.9" />
+                </svg>
+              </span>
+              <h3 class="card__title">Android 安卓端</h3>
+              <p class="card__text">
+                Kotlin + Jetpack Compose 界面，内嵌 Chaquopy CPython 运行同一份导入核心，随包带静态 ffmpeg。
+              </p>
+              <dl class="dl">
+                <div class="dl__row">
+                  <dt class="dl__key">界面</dt>
+                  <dd class="dl__value">Compose Material 3，三页：存储卡 / 队列 / 设置</dd>
+                </div>
+                <div class="dl__row">
+                  <dt class="dl__key">架构</dt>
+                  <dd class="dl__value dl__value--muted">arm64-v8a + armeabi-v7a</dd>
+                </div>
+                <div class="dl__row">
+                  <dt class="dl__key">硬件加速</dt>
+                  <dd class="dl__value dl__value--muted">MediaCodec 硬解 / 硬编，失败自动回退软解</dd>
+                </div>
+              </dl>
+            </article>
+          </div>
+
+          <p class="section__lead mt-32">
+            共享核心位于 <code class="code code--inline">shared/</code>：<code class="code code--inline">insta_index.py</code> 负责索引 protobuf 解析与重建，<code class="code code--inline">instbox/inst_transplant.py</code> 负责 camera_udta 与 inst box 移植，<code class="code code--inline">instbox/moov_rewrap.py</code> 负责 moov 骨架重封装。改共享逻辑时桌面端与安卓端要两处同改——两份代码逻辑等价，但并非字节级一致。
+          </p>
+        </div>
+      </section>
+
 
       <!-- ③ 问题陈述 -->
       <section class="section section--alt" id="problem" aria-labelledby="problem-title">
@@ -332,7 +407,7 @@
           <div class="section__head">
             <h2 class="section__title" id="features-title">功能</h2>
             <p class="section__lead">
-              桌面端 PyQt5 应用。从批量排队到断点续跑，处理的都是「一次几百个文件」这种真实场景。
+              两端共用的能力。从批量排队到断点续跑，处理的都是「一次几百个文件」这种真实场景。
             </p>
           </div>
 
@@ -426,7 +501,7 @@
                   </svg>
                   <div>
                     <p class="feature__title">离线回归</p>
-                    <p class="feature__text">31 项测试，不需要真机也能跑。</p>
+                    <p class="feature__text">34 项测试，不需要真机也能跑。</p>
                   </div>
                 </li>
                 <li class="feature">
@@ -449,79 +524,121 @@
         <div class="container">
           <div class="section__head">
             <h2 class="section__title" id="download-title">下载</h2>
-            <p class="section__lead">单文件 exe，双击运行，无需安装。目前只提供 Windows 版本。</p>
+            <p class="section__lead">
+              桌面端是单文件 exe，双击运行、无需安装；安卓端是 APK，覆盖安装即可。
+            </p>
           </div>
 
-          <div class="release">
-            <div class="release__head">
-              <p class="release__name">InstaAceImporter.exe</p>
-              <span class="tag tag--soft">Latest Release</span>
-            </div>
+          <div class="platform-grid">
+            <article class="release">
+              <div class="release__head">
+                <p class="release__name">Windows 桌面端</p>
+                <span class="tag tag--soft">v1.2.0</span>
+              </div>
 
-            <dl class="meta">
-              <div>
-                <dt class="meta__key">版本</dt>
-                <dd class="meta__value">1.0.0</dd>
-              </div>
-              <div>
-                <dt class="meta__key">平台</dt>
-                <dd class="meta__value">Windows 10 / 11</dd>
-              </div>
-              <div>
-                <dt class="meta__key">大小</dt>
-                <dd class="meta__value">38.93 MB（40,820,647 字节）</dd>
-              </div>
-              <div>
-                <dt class="meta__key">许可证</dt>
-                <dd class="meta__value">GPL-3.0</dd>
-              </div>
-            </dl>
+              <dl class="meta">
+                <div>
+                  <dt class="meta__key">文件</dt>
+                  <dd class="meta__value">InstaAceQml.exe</dd>
+                </div>
+                <div>
+                  <dt class="meta__key">平台</dt>
+                  <dd class="meta__value">Windows 10 / 11（64 位）</dd>
+                </div>
+                <div>
+                  <dt class="meta__key">大小</dt>
+                  <dd class="meta__value">75.18 MB（78,828,598 字节）</dd>
+                </div>
+                <div>
+                  <dt class="meta__key">运行方式</dt>
+                  <dd class="meta__value">单文件，无需安装，无需 Python</dd>
+                </div>
+              </dl>
 
-            <div class="actions">
-              <a
-                class="btn btn--filled"
-                href="https://github.com/DUOFreedom/Insta-camera-tools/releases/latest"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <svg class="btn__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
-                  <path d="M12 4v11" /><path d="M7 11l5 5 5-5" /><path d="M4 19h16" />
-                </svg>
-                前往 Releases 下载
-              </a>
-              <a
-                class="btn btn--alt"
-                href="https://github.com/DUOFreedom/Insta-camera-tools"
-                target="_blank"
-                rel="noopener noreferrer"
-                >查看源码</a
-              >
-            </div>
-
-            <div>
-              <span class="code-label" id="sha-label">SHA256</span>
-              <div class="sha-row">
-                <code class="code code--wrap" id="sha-value"
-                  >E0A2BB89DD45AAC634073D88F238B5EA835E6C0C684C2642CD634F3B47A3D27F</code
+              <div class="actions">
+                <a
+                  class="btn btn--filled"
+                  href="https://github.com/DUOFreedom/Insta-camera-tools/releases/latest"
+                  target="_blank"
+                  rel="noopener noreferrer"
                 >
-                <button class="copy-btn" id="copy-sha" type="button" aria-describedby="sha-label">
-                  <svg class="copy-btn__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
-                    <rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15V5a1 1 0 0 1 1-1h10" />
+                  <svg class="btn__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                    <path d="M12 4v11" /><path d="M7 11l5 5 5-5" /><path d="M4 19h16" />
                   </svg>
-                  <span id="copy-sha-label">复制</span>
-                </button>
+                  前往 Releases 下载
+                </a>
               </div>
-              <p class="sr-only" aria-live="polite" id="copy-status"></p>
-            </div>
 
-            <div>
-              <span class="code-label">校验方法（PowerShell）</span>
-              <code class="code">Get-FileHash .\InstaAceImporter.exe -Algorithm SHA256</code>
-            </div>
+              <div>
+                <span class="code-label" id="sha-win-label">SHA256</span>
+                <div class="sha-row">
+                  <code class="code code--wrap" id="sha-win"
+                    >24C4EBF36172A6BFF0ADFD86090328AF317B0CD9FA8B5D813775251C22CED429</code
+                  >
+                  <button class="copy-btn" data-copy="sha-win" data-label="copy-win-label" type="button">
+                    <svg class="copy-btn__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                      <rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15V5a1 1 0 0 1 1-1h10" />
+                    </svg>
+                    <span id="copy-win-label">复制</span>
+                  </button>
+                </div>
+              </div>
+            </article>
 
-            <p class="section__lead">
-              从源码自行打包得到的 exe 哈希会与此不同——PyInstaller 会把构建时间写进产物，同样的代码每次构建结果都不一致。请以本页面公布的哈希为准核对 Release 下载的文件。
-            </p>
+            <article class="release">
+              <div class="release__head">
+                <p class="release__name">Android 安卓端</p>
+                <span class="tag tag--soft">v1.2.0</span>
+              </div>
+
+              <dl class="meta">
+                <div>
+                  <dt class="meta__key">文件</dt>
+                  <dd class="meta__value">InstaAceAndroid-1.2.0.apk</dd>
+                </div>
+                <div>
+                  <dt class="meta__key">平台</dt>
+                  <dd class="meta__value">Android 8.0+（arm64-v8a / armeabi-v7a）</dd>
+                </div>
+                <div>
+                  <dt class="meta__key">大小</dt>
+                  <dd class="meta__value">69.46 MB（72,830,862 字节）</dd>
+                </div>
+                <div>
+                  <dt class="meta__key">版本码</dt>
+                  <dd class="meta__value">versionCode 14</dd>
+                </div>
+              </dl>
+
+              <div class="actions">
+                <a
+                  class="btn btn--filled"
+                  href="https://github.com/DUOFreedom/Insta-camera-tools/releases/latest"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <svg class="btn__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                    <path d="M12 4v11" /><path d="M7 11l5 5 5-5" /><path d="M4 19h16" />
+                  </svg>
+                  前往 Releases 下载
+                </a>
+              </div>
+
+              <div>
+                <span class="code-label" id="sha-and-label">SHA256</span>
+                <div class="sha-row">
+                  <code class="code code--wrap" id="sha-and"
+                    >60C76774D12F3F5F412C0C2B394BC49B319840E2C1769C6F6D628C4540D401BC</code
+                  >
+                  <button class="copy-btn" data-copy="sha-and" data-label="copy-and-label" type="button">
+                    <svg class="copy-btn__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                      <rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15V5a1 1 0 0 1 1-1h10" />
+                    </svg>
+                    <span id="copy-and-label">复制</span>
+                  </button>
+                </div>
+              </div>
+            </article>
           </div>
 
           <div class="notice mt-24">
@@ -529,42 +646,83 @@
               <circle cx="12" cy="12" r="9" /><path d="M12 8v4.5" /><path d="M12 16h.01" />
             </svg>
             <div>
-              <p class="notice__title">ffmpeg 需要自备</p>
+              <p class="notice__title">桌面端需要自备 ffmpeg</p>
               <p class="notice__body">
-                下载 ffmpeg 后把 ffmpeg.exe 与 ffprobe.exe 放进 exe 同目录的 bin\ 文件夹。程序按「exe 目录 → exe\bin → 系统 PATH」顺序查找，都找不到会明确报错并指出缺哪个。
+                下载 ffmpeg 后把 ffmpeg.exe 与 ffprobe.exe 放进 exe 同目录的 bin\ 文件夹。程序按「exe 目录 → exein → 系统 PATH」顺序查找，都找不到会明确报错并指出缺哪个。
               </p>
               <p class="notice__body">
                 两个文件都要：只放 ffmpeg.exe 不够，程序需要用 ffprobe.exe 读取源文件信息。
               </p>
             </div>
           </div>
+
+          <div class="notice mt-24">
+            <svg class="notice__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+              <circle cx="12" cy="12" r="9" /><path d="M12 8v4.5" /><path d="M12 16h.01" />
+            </svg>
+            <div>
+              <p class="notice__title">安卓端已内置 ffmpeg</p>
+              <p class="notice__body">
+                APK 内已打包静态链接的 ffmpeg 7.1（含 libx264 + libx265）与 ffprobe，双 ABI 合计约 92 MB，不需要额外下载。
+              </p>
+              <p class="notice__body">
+                安装包使用调试证书签名，与早期版本一致，可直接覆盖升级。若手机上是更旧的版本且提示签名冲突，先卸载再安装。
+              </p>
+            </div>
+          </div>
+
+          <p class="section__lead mt-24">
+            从源码自行打包得到的哈希会与此不同——PyInstaller 与 Gradle 都会把构建时间写进产物，同样的代码每次构建结果都不一致。请以本页面公布的哈希为准核对 Release 下载的文件。
+          </p>
         </div>
       </section>
+
 
       <!-- ⑦ 快速开始 -->
       <section class="section section--alt" id="quickstart" aria-labelledby="quickstart-title">
         <div class="container">
           <div class="section__head">
             <h2 class="section__title" id="quickstart-title">快速开始</h2>
-            <p class="section__lead">四步，不需要命令行。</p>
+            <p class="section__lead">两端都不需要命令行。</p>
           </div>
 
+          <h3 class="subhead">Windows 桌面端</h3>
           <ol class="steps">
             <li class="steps__item">
               <span class="steps__num" aria-hidden="true">1</span>
-              <p class="steps__text">把相机卡插到电脑，或者先指定一个输出文件夹。</p>
+              <p class="steps__text">把 ffmpeg.exe 与 ffprobe.exe 放进 exe 同目录的 bin\ 文件夹。</p>
             </li>
             <li class="steps__item">
               <span class="steps__num" aria-hidden="true">2</span>
-              <p class="steps__text">拖入要导入的视频（支持多选、也支持直接拖整个文件夹）。</p>
+              <p class="steps__text">把相机卡插到电脑（经读卡器），或者先指定一个输出文件夹。</p>
             </li>
             <li class="steps__item">
               <span class="steps__num" aria-hidden="true">3</span>
-              <p class="steps__text">点「开始」，等进度条走完。</p>
+              <p class="steps__text">拖入要导入的视频（支持多选、也支持直接拖整个文件夹）。</p>
             </li>
             <li class="steps__item">
               <span class="steps__num" aria-hidden="true">4</span>
-              <p class="steps__text">把卡插回相机，打开相册。</p>
+              <p class="steps__text">点「开始」，等进度条走完，再把卡插回相机。</p>
+            </li>
+          </ol>
+
+          <h3 class="subhead">Android 安卓端</h3>
+          <ol class="steps">
+            <li class="steps__item">
+              <span class="steps__num" aria-hidden="true">1</span>
+              <p class="steps__text">安装 APK，首次启动需勾选同意使用协议。</p>
+            </li>
+            <li class="steps__item">
+              <span class="steps__num" aria-hidden="true">2</span>
+              <p class="steps__text">用 USB-C 读卡器接上相机卡，在「存储卡」页选择卡根目录并授权。</p>
+            </li>
+            <li class="steps__item">
+              <span class="steps__num" aria-hidden="true">3</span>
+              <p class="steps__text">「队列」页添加视频；卡里必须有一对相机原生录制的 VID_/LRV_ 作模板。</p>
+            </li>
+            <li class="steps__item">
+              <span class="steps__num" aria-hidden="true">4</span>
+              <p class="steps__text">点「开始导入」，完成后拔卡插回相机，打开相册。</p>
             </li>
           </ol>
 
@@ -579,7 +737,7 @@
         <div class="container">
           <div class="section__head">
             <h2 class="section__title" id="faq-title">常见问题</h2>
-            <p class="section__lead">七条，覆盖绝大多数「导进去了但相机不认」的情况。</p>
+            <p class="section__lead">九条，覆盖绝大多数「导进去了但相机不认」的情况，以及两端各自的环境问题。</p>
           </div>
 
           <div class="faq">
@@ -678,6 +836,33 @@
               <div class="faq__a">
                 <p>写入 DCIM 目录，文件名按相机规则生成（VID_YYYYMMDD_HHMMSS_000.mp4），文件名冲突时自动递增序号。</p>
                 <p>不会覆盖已有素材。索引写入前会重读现有内容，只追加/替换自己的条目。</p>
+              </div>
+            </details>
+
+            <details class="faq__item">
+              <summary class="faq__q" id="faq-q8" aria-expanded="false">
+                安卓端提示「卡里缺一对真机模板」
+                <svg class="faq__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                  <path d="M6 9l6 6 6-6" />
+                </svg>
+              </summary>
+              <div class="faq__a">
+                <p>卡里必须有一对相机自己录制的 <code class="code code--inline">VID_*.mp4</code> 与 <code class="code code--inline">LRV_*.lrv</code>，导入时需要拿它们当 moov 骨架与 inst box 模板。</p>
+                <p>用相机录一小段（几秒即可），再回来执行导入。</p>
+              </div>
+            </details>
+
+            <details class="faq__item">
+              <summary class="faq__q" id="faq-q9" aria-expanded="false">
+                安卓端导入很慢，或者日志里出现「回退」
+                <svg class="faq__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                  <path d="M6 9l6 6 6-6" />
+                </svg>
+              </summary>
+              <div class="faq__a">
+                <p>编码器默认走软件编码（libx265 + libx264），与桌面端一致，相机识别最稳；设置页可切到「硬件」走 MediaCodec，速度更快。</p>
+                <p>硬编的 i-frame-interval 受系统限制只能取整数秒，拿不到相机要求的 16 帧密集关键帧，若导入后相机不显示缩略图或无法识别，请切回「自动」。</p>
+                <p>硬件解码与硬件编码失败时都会自动回退到软件路径，日志里会打印 <code class="code code--inline">[回退]</code> 行。</p>
               </div>
             </details>
           </div>
@@ -850,10 +1035,40 @@
                   <td class="table__muted">PyQt5 底层框架</td>
                 </tr>
                 <tr>
+                  <td><a class="link" href="https://doc.qt.io/qtforpython/" target="_blank" rel="noopener noreferrer">PySide6</a></td>
+                  <td class="table__muted">≥ 6.5</td>
+                  <td class="table__muted">LGPL-3.0 / GPL-3.0</td>
+                  <td class="table__muted">QML 版桌面界面</td>
+                </tr>
+                <tr>
+                  <td><a class="link" href="https://www.qt.io/" target="_blank" rel="noopener noreferrer">Qt 6</a></td>
+                  <td class="table__muted">6.5+</td>
+                  <td class="table__muted">LGPL-3.0 / GPL-3.0</td>
+                  <td class="table__muted">QML 版底层框架</td>
+                </tr>
+                <tr>
                   <td><a class="link" href="https://ffmpeg.org/" target="_blank" rel="noopener noreferrer">FFmpeg</a></td>
-                  <td class="table__muted">任意近期版本</td>
-                  <td class="table__muted">LGPL-2.1+ / GPL-2.0+</td>
-                  <td class="table__muted">转码与封装（不随仓库分发）</td>
+                  <td class="table__muted">7.1（安卓端静态链接）</td>
+                  <td class="table__muted">GPL-2.0+（含 libx264 / libx265）</td>
+                  <td class="table__muted">转码与封装；桌面端需自备</td>
+                </tr>
+                <tr>
+                  <td><a class="link" href="https://chaquo.com/chaquopy/" target="_blank" rel="noopener noreferrer">Chaquopy</a></td>
+                  <td class="table__muted">16.0.0</td>
+                  <td class="table__muted">MIT（运行时）/ 商业（构建插件）</td>
+                  <td class="table__muted">安卓端内嵌 CPython 3.11</td>
+                </tr>
+                <tr>
+                  <td><a class="link" href="https://developer.android.com/jetpack/compose" target="_blank" rel="noopener noreferrer">Jetpack Compose</a></td>
+                  <td class="table__muted">BOM 2024.06.00</td>
+                  <td class="table__muted">Apache-2.0</td>
+                  <td class="table__muted">安卓端界面</td>
+                </tr>
+                <tr>
+                  <td><a class="link" href="https://kotlinlang.org/" target="_blank" rel="noopener noreferrer">Kotlin</a></td>
+                  <td class="table__muted">1.9.24</td>
+                  <td class="table__muted">Apache-2.0</td>
+                  <td class="table__muted">安卓端界面语言</td>
                 </tr>
               </tbody>
             </table>
@@ -881,12 +1096,22 @@
                   <td class="table__muted">回归测试</td>
                   <td class="table__muted">MIT</td>
                 </tr>
+                <tr>
+                  <td><a class="link" href="https://developer.android.com/build" target="_blank" rel="noopener noreferrer">Android Gradle Plugin</a></td>
+                  <td class="table__muted">安卓端构建</td>
+                  <td class="table__muted">Apache-2.0</td>
+                </tr>
+                <tr>
+                  <td><a class="link" href="https://gradle.org/" target="_blank" rel="noopener noreferrer">Gradle</a></td>
+                  <td class="table__muted">安卓端构建</td>
+                  <td class="table__muted">Apache-2.0</td>
+                </tr>
               </tbody>
             </table>
           </div>
 
           <p class="section__lead">
-            除上述组件外，本项目仅使用 Python 标准库（struct、zlib、subprocess、urllib、threading、ctypes、pathlib、dataclasses 等），无其他第三方代码依赖；索引的 protobuf 编解码为自行实现，未引入 protobuf 库。
+            除上述组件外，共享核心仅使用 Python 标准库（struct、zlib、subprocess、urllib、threading、ctypes、pathlib、dataclasses 等），无其他第三方代码依赖；索引的 protobuf 编解码为自行实现，未引入 protobuf 库。
           </p>
           <p class="section__lead">
             PyQt5 采用 GPL-3.0 授权，本项目同样以 GPL-3.0 发布，二者兼容。
@@ -901,7 +1126,9 @@
               </span>
             </li>
             <li><span>FFmpeg —— 转码与封装</span></li>
-            <li><span>PyQt5 —— 界面框架</span></li>
+            <li><span>PyQt5 / PySide6 —— 桌面端界面框架</span></li>
+            <li><span>Jetpack Compose —— 安卓端界面框架</span></li>
+            <li><span>Chaquopy —— 让 Python 核心跑在 Android 上</span></li>
             <li>
               <span>
                 <a class="link" href="https://www.insta360.com/" target="_blank" rel="noopener noreferrer">Insta360 官方社区</a>
@@ -933,7 +1160,7 @@
       <div class="container">
         <div class="footer__inner">
           <div class="footer__brand">
-            <p class="footer__name">影石相机工具 · InstaAceImporter</p>
+            <p class="footer__name">影石相机工具</p>
             <p class="footer__meta">v1.2.0 · GPL-3.0 · Windows 10 / 11 · Android 8.0+</p>
           </div>
           <div class="footer__links">
@@ -998,32 +1225,32 @@
           });
         });
 
-        /* 复制 SHA256 */
-        var copyBtn = document.getElementById("copy-sha");
-        var copyLabel = document.getElementById("copy-sha-label");
-        var copyStatus = document.getElementById("copy-status");
-        var shaValue = document.getElementById("sha-value");
-
-        if (copyBtn && navigator.clipboard) {
-          copyBtn.addEventListener("click", function () {
-            navigator.clipboard.writeText(shaValue.textContent.trim()).then(
+        /* 复制 SHA256：每个按钮通过 data-copy 指向自己的 <code> 元素 */
+        Array.prototype.forEach.call(document.querySelectorAll(".copy-btn[data-copy]"), function (btn) {
+          var target = document.getElementById(btn.getAttribute("data-copy"));
+          var label = document.getElementById(btn.getAttribute("data-label"));
+          if (!target) return;
+          if (!navigator.clipboard) {
+            btn.hidden = true;
+            return;
+          }
+          btn.addEventListener("click", function () {
+            navigator.clipboard.writeText(target.textContent.trim()).then(
               function () {
-                copyLabel.textContent = "已复制";
-                copyStatus.textContent = "SHA256 已复制到剪贴板";
+                label.textContent = "已复制";
                 window.setTimeout(function () {
-                  copyLabel.textContent = "复制";
-                  copyStatus.textContent = "";
+                  label.textContent = "复制";
                 }, 2000);
               },
               function () {
-                copyLabel.textContent = "复制失败";
-                copyStatus.textContent = "复制失败，请手动选中文本";
+                label.textContent = "复制失败";
+                window.setTimeout(function () {
+                  label.textContent = "复制";
+                }, 2000);
               }
             );
           });
-        } else if (copyBtn) {
-          copyBtn.hidden = true;
-        }
+        });
       })();
     </script>
   </body>
