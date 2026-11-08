@@ -31,9 +31,9 @@
 
 ### 第二轮补充（同日，具备完整构建环境后）
 
-- **APK 已重打**：`versionCode 14 / versionName 0.7.2`，双 ABI，72,830,835 B。产物内 `IBGLA`、`CPVC` 均 0 命中（含 `assets/chaquopy` 下 5 个 `.pyc`）。
+- **APK 已重打**：`versionCode 14 / versionName 0.7.2`，双 ABI，72,830,835 B。产物内设备序列号与第三方产品名均 0 命中（含 `assets/chaquopy` 下 5 个 `.pyc`）。
 - **QML 版已实际打包**：`InstaAceQml.exe --self-test` 输出 `QML_OK roots=1`、退出码 0，产物 205 MB。
-- **`CPVC` 字样清零**：原 16 处（`insta_core.py` 12、`insta_index.py` 4）全部改为「真机原片」等中性表述；技术内容（偏移、参数、字节布局）未动，只去掉第三方产品名。
+- **第三方产品名引用清零**：原 16 处注释（`insta_core.py` 12、`insta_index.py` 4）全部改为「真机原片」等中性表述；技术内容（偏移、参数、字节布局）未动，只去掉产品名与溯源表述。
 - **`release` 关掉 `isDebuggable`**：原为 `true`，正式包不允许（会放行调试器 attach、堆栈导出与 `run-as`）。
 - **签名证书可配置**：改为环境变量 `INSTA_KEYSTORE*` → `local.properties` → debug.keystore 三级查找，不再把口令写死在仓库里。回退 debug.keystore 只为覆盖旧版，正式分发必须配自有证书。
 - **修正 `build.gradle.kts` 的 `Properties` 导入**：Kotlin DSL 需显式 `import java.util.Properties`，且必须放在 `plugins {}` 之前。

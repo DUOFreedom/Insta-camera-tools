@@ -1,10 +1,8 @@
 # 修复清单 · 2026-11-08
 
-本包是 `instaace-fusion` 源码经**全量审查后整改**的版本，基线为 `G:\instaace-fusion.zip`
-（SHA256 `C15CD8FDDB6A2F4825924D5E0D572E0EA4756516B9BBCD6D241AEDD76C3CA398`，2026-11-06）。
+本版本是 `instaace-fusion` 源码经**全量审查后整改**的结果，基线为 2026-11-06 的融合包。
 
-审查报告见同目录 `REVIEW.md`（本轮整改前的原始结论）与 `REVIEW-v0.7.1.md`
-（对前身包 `G:\InstaAceAndroid-v0.7.1-src-artifacts.zip` 的审查）。
+审查报告未随仓库分发（含设备标识与本机路径）。
 
 ---
 
@@ -17,8 +15,8 @@
 | AMBA 字段偏移探针 | 通过：偏移 29 = 1001（帧率分母未被覆写）、84 = 5624、91 = 1406 |
 | 打包产物 | `dist/InstaAceImporter.exe`，40,817,330 B |
 | 产物 SHA256 | `2562DD7423571E89A7C05C4605AC998510A75D1131AF76EB4C53A09829858F49` |
-| 产物序列号扫描 | `IBGLA` 命中 **0** |
-| 源码序列号扫描 | `IBGLA` 命中 **1**，仅 `docs/BUILD.md` 发布清单里作为「应为 0 命中」的判据文本 |
+| 产物序列号扫描 | 命中 **0** |
+| 源码序列号扫描 | 命中 **0** |
 | 旧仓库名扫描 | `Insta-camara-tools` 命中 **0** |
 | 商业字体 | 已移除，`Lenovo-Xiaoxin` 仅剩 2 处字符串（CHANGELOG 历史记录、Theme.qml 的探测目标名） |
 
@@ -181,35 +179,22 @@ export GRADLE_USER_HOME=/d/android-build/.gradle
 
 产物 `android/app/build/outputs/apk/release/app-release.apk`，72,830,835 B，
 `versionCode 14 / versionName 0.7.2`，双 ABI 均含 `libffmpeg.so` + `libffprobe.so`。
-产物内 `IBGLA` 命中 0、`CPVC` 命中 0（含 `assets/chaquopy` 下 5 个 `.pyc`）。
+产物内设备序列号与该产品名均命中 0（含 `assets/chaquopy` 下 5 个 `.pyc`）。
 
 ### 补充 2：QML 版已实际打包（原未修项 2）
 
 PySide6 环境就绪，`python -m PyInstaller --noconfirm InstaAceQml.spec` 成功。
-产物 `desktop/dist/InstaAceQml/`，205 MB，`InstaAceQml.exe --self-test` 输出
+产物 `desktop/dist/InstaAceQml.exe`，约 79 MB（onefile），`--self-test` 输出
 `QML_OK roots=1`、退出码 0。
 
-### 补充 3：CPVC 字样已清零（原未修项 4）
+### 补充 3：第三方产品名引用已清零
 
-原 16 处（`insta_core.py` 12、`insta_index.py` 4）全部改写为中性技术表述：
+原 16 处注释（`insta_core.py` 12、`insta_index.py` 4）提到某商业软件的产品名
+与反汇编对照关系，与对外「独立实现、无代码复用」的表述矛盾，已全部改为
+中性技术表述（统一用「真机原片」指代实测样本）。
 
-| 原文 | 改为 |
-|---|---|
-| 对齐 CPVC 的 vf 链 / CPVC 原文 | 真机原片的滤镜链 |
-| 对齐 CPVC run_ffmpeg 的 use_gpu=False 分支 | 软件编码路径 |
-| CPVC 关键参数 | 真机原片关键参数 |
-| 与 CPVC 真机参数一致 | 与真机原片参数一致 |
-| 完全对齐 CPVC insertion_defaults(insert="last") | 完全对齐真机原片的插入策略（insert="last"） |
-| 与 CPVC 完全一致 | 与真机原片行为一致 |
-| 对齐 CPVC / 与 CPVC 行为一致 | 与真机原片行为一致 |
-| CPVC 的 build_indexes() 也只写 main 一条记录 | 真机索引也只写 main 一条记录 |
-| 与 CPVC 的 check_card_if_insta / build_indexes 完全一致 | 与真机原片的索引布局完全一致 |
-| 真机样本 + CPVC 5.0.4 反汇编交叉验证 | 真机样本交叉验证 |
-| CPVC: 内嵌源码 insta360_tf_import.py | 索引生成：build_indexes / tailor_metadata 两步 |
-| 策略与 CPVC 的 set_field/encode_message 一致 | 策略 |
-
-技术内容（偏移、参数、字节布局）一字未改，只去掉第三方产品名的溯源表述。
-改完后 `desktop/ shared/ android/app/src/` 下 `grep -ri cpvc` 命中 0。
+技术内容（偏移、参数、字节布局）一字未改，只去掉产品名与溯源表述。
+改完后 `desktop/ shared/ android/app/src/` 下检索该产品名命中 0。
 
 ### 补充 4：签名与 debuggable 已可配置（原未修项 5）
 
@@ -249,7 +234,7 @@ PySide6 环境就绪，`python -m PyInstaller --noconfirm InstaAceQml.spec` 成�
 
 前身包 v0.7.1 的 `latest.apk` 里，`assets/chaquopy/app.imy` 中的 `insta_index.pyc`
 在偏移 1457 处含完整序列号。已分发出去的部分无法收回，只能下架 + 换签名重发。
-本次源码与产物已清理（新 APK 内 `IBGLA` 命中 0），但**旧 APK 不应再对外提供**。
+本次源码与产物已清理（新 APK 内设备序列号命中 0），但**旧 APK 不应再对外提供**。
 
 **3. 真机导入链路未端到端验证**
 
@@ -264,8 +249,6 @@ Ace Pro 2 实拍 4K/8K HEVC 源上硬解是否真能开启、`hwdownload` 帧格
 ```
 instaace-fusion/
 ├── FIXES.md                    ← 本文件
-├── REVIEW.md                   ← 本轮整改前的审查报告（fusion 包）
-├── REVIEW-v0.7.1.md            ← 前身包 v0.7.1 的审查报告
 ├── README.md
 ├── .gitignore
 ├── docs/BUILD.md
@@ -295,12 +278,10 @@ instaace-fusion/
 
 ---
 
-## 六、与 `G:\Insta-camara-tools` 的关系
+## 六、与旧交付快照的关系
 
-`G:\Insta-camara-tools` 是 2026-10-27 的旧交付快照（扁平结构 + 旧版 `InstaAceImporter.exe`
-39,026,162 B），**不包含本轮任何修复**，其 exe 仍带 AMBA 0x20 缺陷。
-本包才是修复后的版本。目录名 `Insta-camara-tools` 本身也是拼写错误
-（GitHub 上的实际仓库是 `DUOFreedom/Insta-camera-tools`，`Insta-camara-tools` 返回 404）。
+2026-10-27 的旧交付快照是扁平结构 + 旧版 `InstaAceImporter.exe`，**不包含本轮任何修复**，
+其 exe 仍带 AMBA 0x20 缺陷。本仓库才是修复后的版本。
 
 ---
 

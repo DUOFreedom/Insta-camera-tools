@@ -23,7 +23,7 @@ wheels/
 *.egg
 
 # PyInstaller
-*.spec
+# PyInstaller spec 属于源码（构建配置），不忽略
 *.exe
 
 # Installer logs
@@ -138,3 +138,6 @@ $RECYCLE.BIN/
 
 # Android 原生引擎二进制（92MB，见 docs/BUILD.md 重建方式）
 android/app/src/main/jniLibs/
+
+# 内部审查报告（含设备标识与本机路径，不随仓库分发）
+REVIEW*.md

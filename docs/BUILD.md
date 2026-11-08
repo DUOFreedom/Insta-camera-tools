@@ -25,7 +25,7 @@ cd desktop
 rem 经典版：PyQt5 单文件 exe -> dist\InstaAceImporter.exe
 build.bat
 
-rem QML 版：PySide6 onedir -> dist\InstaAceQml\InstaAceQml.exe
+rem QML 版：PySide6 单文件 exe -> dist\InstaAceQml.exe
 build_qml.bat
 ```
 
@@ -56,10 +56,11 @@ endlocal
 | 文件 | 说明 |
 |------|------|
 | `desktop/dist/InstaAceImporter.exe` | 经典版，PyQt5，单文件，约 39 MB |
-| `desktop/dist/InstaAceQml/` | QML 版，PySide6，onedir 目录（含 Qt6 运行库） |
+| `desktop/dist/InstaAceQml.exe` | QML 版，PySide6，单文件（约 79 MB） |
 
-> QML 版用 onedir 而非 onefile：PySide6 的 Qt6 运行库解压开销大，
-> 单文件启动要数秒；onedir 首帧明显更快。spec 里已排除 WebEngine / Quick3D 等
+> QML 版为 onefile 单文件：首次启动需把约 79 MB 内容解压到 `%TEMP%`，
+> 冷启动约 2-5 秒，之后由系统缓存加速。若更在意启动速度，可把 spec 末尾改回
+> `COLLECT`（onedir）并分发整个文件夹。spec 里已排除 WebEngine / Quick3D 等
 > 用不到的 Qt6 模块以控制体积。
 
 ### 开发模式运行

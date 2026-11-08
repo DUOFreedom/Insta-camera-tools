@@ -154,7 +154,7 @@ PyInstaller 打包的未签名程序会触发 SmartScreen，这是预期行为�
 | 界面 | 技术栈 | 入口 | 构建脚本 | 产物形态 |
 |---|---|---|---|---|
 | 经典版 | PyQt5 5.15 | `gui.py` | `build.bat` / `run.bat` | 单文件 `dist\InstaAceImporter.exe` |
-| QML 版 | PySide6 6.5+ | `main.py` + `bridge.py` + `qml/` | `build_qml.bat` / `run_qml.bat` | onedir `dist\InstaAceQml\` |
+| QML 版 | PySide6 6.5+ | `main.py` + `bridge.py` + `qml/` | `build_qml.bat` / `run_qml.bat` | 单文件 `dist\InstaAceQml.exe`（约 79 MB） |
 
 两套共用同一份 `core.py` 与 `shared/` 下的 `insta_index.py`、`instbox/`，只是界面层不同。
 QML 版依赖 PySide6（LGPL-3.0），经典版依赖 PyQt5（GPL-3.0），两者均列在 `requirements.txt`。
@@ -171,7 +171,7 @@ pip install -r requirements.txt
 python gui.py
 python -m PyInstaller --noconfirm InstaAceImporter.spec
 
-# QML 版（PySide6，onedir）
+# QML 版（PySide6，单文件 exe）
 python main.py
 python -m PyInstaller --noconfirm InstaAceQml.spec
 ```
@@ -197,7 +197,7 @@ Insta-camera-tools\
 │  ├─ build.bat / run.bat         经典版一键构建 / 一键运行
 │  ├─ build_qml.bat / run_qml.bat QML 版一键构建 / 一键运行
 │  ├─ InstaAceImporter.spec       经典版 PyInstaller 配置（onefile）
-│  ├─ InstaAceQml.spec            QML 版 PyInstaller 配置（onedir）
+│  ├─ InstaAceQml.spec            QML 版 PyInstaller 配置（onefile）
 │  ├─ requirements.txt            运行时依赖
 │  ├─ requirements-dev.txt        开发与测试依赖
 │  ├─ CHANGELOG.md                版本变更记录

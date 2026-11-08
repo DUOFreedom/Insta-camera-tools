@@ -25,7 +25,7 @@ instaace-fusion/
 │   ├── build.bat / run.bat        # 经典版一键构建 / 一键运行
 │   ├── build_qml.bat / run_qml.bat# QML 版一键构建 / 一键运行
 │   ├── InstaAceImporter.spec      # 经典版 PyInstaller 配置（onefile）
-│   ├── InstaAceQml.spec           # QML 版 PyInstaller 配置（onedir）
+│   ├── InstaAceQml.spec           # QML 版 PyInstaller 配置（onefile）
 │   ├── requirements.txt           # 运行时依赖（PyQt5 + PySide6）
 │   ├── requirements-dev.txt       # 开发依赖（+ pytest）
 │   ├── assets/                    # 图标、图片等打包资源
@@ -60,7 +60,7 @@ instaace-fusion/
 | 界面 | 技术栈 | 入口 | 构建脚本 | 产物 |
 |---|---|---|---|---|
 | 经典版 | PyQt5 5.15 | `gui.py` | `build.bat` | 单文件 `InstaAceImporter.exe` |
-| QML 版 | PySide6 6.5+ | `main.py` + `bridge.py` + `qml/` | `build_qml.bat` | onedir `InstaAceQml/` |
+| QML 版 | PySide6 6.5+ | `main.py` + `bridge.py` + `qml/` | `build_qml.bat` | 单文件 `InstaAceQml.exe`（约 79 MB） |
 
 ## 核心设计
 
@@ -89,7 +89,7 @@ instaace-fusion/
 ### 桌面端（`desktop/`）
 
 - 语言：Python 3.10+，PyQt5 / PySide6 双界面
-- 打包：PyInstaller（经典版 onefile，QML 版 onedir）
+- 打包：PyInstaller（两版均为 onefile 单文件）
 - 构建与运行命令见 `docs/BUILD.md`
 
 ### 安卓端（`android/`）
@@ -130,12 +130,40 @@ gradle --no-daemon assembleRelease
 
 > 桌面端不锁定具体 Python 小版本；安卓端必须 Python 3.11（Chaquopy 的 armeabi-v7a 构件只到 3.11）。
 
+## 已知限制
+
+### 安卓端 `jniLibs/` 不随仓库分发
+
+`android/app/src/main/jniLibs/<abi>/libffmpeg.so` 与 `libffprobe.so` 共 4 个文件、
+约 92 MB，被 `.gitignore` 排除。**只克隆本仓库无法直接 `assembleRelease`**，
+需要先补齐这两个二进制：
+
+- 它们本质是 **PIE 可执行文件**（静态链接的 ffmpeg 7.1，含 libx264 + libx265），
+  只是沿用 `lib*.so` 命名，以便随 APK 打进 `nativeLibraryDir`（Android 10+ 只允许
+  从该目录执行自带二进制）。
+- 必须保持 `jniLibs { useLegacyPackaging = true }`，否则不会解压到磁盘、无法执行。
+- 重建方式见 [`docs/BUILD.md`](docs/BUILD.md) 的「jniLibs 里的 ffmpeg」一节。
+
+### 真机链路未端到端验证
+
+- AMBA 字段修复只做了合成模板的偏移级验证，未在相机上实拍确认。
+- MediaCodec 硬件解码 / 硬件编码路径带自动回退，但未经真机验证。
+- 首次真机导入后，建议用 `ffprobe` 比对产物与真机原片的 `avg_frame_rate` / `nb_frames`，
+  并检查 `import.log` 中的 `[硬件解码]` / `[回退]` 行。
+
+### 签名
+
+默认回退到 `~/.android/debug.keystore`，仅为能覆盖手机上的旧版。
+**正式分发必须配置自有证书**（环境变量 `INSTA_KEYSTORE` / `INSTA_KEYSTORE_PASSWORD` /
+`INSTA_KEY_ALIAS` / `INSTA_KEY_PASSWORD`，或 `local.properties` 的 `insta.keystore*`），
+否则任何持有 debug.keystore 的人都能伪造升级包。
+
 ## 许可证
 
 本项目采用 **GPL-3.0-or-later** 许可。因为链接了 libx264/libx265（GPL-2.0-or-later），
 FFmpeg 7.1 实际为 GPL-2.0-or-later，与项目 GPL-3.0 兼容。
 
-详见 `desktop/LICENSE` 和 `android/LICENSE`。
+详见根目录 `LICENSE`（以及 `desktop/LICENSE`、`android/LICENSE` 副本）。
 
 ## 变更日志
 
