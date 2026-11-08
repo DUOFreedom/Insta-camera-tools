@@ -4,9 +4,11 @@ package com.duofreedom.instaace.ui
 
 import android.content.Intent
 import android.content.SharedPreferences
+import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -24,6 +26,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.PlaylistPlay
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.Code
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.Info
@@ -49,6 +52,7 @@ import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
@@ -83,6 +87,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 private val TABS = listOf("存储卡", "队列", "设置")
+private const val SOURCE_URL = "https://github.com/DUOFreedom/Insta-camera-tools"
 private const val PREFS_UPDATE = "update_prefs"
 private const val KEY_IGNORED_TAG = "ignored_update_tag"
 
@@ -192,7 +197,7 @@ fun InstaAceApp() {
             CenterAlignedTopAppBar(
                 title = {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("InstaAce 导入器", fontWeight = FontWeight.SemiBold)
+                        Text("影石相机工具", fontWeight = FontWeight.SemiBold)
                         Text(
                             "影石 Ace Pro 2 · 素材导入",
                             style = MaterialTheme.typography.labelSmall,
@@ -566,8 +571,13 @@ private fun SettingsScreen(
     onOpenDoc: (file: String, title: String) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    // 设置项越加越多，小屏必然超过一屏；不给 verticalScroll 的话
+    // 底部内容会被裁掉且无法查看。
     Column(
-        modifier.fillMaxSize().padding(16.dp),
+        modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Card(Modifier.fillMaxWidth()) {
@@ -653,7 +663,60 @@ private fun SettingsScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 HorizontalDivider(Modifier.padding(vertical = 4.dp))
-                Text("作者：B站@铎DUOFreedom", style = MaterialTheme.typography.bodySmall)
+
+                // 开发者与源码入口
+                Text(
+                    "开发者",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(4.dp))
+                Text("B站 @铎DUOFreedom", style = MaterialTheme.typography.bodyMedium)
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    "GitHub  ·  DUOFreedom",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "源代码",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "github.com/DUOFreedom/Insta-camera-tools",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.clickable {
+                        runCatching {
+                            ctx.startActivity(
+                                Intent(Intent.ACTION_VIEW, Uri.parse(SOURCE_URL))
+                            )
+                        }
+                    }
+                )
+                Spacer(Modifier.height(6.dp))
+                OutlinedButton(
+                    onClick = {
+                        runCatching {
+                            ctx.startActivity(
+                                Intent(Intent.ACTION_VIEW, Uri.parse(SOURCE_URL))
+                            )
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(
+                        Icons.Rounded.Code,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(Modifier.size(6.dp))
+                    Text("在浏览器中打开源代码仓库")
+                }
+                Spacer(Modifier.height(8.dp))
                 Text(
                     "GPL-3.0 · 与桌面端同源",
                     style = MaterialTheme.typography.bodySmall,

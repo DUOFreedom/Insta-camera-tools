@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">InstaAce 导入器</string>
+    <string name="app_name">影石相机工具</string>
     <string name="app_subtitle">影石 Ace Pro 2 · 素材导入</string>
     <string name="tab_card">存储卡</string>
     <string name="tab_queue">队列</string>
