@@ -8,6 +8,12 @@ import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.rememberScrollState
@@ -82,6 +88,7 @@ import androidx.compose.ui.unit.dp
 import com.duofreedom.instaace.engine.Engine
 import com.duofreedom.instaace.engine.PythonEngine
 import com.duofreedom.instaace.engine.UpdateCheckListener
+import com.duofreedom.instaace.ui.theme.Motion
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -234,33 +241,54 @@ fun InstaAceApp() {
         snackbarHost = { SnackbarHost(snackbar) },
         containerColor = MaterialTheme.colorScheme.background
     ) { inner ->
-        when (tab) {
-            0 -> CardScreen(
-                state,
-                onPick = { cardPicker.launch(null) },
-                modifier = Modifier.padding(inner)
-            )
-            1 -> QueueScreen(
-                state = state,
-                onPick = { videoPicker.launch(arrayOf("video/*")) },
-                onStart = {
-                    scope.launch {
-                        state.startImport(ctx)
-                        snackbar.showSnackbar(
-                            when {
-                                state.stage.startsWith("失败") || state.stage.startsWith("部分完成") ->
-                                    state.stage
-                                else -> "导入完成：已写回相机卡，拔卡插回相机查看"
-                            }
-                        )
+        // 页面切换：位移 + 淡入淡出，全部走弹簧；方向由序号差决定
+        AnimatedContent(
+            targetState = tab,
+            transitionSpec = {
+                val dir = if (targetState >= initialState) 1 else -1
+                (slideInHorizontally(
+                    animationSpec = Motion.spatialSlow(),
+                    initialOffsetX = { w -> dir * w / 6 }
+                ) + fadeIn(animationSpec = Motion.effectsDefault()))
+                    .togetherWith(
+                        slideOutHorizontally(
+                            animationSpec = Motion.spatialFast(),
+                            targetOffsetX = { w -> -dir * w / 6 }
+                        ) + fadeOut(animationSpec = Motion.effectsFast())
+                    )
+            },
+            label = "tab",
+            modifier = Modifier.padding(inner)
+        ) { current ->
+            when (current) {
+                0 -> CardScreen(
+                    state,
+                    onPick = { cardPicker.launch(null) }
+                )
+                1 -> QueueScreen(
+                    state = state,
+                    onPick = { videoPicker.launch(arrayOf("video/*")) },
+                    onStart = {
+                        scope.launch {
+                            state.startImport(ctx)
+                            snackbar.showSnackbar(
+                                when {
+                                    state.stage.startsWith("失败") || state.stage.startsWith("部分完成") ->
+                                        state.stage
+                                    else -> "导入完成：已写回相机卡，拔卡插回相机查看"
+                                }
+                            )
+                        }
                     }
-                },
-                modifier = Modifier.padding(inner)
-            )
-            else -> SettingsScreen(state, onOpenDoc = { file: String, title: String ->
-                docName = file
-                docTitle = title
-            }, modifier = Modifier.padding(inner))
+                )
+                else -> SettingsScreen(
+                    state,
+                    onOpenDoc = { file: String, title: String ->
+                        docName = file
+                        docTitle = title
+                    }
+                )
+            }
         }
     }
 
@@ -595,13 +623,19 @@ private fun SettingsScreen(
                     }
                 }
                 Spacer(Modifier.height(8.dp))
-                Text(
-                    "自动 = 软件编码（libx265 + libx264，与桌面端一致，相机识别最稳）。\n" +
-                        "硬件 = MediaCodec 硬件编码，速度快很多，但关键帧间隔受系统限制只能 1 秒" +
-                        "（相机要求 16 帧），若导入后相机不显示缩略图或无法识别，请切回「自动」。",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                ExpandableSection(
+                    title = "两种编码器的区别",
+                    subtitle = if (state.encoder == "硬件") "当前：硬件（快，但关键帧间隔受限）"
+                    else "当前：自动（软件编码，识别最稳）"
+                ) {
+                    Text(
+                        "自动 = 软件编码（libx265 + libx264，与桌面端一致，相机识别最稳）。\n" +
+                            "硬件 = MediaCodec 硬件编码，速度快很多，但关键帧间隔受系统限制只能 1 秒" +
+                            "（相机要求 16 帧），若导入后相机不显示缩略图或无法识别，请切回「自动」。",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
         }
 
