@@ -265,9 +265,21 @@ class Bridge(QObject):
     def _run(self, files, out, do_index, auto_seq, encoder) -> None:
         ok_count = 0
         fail_count = 0
+        #   auto_seq=True（默认）：交给 core 扫目录自动接续下一个序号；
+        #   auto_seq=False：从 000 起编号，每成功一个文件 +1，
+        #   避免旧文件把序号顶到高位（此前该开关收下后从未使用）。
+        next_start = None if auto_seq else 0
         try:
             core.set_awake(True)
-            use_inst = do_index and core.is_camera_card(out)
+            card_ok = core.is_camera_card(out)
+            use_inst = do_index and card_ok
+            if do_index and not card_ok:
+                # 用户勾了「登记索引」但输出目录不是相机卡结构：不阻断，
+                # 只降级为纯转码，但要显式告知并写日志，避免用户以为
+                # 已经登记成功（此前是静默降级）。
+                core.append_log(
+                    "[warn] 输出目录不是影石相机卡结构，跳过 inst 移植与索引登记：%s" % out)
+                self._set_status("输出目录不是相机卡结构，改为仅转码")
             template = None
             if use_inst:
                 try:
@@ -296,6 +308,7 @@ class Bridge(QObject):
                             src, out, template=template, encoder=encoder,
                             spec=self._spec, progress=on_progress,
                             cancel=self._cancel, log=self._set_status,
+                            start_number=next_start,
                         )
                         if not result.get("inst_ok"):
                             raise RuntimeError(result.get("inst_error") or "inst 移植失败")
@@ -303,9 +316,11 @@ class Bridge(QObject):
                         core.convert(
                             src, out, encoder=encoder, spec=self._spec,
                             progress=on_progress, cancel=self._cancel,
-                            log=self._set_status,
+                            log=self._set_status, start_number=next_start,
                         )
                     ok_count += 1
+                    if next_start is not None:
+                        next_start += 1
                 except core.CanceledError:
                     break
                 except Exception as exc:

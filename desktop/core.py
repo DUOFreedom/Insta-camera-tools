@@ -1,4 +1,4 @@
-# 影石相机工具 --- 影石 Ace Pro 2 第三方视频导入工具
+﻿# 影石相机工具 --- 影石 Ace Pro 2 第三方视频导入工具
 # Copyright (C) 2026  影石相机工具 contributors
 #
 # This program is free software: you can redistribute it and/or modify
@@ -60,7 +60,7 @@ from pathlib import Path
 import zipfile
 from datetime import datetime, timedelta
 
-__version__ = "1.1.0"
+__version__ = "1.3.0"
 
 # 以下仅为【无真机模板时】的兜底值。
 # 有真机原片时，一律以 analyze_native() 实测结果为准（见 _build_spec_tasks）。
@@ -2085,7 +2085,8 @@ def import_with_inst(source: str, card_root: str,
                      log=None, encoder: tuple[str, str, str] | None = None,
                      progress=None, cancel: threading.Event | None = None,
                      spec: dict | None = None,
-                     cover: str | None = None) -> dict:
+                     cover: str | None = None,
+                     start_number: int | None = None) -> dict:
     """【完整导入】转码 + `.inst` 移植 + 索引登记（三步全做）。
 
     相机识别的三个必要条件：
@@ -2103,6 +2104,9 @@ def import_with_inst(source: str, card_root: str,
         cancel    threading.Event；置位时中断整个导入流程
         spec      原生视频结构；None 时从模板量出
         cover     可选封面图片路径
+        start_number 起始序号；None 表示自动接取输出目录里下一个可用序号
+                  （即「自动接续序号」）。传具体整数则从该序号起编号，
+                  用于关闭自动接续时从 000 开始。
 
     前置条件:
         source 存在且为常规文件；
@@ -2146,6 +2150,11 @@ def import_with_inst(source: str, card_root: str,
         raise ValidationError("spec 必须为 dict 或 None")
     if cover is not None and not isinstance(cover, str):
         raise ValidationError("cover 必须为字符串或 None")
+    if start_number is not None:
+        if isinstance(start_number, bool) or not isinstance(start_number, int):
+            raise ValidationError(f"start_number 必须为整数或 None: {start_number!r}")
+        if start_number < 0:
+            raise ValidationError(f"start_number 不能为负数: {start_number}")
 
     if cancel.is_set():
         raise CanceledError("已取消")
@@ -2183,7 +2192,7 @@ def import_with_inst(source: str, card_root: str,
     p_transcode = _stage_cb(progress, 0.0, 0.70, "转码")
     main_path, proxy_path = convert(source, cam, encoder=encoder,
                                     spec=spec, log=None, progress=p_transcode,
-                                    cancel=cancel)
+                                    cancel=cancel, start_number=start_number)
 
     say("步骤 2/3 移植 inst box...")
     import tempfile as _temp

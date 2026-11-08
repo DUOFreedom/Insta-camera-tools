@@ -5,93 +5,140 @@
 ## 一、桌面端构建（Windows）
 
 ### 环境要求
-- Python 3.14（`C:\Users\Administrator\AppData\Local\Programs\Python\Python314\python.exe`）
-- PyInstaller 6.22.3
-- PyQt5>=5.15
+
+- Python **3.10+**（3.11 / 3.12 / 3.13 均可；仓库不再指定某个具体小版本）
+- PyInstaller 6.x
+- PyQt5 >= 5.15（经典版）与/或 PySide6 >= 6.5（QML 版）
+
+两套界面的依赖都写在 `desktop/requirements.txt` 里，一次装齐即可：
+
+```cmd
+cd desktop
+pip install -r requirements.txt
+```
 
 ### 构建命令
 
 ```cmd
 cd desktop
+
+rem 经典版：PyQt5 单文件 exe -> dist\InstaAceImporter.exe
 build.bat
+
+rem QML 版：PySide6 onedir -> dist\InstaAceQml\InstaAceQml.exe
+build_qml.bat
 ```
 
-`build.bat` 内容：
+两个脚本都只是 `python -m PyInstaller --noconfirm <spec>` 的薄封装，
+真正的打包参数在 spec 文件里（避免命令行漏掉 `--add-data`）。
+
+`desktop/build.bat` 内容：
 
 ```bat
 @echo off
-set PY=C:\Users\Administrator\AppData\Local\Programs\Python\Python314\python.exe
+chcp 936 >nul
+setlocal
 cd /d "%~dp0"
-"%PY%" -m PyInstaller --noconfirm --windowed --onefile --name InstaAceImporter --icon assets\app.ico --add-data "assets;assets" --hiddenimport inst_transplant --hiddenimport moov_rewrap gui.py
+python -c "import PyInstaller" 2>nul
+if errorlevel 1 (
+  echo [错误] 未安装 PyInstaller，请先执行: pip install pyinstaller
+  exit /b 1
+)
+python -m PyInstaller --noconfirm InstaAceImporter.spec
 echo EXITCODE=%ERRORLEVEL%
+endlocal
 ```
+
+`build_qml.bat` 额外检查 `PySide6` 是否可导入，再调用 `InstaAceQml.spec`。
 
 ### 产物
 
 | 文件 | 说明 |
 |------|------|
-| `desktop/dist/InstaAceImporter.exe` | 单文件 GUI 可执行文件（约 39 MB） |
+| `desktop/dist/InstaAceImporter.exe` | 经典版，PyQt5，单文件，约 39 MB |
+| `desktop/dist/InstaAceQml/` | QML 版，PySide6，onedir 目录（含 Qt6 运行库） |
+
+> QML 版用 onedir 而非 onefile：PySide6 的 Qt6 运行库解压开销大，
+> 单文件启动要数秒；onedir 首帧明显更快。spec 里已排除 WebEngine / Quick3D 等
+> 用不到的 Qt6 模块以控制体积。
 
 ### 开发模式运行
 
 ```cmd
 cd desktop
-run.bat
+run.bat        rem 经典版，python gui.py
+run_qml.bat    rem QML 版，pythonw main.py
 ```
+
+QML 版支持自检模式，用于 CI 或快速验证 QML 是否可加载：
+
+```cmd
+python main.py --self-test
+```
+
+成功时打印 `QML_OK roots=N` 并以 0 退出；QML 有语法/导入错误时退出码非 0。
 
 ### 打包说明
 
-- `--onefile --windowed`：单文件、无控制台窗口
-- `--hiddenimport inst_transplant --hiddenimport moov_rewrap`：确保 shared/instbox 模块被打入 PYZ
-- `--add-data "assets;assets"`：将图标资源打入 exe
-- 打包后 `shared/` 目录中的 `insta_index.py` 和 `instbox/` 模块通过 `sys.path` 运行时加载（开发时）；PyInstaller 打包后通过 `_MEIPASS` 定位资源
+- `--onefile --windowed`（经典版）：单文件、无控制台窗口
+- `hiddenimports=['inst_transplant','moov_rewrap']`：确保 shared/instbox 模块被打入 PYZ
+- `hiddenimports=['insta_index','instbox','instbox.inst_transplant','instbox.moov_rewrap']`（QML 版）：同上，另含 `insta_index`
+- `datas=[('assets','assets')]`：图标资源；QML 版另有 `('qml','qml')`
+- `pathex`：经典版为 `['../shared/instbox']`，QML 版为 `['../shared','../shared/instbox']`，
+  让 PyInstaller 能找到 `desktop/` 之外的两个共享模块
 
 ## 二、安卓端构建
 
 ### 环境要求
 
-| 组件 | 版本 | 路径 |
+| 组件 | 版本 | 说明 |
 |------|------|------|
-| JDK | 21 LTS | `D:\android-build\jdk21\jdk-21.0.12.1+1` |
-| Gradle | 8.7 | `D:\android-build\gradle-8.7\bin\gradle` |
-| Android SDK | 34 | `D:\android-build\sdk` |
-| NDK | r27 | `D:\android-build\ndk\android-ndk-r27` |
-| Python | 3.11（Chaquopy） | `D:\android-build\py311\python.exe` |
+| JDK | **21** | 必须 21；Gradle 8.7 不支持 Java 27，构建会直接失败 |
+| Gradle | 8.7 | 或使用 Android Studio 自带的兼容版本 |
+| Android SDK | 34 | `compileSdk = 34` |
+| NDK | r27 | 仅在重建 `jniLibs/` 里的 ffmpeg 时需要 |
+| Python | **3.11** | Chaquopy 用；3.12/3.13 没有 armeabi-v7a 构件，无法出 32 位包 |
 
-> ⚠️ **不要使用 JDK 27**：Gradle 8.7 不支持 Java 27，构建会直接失败（`What went wrong: 27.0.1`），必须使用 JDK 21。
+具体安装路径由本机决定，**不要写死进仓库**。需要告诉 Gradle 的两处位置：
+
+`android/local.properties`（已被 `.gitignore` 排除，不入库）：
+
+```
+sdk.dir=<你的 Android SDK 路径>
+chaquopy.python=<你的 Python 3.11 解释器路径>
+```
+
+也可以改用环境变量 `CHAQUOPY_PYTHON` 指定 Python 3.11；
+两者都不配时由 Chaquopy 自行探测。SDK 路径也支持 `ANDROID_HOME` / `ANDROID_SDK_ROOT`。
 
 ### 构建命令
 
 ```bash
 cd android
-export JAVA_HOME=/d/android-build/jdk21/jdk-21.0.12.1+1
-export ANDROID_HOME=/d/android-build/sdk
-export ANDROID_SDK_ROOT=/d/android-build/sdk
-export GRADLE_USER_HOME=/d/android-build/.gradle
-JAVA_HOME=/d/android-build/jdk21/jdk-21.0.12.1+1 /d/android-build/gradle-8.7/bin/gradle --no-daemon assembleRelease
+export JAVA_HOME=<你的 JDK 21 路径>
+export ANDROID_HOME=<你的 Android SDK 路径>
+export GRADLE_USER_HOME=<可写的 Gradle 缓存目录>
+gradle --no-daemon assembleRelease
 ```
+
+> 首次构建会从 Maven 拉 Chaquopy 与 Compose 依赖，耗时数分钟。
 
 ### 产物
 
 | 文件 | 说明 |
 |------|------|
-| `android/app/build/outputs/apk/release/app-release.apk` | 签名 APK，versionCode 13 / versionName 0.7.1 |
+| `android/app/build/outputs/apk/release/app-release.apk` | 签名 APK，versionCode 14 / versionName 0.7.2 |
 
 ### 签名
 
-使用 `~/.android/debug.keystore`（debug 签名），可覆盖已安装的旧版本（0.1.0 ~ 0.6.x ~ 0.7.0）。
-
-### local.properties 配置
-
-`android/local.properties` 内容：
-
-```
-sdk.dir=D:\\android-build\\sdk
-```
+默认使用 `~/.android/debug.keystore`（debug 签名），可覆盖已安装的旧版本。
+**debug 签名不适合对外分发**——如需发布，请在 `android/app/build.gradle.kts`
+的 `signingConfigs` 里换成自己的 keystore，并把密码放在 `local.properties` 或
+环境变量里，不要提交进仓库。
 
 ### 双 ABI 支持
 
-`android/build.gradle.kts` 已配置：
+`android/app/build.gradle.kts` 已配置：
 
 ```kotlin
 ndk {
@@ -99,17 +146,41 @@ ndk {
 }
 ```
 
+只带 `arm64-v8a` 时，32 位设备会 `INSTALL_FAILED_NO_MATCHING_ABIS`，
+系统界面显示成「应用未安装」。
+
+### jniLibs 里的 ffmpeg
+
+`android/app/src/main/jniLibs/<abi>/` 下的 `libffmpeg.so` / `libffprobe.so`
+**不是真正的动态库**，而是静态链接了 ffmpeg 7.1 + libx264 + libx265 的
+**PIE 可执行文件**，只是沿用 `lib*.so` 命名以便被打进 `nativeLibraryDir`
+（Android 10+ 只允许从该目录执行自带二进制）。
+
+- 必须保持 `jniLibs { useLegacyPackaging = true }`，否则文件会被压缩，无法执行。
+- 该目录被 `.gitignore` 排除（约 92 MB）。重建方式见
+  `InstaAceAndroid` 导出包里的 `BUILD_NOTES.md`（含 9 条交叉编译踩坑记录）。
+- 若只改 Python 逻辑、不动编码参数，不需要重建这两个二进制。
+
 ## 三、共享库说明
 
-`shared/` 下的模块与桌面端和安卓端同源：
+`shared/` 是**桌面端唯一的引用源**：`desktop/` 下没有 `insta_index.py`，
+也没有 `instbox/` 目录，靠 spec 的 `pathex` 指向 `../shared` 与 `../shared/instbox`。
 
-| 模块 | 桌面端引用路径 | 安卓端引用路径 |
-|------|--------------|--------------|
-| `shared/insta_index.py` | `sys.path` 指向 `shared/`，`import insta_index as ix` | 同上 |
-| `shared/instbox/inst_transplant.py` | `import instbox.inst_transplant as _tf` | 同上 |
-| `shared/instbox/moov_rewrap.py` | `import instbox.moov_rewrap as _rw` | 同上 |
+安卓端因为 Chaquopy 只打包 `android/app/src/main/python/` 这一个目录，
+在该目录下保留了同名副本：
 
-桌面端 `desktop/core.py` 和安卓端 `android/src/main/python/insta_core.py` 均已将 `_INST_ORIGIN` 指向仓库根目录的 `shared/`。
+| 模块 | 桌面端 | 安卓端 |
+|------|--------|--------|
+| 索引读写 | `shared/insta_index.py`，`import insta_index as ix` | `android/app/src/main/python/insta_index.py` |
+| inst 移植 | `shared/instbox/inst_transplant.py`，`import instbox.inst_transplant as _tf` | `android/app/src/main/python/insta360_tf_import.py`，`import insta360_tf_import as _tf` |
+| moov 重封装 | `shared/instbox/moov_rewrap.py`，`import instbox.moov_rewrap as _rw` | `android/app/src/main/python/camera_moov_rewrap.py`，`import camera_moov_rewrap as _rw` |
+
+**这两套副本逻辑等价，但不是字节级一致**：安卓副本去掉了 GPL 头、部分中文注释，
+模块名也不同。修改共享逻辑时必须两处同时改——`desktop/tests/` 只覆盖桌面端，
+安卓侧没有自动化测试。
+
+安卓端 `insta_core.py` 的 `_INST_ORIGIN` 指向自身所在目录，配合上面的顶层模块名
+`import` 使用；不要改回 `import instbox.*`（Android 侧不存在该包）。
 
 ## 四、GitHub 发布清单
 
@@ -117,6 +188,8 @@ ndk {
 
 - [ ] `.gitignore` 已排除 `build/`、`dist/`、`*.exe`、`*.apk`、`__pycache__/`、`local.properties`、`android/app/build/` 等构建产物
 - [ ] `desktop/LICENSE` 和 `android/LICENSE` 均为 GPL-3.0
-- [ ] `desktop/CHANGELOG.md` 已记录 AMBA 修复（1.0.1 补丁）
+- [ ] `desktop/CHANGELOG.md` 已记录本次版本的全部修复（当前为 1.3.0）
 - [ ] 顶层 `README.md` 已说明仓库结构与构建步骤
 - [ ] 本目录 `BUILD.md` 已说明双端构建命令
+- [ ] 仓库内无真实设备序列号（`grep -r IBGLA` 应为 0 命中）
+- [ ] 仓库内无商业字体、无写死的本机绝对路径

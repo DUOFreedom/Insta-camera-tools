@@ -53,7 +53,20 @@ QtObject {
     readonly property color iconSecondary: textSecondary
 
     readonly property string fontFamily: "Microsoft YaHei UI"
-    readonly property string fontDisplayFamily: "Lenovo-XiaoxinChaokuGB"
+    // 标题字体：仓库不随附任何商业字体（此前带的是联想小新字体，
+    // 商业授权不允许随 GPL 项目分发）。用户若自行把 .ttf 放进
+    // assets/fonts/，main.py 的 load_fonts() 会注册它，这里的
+    // loadedFonts 就能探测到并启用；否则回退到系统雅黑。
+    readonly property string fontDisplayFamily: {
+        var want = "Lenovo-XiaoxinChaokuGB"
+        var list = (typeof loadedFonts !== "undefined" && loadedFonts) ? loadedFonts : []
+        for (var i = 0; i < list.length; ++i) {
+            if (list[i] === want) {
+                return want
+            }
+        }
+        return "Microsoft YaHei UI"
+    }
 
     readonly property int fontDisplaySize: 22
     readonly property int fontDisplayLine: 28

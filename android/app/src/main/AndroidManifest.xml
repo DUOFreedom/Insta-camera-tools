@@ -1,8 +1,13 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <!-- 导入流程全部走 SAF 目录授权（相机卡经读卡器是 U 盘），
          因此不需要 MANAGE_EXTERNAL_STORAGE / 存储权限。 -->
+
+    <!-- 仅用于 android_bridge._Updater 的 GitHub Release 版本检查（单次 GET，
+         无遥测、无上传）。此前缺失该权限，更新检查必然抛
+         Permission denied 并被静默吞掉。 -->
+    <uses-permission android:name="android.permission.INTERNET" />
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"

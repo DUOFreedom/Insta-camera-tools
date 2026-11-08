@@ -39,8 +39,15 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
+# shared/ 是 insta_index.py 与 instbox/ 的唯一来源，测试不依赖外部 PYTHONPATH。
+SHARED = os.path.join(os.path.dirname(ROOT), "shared")
+if SHARED not in sys.path:
+    sys.path.insert(0, SHARED)
+
 import core                  # noqa: E402
 import insta_index as ix     # noqa: E402
+from instbox import inst_transplant as tf  # noqa: E402
+from instbox import moov_rewrap as rw      # noqa: E402
 
 SAMPLES = os.path.join(ROOT, "samples")
 FILEINFO = os.path.join(SAMPLES, "fileinfo_list.list")
@@ -295,3 +302,81 @@ def test_set_awake_returns_bool():
         assert isinstance(ok, bool)
     finally:
         core.set_awake(False)
+
+# ---------------------------------------------------------------- AMBA 字段
+# 铁律：AMBA box 内 0x54 (84) 是音频采样率、0x5B (91) 是音频帧数；
+# 0x20 (32) 属于 0x1D (29) 处的视频帧率分母字段的高字节。
+# 曾因 udta_with_audio_frames 误用 amba[0]+0x20 把 1001 覆写成 4160750569，
+# 每次导入都会写坏产物，且当时测试对此零覆盖。以下三条是防回归护栏。
+
+THUMB = 896 * 512 * 3 // 2
+NAIL = 688144
+
+
+def _make_udta(amba_size: int = 128, nail_size: int = NAIL) -> bytes:
+    """合成一个 udta：首个子 box 是 AMBA，随后是 nail。"""
+    amba = struct.pack(">I4s", amba_size, b"AMBA") + b"\x00" * (amba_size - 8)
+    thumb = b"\x11" * THUMB
+    nail = struct.pack(">I4sII", nail_size, b"nail", 896, 512) + thumb
+    body = amba + nail
+    assert len(body) + 8 == 8 + amba_size + nail_size
+    return struct.pack(">I4s", 8 + len(body), b"udta") + body
+
+
+def _make_template(tmp_path):
+    """合成一个最小 MP4：ftyp + moov(mvhd + udta)，够 extract_udta 用。"""
+    udta = _make_udta()
+    mvhd = struct.pack(">I4s", 8, b"mvhd")
+    moov_body = mvhd + udta
+    moov = struct.pack(">I4s", 8 + len(moov_body), b"moov") + moov_body
+    ftyp = struct.pack(">I4s4s", 16, b"ftyp", b"isom") + b"\x00\x00\x02\x00"
+    path = tmp_path / "native.mp4"
+    path.write_bytes(ftyp + moov)
+    return path
+
+
+STATS = {
+    "video_timescale": 30000,
+    "video_duration_ts": 300000,
+    "video_frames": 300,
+    "audio_rate": 48000,
+    "audio_frames": 1406,
+}
+
+
+def test_udta_with_audio_frames_keeps_fps_denominator():
+    """udta_with_audio_frames 只能写 0x54/0x5B，不能碰 0x1D 的 1001。"""
+    udta = _make_udta()
+    buf = bytearray(udta)
+    struct.pack_into("<I", buf, 8 + 29, 1001)     # camera_udta 写入的帧率分母
+    data = bytes(buf)
+
+    out = rw.udta_with_audio_frames(data, (0, len(data), b"udta"), 1406)
+
+    assert struct.unpack_from("<I", out, 8 + 29)[0] == 1001          # 未被覆写
+    assert struct.unpack_from("<I", out, 8 + 0x54)[0] == 1406 * 4    # 音频采样率
+    assert struct.unpack_from("<I", out, 8 + 0x5B)[0] == 1406        # 音频帧数
+
+
+def test_udta_with_audio_frames_rejects_small_amba():
+    """AMBA 太短时必须抛错，不能越界静默写。"""
+    udta = _make_udta(amba_size=64)
+    with pytest.raises(ValueError, match="AMBA"):
+        rw.udta_with_audio_frames(udta, (0, len(udta), b"udta"), 100)
+
+
+def test_camera_udta_writes_expected_amba_fields(tmp_path):
+    """camera_udta 的九个字段必须落在文档声明的偏移上。"""
+    template = _make_template(tmp_path)
+    udta = tf.camera_udta(
+        template, old_name="", new_name="",
+        thumbnail=b"\x00" * THUMB, stats=STATS,
+    )
+    amba = [b for b in tf.child_boxes(bytearray(udta), 8, len(udta)) if b[2] == b"AMBA"][0]
+    off = amba[0]
+    got = {o: struct.unpack_from("<I", udta, off + o)[0]
+           for o in (25, 29, 41, 49, 53, 67, 71, 84, 91)}
+    assert got == {
+        25: 30000, 29: 1001, 41: 300000, 49: 300, 53: 16,
+        67: 48000, 71: 1024, 84: 1406 * 4, 91: 1406,
+    }

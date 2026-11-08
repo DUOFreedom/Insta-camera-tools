@@ -97,8 +97,14 @@ class Updater(QObject):
             self._tag = tag
             self._url = str(payload.get("html_url") or FALLBACK_URL)
             self._available = True
-        except Exception:
-            pass
+        except Exception as exc:  # noqa: BLE001
+            # 网络不可达、API 限流、证书错误都属预期失败，不应中断界面；
+            # 但必须留痕，否则「更新检查永远无声失效」无从排查
+            # （此前这里是裸 pass，与本项目其它模块的静默吞异常同源）。
+            try:
+                core.append_log("[update] %s: %s" % (type(exc).__name__, exc))
+            except Exception:  # noqa: BLE001
+                pass
         finally:
             self._checking = False
             self.stateChanged.emit()

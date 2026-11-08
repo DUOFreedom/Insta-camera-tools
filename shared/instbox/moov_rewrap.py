@@ -175,27 +175,31 @@ def strip_sei(sample: bytes, *, hevc: bool) -> bytes:
 
 
 def udta_with_audio_frames(data: bytes, udta_box, audio_frames: int) -> bytes:
-    """将 AMBA box 内的音频采样率和帧数更新为实际值。
+    """把 AMBA box 内的音频采样率和帧数更新为实测值。
 
-    AMBA box 内结构不固定，不能硬编码绝对偏移量。这里按实测布局写入：
-      0x54 (84): 音频采样率
-      0x5B (91): 音频帧数
-    若偏移超出 box 范围则抛异常，避免静默写错字节。
+    AMBA box 内字段偏移（相对 AMBA box 起始，与
+    inst_transplant.camera_udta 的 _amba_fields 同一基准）：
+      0x54 (84): 音频采样率 -> audio_frames * 4
+      0x5B (91): 音频帧数   -> audio_frames
+
+    注意 0x20-0x23 是视频帧率 (fps_num / fps_den)、0x24-0x27 是视频总帧数，
+    不能当音频采样率写；早期版本误用 amba[0]+0x20，会覆写 0x1D 处的帧率
+    分母字段。若偏移超出 box 范围则抛异常，避免静默写坏字节。
     """
     udta = bytearray(box_bytes(data, udta_box))
     amba_boxes = [item for item in insta.child_boxes(udta, 8, len(udta)) if item[2] == b"AMBA"]
     if not amba_boxes:
         raise ValueError("udta has no AMBA box")
     amba = amba_boxes[0]
-    amba_start = amba[0] + 8  # AMBA box 数据区起始（跳过 8 字节 box header）
-    if amba[0] + 92 > len(udta):
-        raise ValueError(f"AMBA box too small: size={amba[1]}, offset={amba[0]}")
-    audio_rate_offset = amba[0] + 0x20
-    audio_frames_offset = amba[0] + 0x5B
-    if audio_rate_offset + 4 > len(udta):
-        raise ValueError(f"AMBA box too small: offset={audio_rate_offset}, size={len(udta)}")
-    if audio_frames_offset + 4 > len(udta):
-        raise ValueError(f"AMBA box too small: offset={audio_frames_offset}, size={len(udta)}")
+    amba_end = amba[0] + amba[1]           # AMBA box 自身的结束位置
+    audio_rate_offset = amba[0] + 0x54    # 与 camera_udta 的 (84, frames * 4) 对齐
+    audio_frames_offset = amba[0] + 0x5B  # 与 camera_udta 的 (91, frames) 对齐
+    # 边界必须按 AMBA box 自身长度判定：只比 len(udta) 会把字段写进紧随其后
+    # 的 nail box —— 产物看似正常，实际音频字段落在错误位置。
+    if audio_rate_offset + 4 > amba_end:
+        raise ValueError(f"AMBA box too small: offset=0x54, box_size={amba[1]}")
+    if audio_frames_offset + 4 > amba_end:
+        raise ValueError(f"AMBA box too small: offset=0x5B, box_size={amba[1]}")
     struct.pack_into("<I", udta, audio_rate_offset, audio_frames * 4)
     struct.pack_into("<I", udta, audio_frames_offset, audio_frames)
     return bytes(udta)

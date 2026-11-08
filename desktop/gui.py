@@ -1,4 +1,4 @@
-# 影石相机工具 --- 影石 Ace Pro 2 第三方视频导入工具
+﻿# 影石相机工具 --- 影石 Ace Pro 2 第三方视频导入工具
 # Copyright (C) 2026  影石相机工具 contributors
 #
 # This program is free software: you can redistribute it and/or modify
@@ -1171,6 +1171,10 @@ class App(QWidget):
 
             ok, bad = [], []
             total = max(1, len(todo))
+            #   auto=True（默认）：交给 core 扫目录自动接续下一个序号；
+            #   auto=False：从 000 起编号，每成功一个文件 +1。
+            #   此前该参数传进来后从未使用，「自动接续序号」是死开关。
+            next_start = None if auto else 0
             media_metas: dict[str, bytes] = {}
             inst_errs_log: list[str] = []
             idx_err_log: list[str] = []
@@ -1193,7 +1197,8 @@ class App(QWidget):
                         res = _core.import_with_inst(
                             src, dest, template=tpl, log=self._sig_status.emit,
                             encoder=enc_arg, progress=_cb, spec=spec,
-                            cover=item_cover, cancel=self._cancel)
+                            cover=item_cover, cancel=self._cancel,
+                            start_number=next_start)
                         if res.get("inst_metas"):
                             media_metas.update(res.get("inst_metas") or {})
                         for _ie in (res.get("inst_error") or "").split("; "):
@@ -1217,7 +1222,7 @@ class App(QWidget):
                         main_p, lrv_p = _core.convert(
                             src, dest, encoder=enc_arg,
                             log=self._sig_status.emit, progress=_cb, spec=spec,
-                            cancel=self._cancel)
+                            cancel=self._cancel, start_number=next_start)
                         ok.append((src, main_p, lrv_p))
                 except _core.CanceledError:
                     self._sig_status.emit("  ⏹ {}: 已取消".format(

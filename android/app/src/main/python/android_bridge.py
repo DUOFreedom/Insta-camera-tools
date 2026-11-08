@@ -26,6 +26,16 @@ _rw = None
 _log_file = None
 
 
+def _core_version():
+    """取 insta_core 的版本号。
+
+    本模块自身不定义版本常量（版本号只存在于 insta_core.py）。早期在
+    _Updater._run 里直接引用裸名，会抛 NameError 并被 except 静默吞掉，
+    表现为更新检查永远无声失效。
+    """
+    return getattr(_core, "__version__", "?")
+
+
 def init(ffmpeg_path, ffprobe_path, cache_dir):
     """初始化：设置工具路径与临时目录，导入核心模块。返回版本字符串。"""
     global _core, _tf, _rw, _log_file
@@ -199,14 +209,14 @@ class _Updater:
     def _run(self, callback):
         try:
             request = urllib.request.Request(_API_URL, headers={
-                "User-Agent": "InstaAceAndroid/%s" % __version__,
+                "User-Agent": "InstaAceAndroid/%s" % _core_version(),
                 "Accept": "application/vnd.github+json",
             })
             with urllib.request.urlopen(request, timeout=_TIMEOUT) as resp:
                 payload = json.loads(resp.read().decode("utf-8", "replace"))
             tag = str(payload.get("tag_name") or "")
             latest = _parse_version(tag)
-            current = _parse_version(__version__)
+            current = _parse_version(_core_version())
             if not tag or latest is None or current is None:
                 return
             if tag == self._ignored_tag or latest <= current:
@@ -216,8 +226,14 @@ class _Updater:
             self._available = True
             if callback:
                 callback(tag, self._url)
-        except Exception:
-            pass
+        except Exception as exc:  # noqa: BLE001
+            # 早期是裸 pass：网络不通 / 仓库 404 / 无 INTERNET 权限都会静默失败。
+            try:
+                if _log_file:
+                    with open(_log_file, "a", encoding="utf-8") as fh:
+                        fh.write("[update] %s: %s\n" % (type(exc).__name__, exc))
+            except Exception:  # noqa: BLE001
+                pass
         finally:
             self._checking = False
 

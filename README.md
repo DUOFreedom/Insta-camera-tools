@@ -1,69 +1,103 @@
 # InstaAce — 影石 Ace Pro 2 第三方视频导入工具
 
-融合仓库：**同时支持桌面端（Windows PyQt5）和安卓端（Chaquopy / Android Gradle）** 的影石 Ace Pro 2 视频导入工具。
+融合仓库：**桌面端（Windows，双界面）+ 安卓端（Chaquopy / Gradle）** 的影石 Ace Pro 2 视频导入工具。
 
-普通视频转码为影石相机相册可识别的原生格式（VID + LRV 双文件、移植 `inst` box、登记相机索引），使手机相册与 App 能识别并播放。
+普通视频转码为影石相机相册可识别的原生格式（VID + LRV 双文件、移植 `inst` box、登记相机索引），使相机相册与 App 能识别并播放。
 
 ## 仓库结构
 
 ```
 instaace-fusion/
-├── shared/              # 共享核心库（桌面 + 安卓通用）
+├── shared/                        # 共享核心库（桌面端唯一引用源）
 │   ├── __init__.py
-│   ├── insta_index.py   # 相机索引 protobuf 解析/生成（fileinfo_list.list, .editinfo_list.list）
-│   └── instbox/         # inst box 移植与 moov 重封装
+│   ├── insta_index.py             # 相机索引 protobuf 解析/生成
+│   └── instbox/                   # inst box 移植与 moov 重封装
 │       ├── __init__.py
-│       ├── inst_transplant.py  # camera_udta / inst box 移植 / ftyp 补丁 / 索引登记
-│       └── moov_rewrap.py      # moov 骨架重封装 / 音视频样本重排 / avc1 采样条目精简
-├── desktop/             # 桌面端（Windows，PyQt5 + PyInstaller）
-│   ├── core.py          # 转码核心（桌面版，含 GUI 调用接口）
-│   ├── gui.py           # PyQt5 图形界面
-│   ├── build.bat        # PyInstaller 一键打包脚本
-│   ├── run.bat          # 开发模式直接运行脚本
-│   ├── InstaAceImporter.spec  # PyInstaller 打包规范
-│   ├── requirements.txt # 运行时依赖（PyQt5）
-│   ├── requirements-dev.txt   # 开发依赖（PyQt5 + pytest）
-│   ├── assets/          # 图标、图片等打包资源
-│   ├── tests/           # pytest 离线回归
-│   ├── tools/           # make_icon.py 等辅助工具
-│   ├── CHANGELOG.md     # 桌面端变更日志
-│   └── LICENSE          # GPL-3.0
-├── android/             # 安卓端（Gradle + Chaquo Python）
-│   ├── build.gradle.kts         # Gradle 构建配置（双 ABI arm64-v8a/armeabi-v7a）
+│       ├── inst_transplant.py     # camera_udta / inst box 移植 / ftyp 补丁 / 索引登记
+│       └── moov_rewrap.py         # moov 骨架重封装 / 样本重排 / avc1 条目精简
+├── desktop/                       # 桌面端（Windows）
+│   ├── core.py                    # 转码核心（含 QML/CLI 调用接口）
+│   ├── gui.py                     # 经典版界面（PyQt5）
+│   ├── main.py                    # QML 版入口（PySide6）
+│   ├── bridge.py                  # QML 版与 core.py 的槽/信号桥
+│   ├── updater.py                 # QML 版更新检查
+│   ├── qml/                       # 24 个 QML 组件与视图
+│   ├── build.bat / run.bat        # 经典版一键构建 / 一键运行
+│   ├── build_qml.bat / run_qml.bat# QML 版一键构建 / 一键运行
+│   ├── InstaAceImporter.spec      # 经典版 PyInstaller 配置（onefile）
+│   ├── InstaAceQml.spec           # QML 版 PyInstaller 配置（onedir）
+│   ├── requirements.txt           # 运行时依赖（PyQt5 + PySide6）
+│   ├── requirements-dev.txt       # 开发依赖（+ pytest）
+│   ├── assets/                    # 图标、图片等打包资源
+│   ├── tests/                     # pytest 离线回归
+│   ├── tools/                     # make_icon.py 等辅助工具
+│   ├── CHANGELOG.md               # 桌面端变更日志
+│   └── LICENSE                    # GPL-3.0
+├── android/                       # 安卓端（Gradle + Chaquopy）
+│   ├── app/build.gradle.kts       # 应用构建配置（双 ABI）
+│   ├── app/src/main/AndroidManifest.xml
+│   ├── app/src/main/python/       # Chaquopy Python 源码
+│   │   ├── insta_core.py          # 转码核心（安卓版）
+│   │   ├── android_bridge.py      # 桥接层（初始化、导入、日志、更新检查）
+│   │   ├── camera_moov_rewrap.py  # moov 重封装（安卓副本）
+│   │   ├── insta360_tf_import.py  # inst box 移植（安卓副本）
+│   │   └── insta_index.py         # 相机索引（安卓副本）
+│   ├── app/src/main/java/         # Kotlin（Compose UI + Python 引擎封装）
+│   ├── build.gradle.kts
 │   ├── settings.gradle.kts
 │   ├── gradle.properties
-│   ├── local.properties         # SDK 路径（需本地配置 sdk.dir）
-│   ├── AndroidManifest.xml      # 应用清单
-│   ├── LICENSE                  # GPL-3.0
-│   └── src/main/python/         # Chaquo Python 源码
-│       ├── insta_core.py        # 转码核心（安卓版，含 android_bridge 调用）
-│       ├── android_bridge.py    # 安卓桥接层（卡检测、索引写入、前台服务等）
-│       ├── camera_moov_rewrap.py# moov 重封装（安卓版）
-│       ├── insta360_tf_import.py# inst box 移植（安卓版）
-│       └── insta_index.py       # 相机索引（安卓版副本）
-├── docs/                # 文档
-└── README.md            # 本文件
+│   ├── local.properties           # SDK 路径，本机配置，不入库
+│   └── LICENSE                    # GPL-3.0
+├── docs/
+│   └── BUILD.md                   # 双端构建指南
+└── README.md                      # 本文件
 ```
+
+## 桌面端两套界面
+
+两套界面功能等价，共用同一份 `core.py` 与 `shared/`：
+
+| 界面 | 技术栈 | 入口 | 构建脚本 | 产物 |
+|---|---|---|---|---|
+| 经典版 | PyQt5 5.15 | `gui.py` | `build.bat` | 单文件 `InstaAceImporter.exe` |
+| QML 版 | PySide6 6.5+ | `main.py` + `bridge.py` + `qml/` | `build_qml.bat` | onedir `InstaAceQml/` |
 
 ## 核心设计
 
-### 共享库 (`shared/`)
-`instbox/inst_transplant.py`、`instbox/moov_rewrap.py`、`insta_index.py` 三个模块在桌面端和安卓端之间**完全同源**（字节级一致），已修复以下问题：
+### 共享库（`shared/`）
 
-- **AMBA 硬编码偏移**：`camera_udta` 中 9 个硬编码 AMBA 偏移（25/29/41/49/53/67/71/84/91）改为表驱动 `_amba_fields`，逐字段做 `_off + 4 > amba_size` 越界校验，超界抛 `ValueError`，不再静默写错字节。
-- **AMBA 音频偏移**：`udta_with_audio_frames` 中 `amba[0]+84`/`amba[0]+91` 改为按实测布局的 `amba[0]+0x20`（音频采样率）/`amba[0]+0x5B`（音频帧数），并加边界检查；修复 `audio_fps_field` 未定义导致的 `NameError`。
+`shared/` 是**桌面端唯一的引用源**：`desktop/` 下没有 `insta_index.py`，也没有 `instbox/` 目录，
+靠 spec 的 `pathex` 指向 `../shared` 与 `../shared/instbox`。
 
-### 桌面端 (`desktop/`)
-- 语言：Python 3.11+，PyQt5 GUI
-- 打包：PyInstaller `--onefile --windowed`，输出单文件 `InstaAceImporter.exe`
-- 构建：`desktop/build.bat`
-- 直接运行：`desktop/run.bat`
+安卓端因为 Chaquopy 只打包 `android/app/src/main/python/` 一个目录，保留了同名副本
+（`insta360_tf_import.py` / `camera_moov_rewrap.py` / `insta_index.py`）。
+**两套副本逻辑等价但不是字节级一致**：安卓副本去掉了 GPL 头与部分中文注释，模块名也不同。
+修改共享逻辑时必须两处同时改，`desktop/tests/` 只覆盖桌面端。
 
-### 安卓端 (`android/`)
-- 语言：Python 3.11（Chaquopy）+ Kotlin
+已修复的关键缺陷：
+
+- **AMBA 字段重叠写**：`udta_with_audio_frames` 曾把「音频采样率」写到 `amba[0]+0x20`，
+  而 `0x20-0x23` 实际是视频帧率（fps_num/fps_den），与 `camera_udta` 写入的
+  `(29, 1001)` 在 AMBA 内字节 **32** 处重叠，导致每次导入都把帧率分母写成垃圾值。
+  现改为 `amba[0]+0x54`（与 `camera_udta` 的 `(84, frames*4)` 对齐）。
+- **AMBA 越界校验**：`camera_udta` 的 9 个偏移改为表驱动 `_amba_fields`，
+  逐字段做 `_off + 4 > amba_size` 校验，超界抛 `ValueError`。
+- **安卓端模块加载**：`insta_core.py` 的 `_INST_ORIGIN` 指向自身所在目录，
+  并用顶层模块名 `import insta360_tf_import` / `import camera_moov_rewrap`
+  （Android 侧没有 `instbox` 包，旧写法会让 `init()` 直接抛异常）。
+
+### 桌面端（`desktop/`）
+
+- 语言：Python 3.10+，PyQt5 / PySide6 双界面
+- 打包：PyInstaller（经典版 onefile，QML 版 onedir）
+- 构建与运行命令见 `docs/BUILD.md`
+
+### 安卓端（`android/`）
+
+- 语言：Python 3.11（Chaquopy）+ Kotlin（Compose）
 - 构建：Gradle，双 ABI `arm64-v8a` + `armeabi-v7a`
-- 签名：`~/.android/debug.keystore`（debug.keystore，可覆盖安装）
-- APK：`versionCode 13 / versionName 0.7.1`
+- 签名：默认 `~/.android/debug.keystore`，**对外分发前须换成正式签名**
+- APK：`versionCode 14 / versionName 0.7.2`
 
 ## 快速开始
 
@@ -71,17 +105,18 @@ instaace-fusion/
 
 ```cmd
 cd desktop
-build.bat
+pip install -r requirements.txt
+build.bat          rem 经典版 -> dist\InstaAceImporter.exe
+build_qml.bat      rem QML 版 -> dist\InstaAceQml\
 ```
-
-产物：`desktop/dist/InstaAceImporter.exe`
 
 ### 安卓端构建
 
 ```bash
 cd android
-# 需配置 local.properties 中的 sdk.dir 指向 Android SDK
-JAVA_HOME=/d/android-build/jdk21 /d/android-build/gradle-8.7/bin/gradle --no-daemon assembleRelease
+# 先在 local.properties 配置 sdk.dir 与 chaquopy.python（或用环境变量）
+export JAVA_HOME=<JDK 21 路径>
+gradle --no-daemon assembleRelease
 ```
 
 产物：`android/app/build/outputs/apk/release/app-release.apk`
@@ -90,12 +125,15 @@ JAVA_HOME=/d/android-build/jdk21 /d/android-build/gradle-8.7/bin/gradle --no-dae
 
 | 平台 | 关键依赖 | 构建工具 |
 |------|---------|---------|
-| 桌面端 | Python 3.14，PyQt5>=5.15，PyInstaller 6.22.3 | PyInstaller |
+| 桌面端 | Python 3.10+，PyQt5>=5.15，PySide6>=6.5，PyInstaller 6.x | PyInstaller |
 | 安卓端 | JDK 21，Gradle 8.7，Android SDK 34，NDK r27，Chaquopy Python 3.11，ffmpeg 7.1（静态 libx264+libx265） | Gradle |
+
+> 桌面端不锁定具体 Python 小版本；安卓端必须 Python 3.11（Chaquopy 的 armeabi-v7a 构件只到 3.11）。
 
 ## 许可证
 
-本项目采用 **GPL-3.0-or-later** 许可。因为链接了 libx264/libx265（GPL-2.0-or-later），FFmpeg 7.1 实际为 GPL-2.0-or-later，与项目 GPL-3.0 兼容。
+本项目采用 **GPL-3.0-or-later** 许可。因为链接了 libx264/libx265（GPL-2.0-or-later），
+FFmpeg 7.1 实际为 GPL-2.0-or-later，与项目 GPL-3.0 兼容。
 
 详见 `desktop/LICENSE` 和 `android/LICENSE`。
 
@@ -105,4 +143,5 @@ JAVA_HOME=/d/android-build/jdk21 /d/android-build/gradle-8.7/bin/gradle --no-dae
 
 ## 真机验证
 
-安卓 APK 需在实际 Insta360 Ace Pro 2 设备上验证：覆盖安装 `latest.apk`，导入一段视频，确认相机相册能识别并播放。本机无 adb，验证依赖用户提供 `import.log` 或截图。
+安卓 APK 需在实际 Insta360 Ace Pro 2 设备上验证：覆盖安装 APK，导入一段视频，
+确认相机相册能识别并播放。构建机上无 adb，验证依赖真机侧导出的 `import.log` 或截图。

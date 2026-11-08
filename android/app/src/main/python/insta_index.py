@@ -10,7 +10,7 @@ Insta360 相机相册不是靠"扫目录"认文件的（这点和 DJI 不同）�
     <卡根>/DCIM/.editinfo_list.list         编辑索引（"是否已编辑"标记）
 
 
-（与 CPVC 的 check_card_if_insta / build_indexes 完全一致。）
+（与真机原片的索引布局完全一致。）
 
 格式（逆向自真机样本）
 =====================
@@ -23,7 +23,7 @@ fileinfo_list.list
         MediaInfo meta = 2;     // 完整元数据块（可为空）
     }
     message MediaInfo {
-        string device_serial = 1;    // "IBGLA2606J3U7N"
+        string device_serial = 1;    // 设备序列号
         string device_model  = 2;    // "Insta360 Ace Pro 2"
         string firmware      = 3;    // "v_2.0.50_build1"
         string gyro          = 5;    // "1_5144.896_4098.847_..."
@@ -55,9 +55,9 @@ fileinfo_list.list
 
 逆向来源
 ========
-真机样本 + CPVC 5.0.4 反汇编交叉验证：
+真机样本交叉验证：
 - 样本：本目录 *_list.list(+.bak 历史序列)
-- CPVC: 内嵌源码 insta360_tf_import.py（build_indexes / tailor_metadata）
+- 索引生成：build_indexes / tailor_metadata 两步
 """
 
 from __future__ import annotations
@@ -197,7 +197,7 @@ class MediaInfo:
     def to_bytes(self) -> bytes:
         """序列化。
 
-        策略与 CPVC 的 set_field/encode_message 一致：
+        策略：
         以原始字段序列为基准，只对"已知且被改写"的字段做就地替换，
         未知字段原样保留 —— 这样重建结果与真机字节级一致。
         """

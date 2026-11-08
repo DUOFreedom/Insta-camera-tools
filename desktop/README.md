@@ -9,10 +9,11 @@
 转码成相机原生结构（VID + LRV）· 移植 `inst` box · 登记相机索引
 插回相机，相册里能识别、能播放、封面正确
 
-[![Version](https://img.shields.io/badge/version-1.0.0-blue?style=flat-square)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.3.0-blue?style=flat-square)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-GPL--3.0-green?style=flat-square)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-lightgrey?style=flat-square)]()
 [![Python](https://img.shields.io/badge/python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white)]()
+[![PySide6](https://img.shields.io/badge/PySide6-6.5%2B-41CD52?style=flat-square&logo=qt&logoColor=white)]()
 [![ffmpeg](https://img.shields.io/badge/ffmpeg-required-007808?style=flat-square&logo=ffmpeg&logoColor=white)]()
 
 [下载](#下载) · [快速开始](#快速开始) · [功能](#功能) · [常见问题](#常见问题) · [从源码构建](#从源码构建) · [技术原理](#技术原理) · [开源声明](#开源声明)
@@ -40,13 +41,12 @@
 从 [**Releases**](../../releases/latest) 下载 `InstaAceImporter.exe`，双击运行，无需安装。
 
 ```text
-InstaAceImporter.exe   38.93 MB (40,820,647 字节)
-SHA256  E0A2BB89DD45AAC634073D88F238B5EA835E6C0C684C2642CD634F3B47A3D27F
+InstaAceImporter.exe   约 39 MB（单文件，免安装）
 ```
 
 > 校验方法：`Get-FileHash .\InstaAceImporter.exe -Algorithm SHA256`
 >
-> 从源码自行打包得到的 exe 哈希会与此不同——PyInstaller 会把构建时间写进产物，同样的代码每次构建结果都不一致。请以本页面公布的哈希为准核对 Release 下载的文件。
+> 每个 Release 页面会公布该次产物的 SHA256。从源码自行打包得到的哈希必然不同——PyInstaller 会把构建时间写进产物，同样的代码每次构建结果都不一致。
 
 > **ffmpeg 需要自备。** 下载 ffmpeg 后把 `ffmpeg.exe` 与 `ffprobe.exe` 放进 exe 同目录的 `bin\` 文件夹。
 > 程序按「exe 目录 → exe\bin → 系统 PATH」顺序查找，都找不到会明确报错并指出缺哪个。
@@ -147,47 +147,80 @@ PyInstaller 打包的未签名程序会触发 SmartScreen，这是预期行为�
 不会覆盖已有素材。索引写入前会重读现有内容，只追加/替换自己的条目。
 </details>
 
+## 两套界面
+
+仓库里有**两套**桌面界面，功能等价，任选其一：
+
+| 界面 | 技术栈 | 入口 | 构建脚本 | 产物形态 |
+|---|---|---|---|---|
+| 经典版 | PyQt5 5.15 | `gui.py` | `build.bat` / `run.bat` | 单文件 `dist\InstaAceImporter.exe` |
+| QML 版 | PySide6 6.5+ | `main.py` + `bridge.py` + `qml/` | `build_qml.bat` / `run_qml.bat` | onedir `dist\InstaAceQml\` |
+
+两套共用同一份 `core.py` 与 `shared/` 下的 `insta_index.py`、`instbox/`，只是界面层不同。
+QML 版依赖 PySide6（LGPL-3.0），经典版依赖 PyQt5（GPL-3.0），两者均列在 `requirements.txt`。
+
 ## 从源码构建
 
 ```powershell
-git clone https://github.com/duofreedom/Insta-camara-tools.git
-cd Insta-camara-tools
+git clone https://github.com/duofreedom/Insta-camera-tools.git
+cd Insta-camera-tools\desktop
 
 pip install -r requirements.txt
-python gui.py                                              # 直接运行
-python -m PyInstaller --noconfirm InstaAceImporter.spec    # 打包
+
+# 经典版（PyQt5，单文件 exe）
+python gui.py
+python -m PyInstaller --noconfirm InstaAceImporter.spec
+
+# QML 版（PySide6，onedir）
+python main.py
+python -m PyInstaller --noconfirm InstaAceQml.spec
 ```
 
-打包产物在 `dist\InstaAceImporter.exe`。
+打包产物分别在 `dist\InstaAceImporter.exe` 与 `dist\InstaAceQml\`。
 
 **环境要求：** Windows 10 / 11，Python 3.10 及以上，ffmpeg 与 ffprobe 在 PATH 中或放在 `bin\`。
 
 ## 目录结构
 
 ```text
-Insta-camara-tools\
-├─ core.py                    核心：转码、inst 移植、索引登记、开工体检
-├─ gui.py                     PyQt5 界面：拖拽、三阶段进度、任务队列
-├─ insta_index.py             相机索引 protobuf 读写
-├─ instbox\                   inst box 移植与 moov 重封装
-│  ├─ inst_transplant.py      索引构建、元数据裁剪、box 移植主流程
-│  └─ moov_rewrap.py          moov 骨架重建与样本表生成
-├─ tests\test_insta.py        离线回归测试套件
-├─ assets\                    图标资源（SVG / ICO / PNG）
-├─ tools\make_icon.py         SVG 转多尺寸 ICO 生成器
-├─ build.bat / run.bat        一键构建 / 一键运行
-├─ InstaAceImporter.spec      PyInstaller 打包配置
-├─ requirements.txt           运行时依赖
-├─ requirements-dev.txt       开发与测试依赖
-├─ CHANGELOG.md               版本变更记录
-├─ README.md                  本文件
-└─ LICENSE                    GPL-3.0
+Insta-camera-tools\
+├─ desktop\                       桌面端（Windows）
+│  ├─ core.py                     核心：转码、inst 移植、索引登记、开工体检
+│  ├─ gui.py                      经典版界面（PyQt5）：拖拽、三阶段进度、任务队列
+│  ├─ main.py                     QML 版入口（PySide6），加载 qml\main.qml
+│  ├─ bridge.py                   QML 版与 core.py 之间的槽/信号桥
+│  ├─ updater.py                  QML 版更新检查（GitHub Releases）
+│  ├─ qml\                        24 个 QML 组件与视图
+│  ├─ assets\                     图标资源（SVG / ICO / PNG）与内嵌字体
+│  ├─ tests\test_insta.py         离线回归测试套件
+│  ├─ tools\make_icon.py          SVG 转多尺寸 ICO 生成器
+│  ├─ build.bat / run.bat         经典版一键构建 / 一键运行
+│  ├─ build_qml.bat / run_qml.bat QML 版一键构建 / 一键运行
+│  ├─ InstaAceImporter.spec       经典版 PyInstaller 配置（onefile）
+│  ├─ InstaAceQml.spec            QML 版 PyInstaller 配置（onedir）
+│  ├─ requirements.txt            运行时依赖
+│  ├─ requirements-dev.txt        开发与测试依赖
+│  ├─ CHANGELOG.md                版本变更记录
+│  └─ LICENSE                     GPL-3.0
+├─ shared\                        两端共享的 Python 核心
+│  ├─ insta_index.py              相机索引 protobuf 读写
+│  └─ instbox\
+│     ├─ inst_transplant.py       索引构建、元数据裁剪、box 移植主流程
+│     └─ moov_rewrap.py           moov 骨架重建与样本表生成
+├─ android\                       安卓端（Kotlin + Chaquopy）
+├─ docs\BUILD.md                  双端构建指南
+└─ README.md                      仓库总览
 ```
+
+> 关于「共享」的准确含义：`shared/` 是桌面端唯一的引用源（`desktop/` 下没有副本）。
+> 安卓端因 Chaquopy 只打包 `android/app/src/main/python/` 目录，保留了该目录下的同名副本，
+> 二者**逻辑等价但不是字节级一致**（安卓副本去掉了 GPL 头与部分中文注释）。
+> 修改共享逻辑时必须同时改这两处，`desktop/tests/` 只覆盖桌面端。
 
 ## 回归测试
 
 ```powershell
-cd Insta-camara-tools
+cd Insta-camera-tools
 pip install -r requirements-dev.txt
 python -m pytest -q
 ```
@@ -251,6 +284,8 @@ python -m pytest -q
 | [Python](https://www.python.org/) | 3.10+ | [PSF License](https://docs.python.org/3/license.html) | 运行环境 |
 | [PyQt5](https://riverbankcomputing.com/software/pyqt/) | ≥ 5.15 | [GPL-3.0](https://www.gnu.org/licenses/gpl-3.0.html) | 图形界面（Qt5 绑定） |
 | [Qt 5](https://www.qt.io/) | 5.15 | [LGPL-3.0](https://www.gnu.org/licenses/lgpl-3.0.html) / GPL-3.0 | PyQt5 底层框架 |
+| [PySide6](https://doc.qt.io/qtforpython/) | ≥ 6.5 | [LGPL-3.0](https://www.gnu.org/licenses/lgpl-3.0.html) | QML 版界面（Qt6 官方绑定） |
+| [Qt 6](https://www.qt.io/) | 6.5+ | LGPL-3.0 / GPL-3.0 | PySide6 底层框架 |
 | [FFmpeg](https://ffmpeg.org/) | 任意近期版本 | [LGPL-2.1+](https://ffmpeg.org/legal.html) / GPL-2.0+ | 转码与封装 |
 
 **关于 FFmpeg：** 本项目通过 `subprocess` 调用外部 `ffmpeg.exe` / `ffprobe.exe`，属于进程间调用，不链接其代码，因此不构成衍生作品。FFmpeg **不随本仓库分发**，需用户自行下载安装。请从[官方站点](https://ffmpeg.org/download.html)或 [gyan.dev](https://www.gyan.dev/ffmpeg/builds/) 获取，并遵守其许可证——若使用带 `--enable-gpl` 的构建，该构建本身受 GPL 约束。
@@ -268,7 +303,13 @@ python -m pytest -q
 
 ### 协议兼容性说明
 
-PyQt5 采用 GPL-3.0 授权，本项目同样以 GPL-3.0 发布，二者兼容。若需在闭源项目中使用 PyQt5，应改用 [PySide6](https://doc.qt.io/qtforpython/)（LGPL）。
+本项目以 GPL-3.0 发布，包含两套并列的界面：经典版用 **PyQt5**（Riverbank 以 GPL-3.0 授权），QML 版用 **PySide6**（Qt 官方绑定，LGPL-3.0）。
+
+- PyQt5 的 GPL-3.0 与本项目协议一致，可整体以 GPL-3.0 分发。
+- PySide6 为 LGPL-3.0，作为动态链接库使用并保留其许可证声明即满足要求；本项目并未修改 Qt/PySide6 本身。
+- 两套界面**不互相依赖**：只分发其中之一时，只需保留对应那套的许可证声明。
+
+若你希望在闭源项目中复用本项目代码，请自行移除 PyQt5 部分（其 GPL-3.0 具有传染性），仅保留 PySide6 路径。
 
 ## 致谢
 
@@ -276,7 +317,8 @@ PyQt5 采用 GPL-3.0 授权，本项目同样以 GPL-3.0 发布，二者兼容�
 
 - **[YCTS-otree](https://github.com/YCTS-otree)** —— 感谢其在影石相机文件格式逆向分析上的公开工作，为理解 `inst` box 布局与索引 protobuf 结构提供了重要参考
 - [FFmpeg](https://ffmpeg.org/) —— 转码与封装
-- [PyQt5](https://riverbankcomputing.com/software/pyqt/) —— 界面框架
+- [PyQt5](https://riverbankcomputing.com/software/pyqt/) —— 经典版界面框架
+- [PySide6](https://doc.qt.io/qtforpython/) / [Qt 6](https://www.qt.io/) —— QML 版界面框架
 - [Insta360 官方社区](https://www.insta360.com/) —— 设备使用与格式相关的公开讨论
 
 ## 免责声明

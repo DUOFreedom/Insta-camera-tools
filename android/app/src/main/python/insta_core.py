@@ -37,7 +37,7 @@ from pathlib import Path
 import zipfile
 from datetime import datetime, timedelta
 
-__version__ = "1.1.0"
+__version__ = "1.3.0"
 
 # 以下仅为【无真机模板时】的兜底值。
 # 有真机原片时，一律以 analyze_native() 实测结果为准（见 _build_spec_tasks）。
@@ -747,9 +747,9 @@ def _run_ffmpeg(cmd: list[str], duration: float, progress=None, cancel=None,
 
 
 def _scale_pad(w: int, h: int) -> str:
-    """缩放并居中填充到目标尺寸（对齐 CPVC 的 vf 链）。
+    """缩放并居中填充到目标尺寸（真机原片的滤镜链）。
 
-    CPVC 原文：
+    真机原片的滤镜链：
         scale=...:force_original_aspect_ratio=decrease,
         pad=...:(ow-iw)/2:(oh-ih)/2:black,setsar=1,format=yuv420p,setrange=full
     """
@@ -827,7 +827,7 @@ def _build_transcode_cmd(src, dst, vcodec, tag, vf, enc_params,
                          color_range, src_audio_count=0, is_lrv=False,
                          fps: str = FPS, level: int | None = None,
                          bitrate: int | None = None, hw_decoder: str = "") -> list[str]:
-    """软件编码命令（对齐 CPVC run_ffmpeg 的 use_gpu=False 分支）。
+    """软件编码命令（软件编码路径）。
 
     hw_decoder 非空时，输入侧用 MediaCodec 解码（帧为 surface），
     滤镜链最前面加 hwdownload,format=nv12 拉回系统内存。
@@ -880,7 +880,7 @@ def _build_hw_transcode_cmd(src, dst, vcodec, tag, vf, extra_args,
                             bitrate: int | None = None, hw_decoder: str = "") -> list[str]:
     """硬件编码命令（桌面端 AMF/NVENC/QSV，或 Android MediaCodec）。
 
-    CPVC 关键参数：-g 16 -keyint_min 16 -sc_threshold 0 -bf 0 -extra_sei 0
+    真机原片关键参数：-g 16 -keyint_min 16 -sc_threshold 0 -bf 0 -extra_sei 0
                   -udu_sei 0 -c:a aac 192k 48k 2ch + bt709 + 30000/1001 cfr
 
       - 绝对不要加 -hwaccel（那是解码选项，会导致
@@ -921,7 +921,7 @@ def _build_hw_transcode_cmd(src, dst, vcodec, tag, vf, extra_args,
                 "-keyint_min", "16", "-sc_threshold", "0"]
         prof = "high" if "264" in vcodec else "main"
         cmd += ["-profile:v", prof]
-    # 像素格式处理（CPVC 的 vf 已含 format=yuv420p,setrange=full）
+    # 像素格式处理（目标 vf 已含 format=yuv420p,setrange=full）
     if "qsv" in vcodec:
         vf2 = vf + ",format=nv12"
     else:
@@ -1007,7 +1007,7 @@ def _build_spec_tasks(input_path, output_dir, seq, stamp, hw, spec):
         preview_vc, preview_tag = h264_enc, "avc1"
         extra = _hw_extra_args(hevc_enc)
     else:
-        #   主视频 libx265 / 预览 libx264，与 CPVC 真机参数一致。
+        #   主视频 libx265 / 预览 libx264，与真机原片参数一致。
         main_vc, main_tag = "libx265", "hvc1"
         preview_vc, preview_tag = "libx264", "avc1"
         extra = []
@@ -1269,7 +1269,7 @@ def convert(input_path: str, output_dir: str, start_number: int | None = None,
 def _card_timeline(output_dir: str) -> tuple[datetime | None, int]:
     """扫描卡里已有 VID_/LRV_ 文件，返回 (最大时间, 最大序号)。
 
-    完全对齐 CPVC insertion_defaults(insert="last")：
+    完全对齐真机原片的插入策略（insert="last"）：
         when     = 卡里现有最大时间 + 1 秒
         sequence = 卡里现有最大序号 + 1
     这样连续导入多个视频时时间戳自然递增、且总比卡里最新的更新。
@@ -1451,19 +1451,23 @@ def has_inst_box(path: str) -> tuple[bool, int]:
 # 没有 inst box 的视频 → 相机视为"外来文件"，会自行重建索引或直接忽略。
 # 这就是"相机能自己重建索引"的根本原因。
 #
-# 做法（与 CPVC 完全一致）：
+# 做法（与真机原片行为一致）：
 #   1. 用真机原片作模板 —— 取它的 moov 骨架、udta、inst box
 #   2. 把自己编码的视频样本，按真机的采样表重新封装
 #   3. 移植 inst box 并更新其中的 protobuf 元数据 / 偏移表
 #   4. patch_ftyp 把 free 改成 wide
-# 共享核心库位于仓库根目录的 shared/instbox（与桌面端同源）
-_INST_ORIGIN = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                            "..", "..", "..", "shared")
+# .inst 移植模块与 insta_core.py 平铺在同一目录（Chaquopy 已把
+# app/src/main/python 挂进 sys.path），模块名沿用顶层名
+# insta360_tf_import / camera_moov_rewrap，与桌面端 shared/instbox 同源。
+# 早期写成 "..", "..", "..", "shared"：从 app/src/main/python 上溯三级只到
+# android/，拼出的 android/shared 不存在；且模块按 instbox.* 包名导入，
+# 而 Android 侧没有该包 → init() 必然抛 RuntimeError。见 REVIEW.md P0-2。
+_INST_ORIGIN = os.path.dirname(os.path.abspath(__file__))
 
 def _load_inst_modules():
-    """按需加载 shared/instbox 下的 .inst 移植模块（与桌面端同源）。
+    """按需加载同目录下的 .inst 移植模块（与桌面端 shared/instbox 同源）。
 
-      instbox 里的模块用 ffprobe()/ffmpeg 子进程，
+      insta360_tf_import / camera_moov_rewrap 用 ffprobe()/ffmpeg 子进程，
       若靠 PATH 查找，打包后会抛 WinError 2。
     """
     for key, finder in (("FFMPEG_PATH", find_ffmpeg),
@@ -1478,8 +1482,8 @@ def _load_inst_modules():
             os.environ[key] = found
     if _INST_ORIGIN not in sys.path:
         sys.path.insert(0, _INST_ORIGIN)
-    import instbox.inst_transplant as _tf          # noqa: PLC0415
-    import instbox.moov_rewrap as _rw              # noqa: PLC0415
+    import insta360_tf_import as _tf               # noqa: PLC0415
+    import camera_moov_rewrap as _rw               # noqa: PLC0415
     return _tf, _rw
 
 def extract_inst_meta(path: str) -> bytes | None:
@@ -1652,7 +1656,7 @@ def _write_inplace(path: str, data: bytes) -> None:
 
 
 def _write_index_file(path: str, data: bytes, log=None) -> None:
-    """写入索引文件，保留 Windows 隐藏属性与 ACL（对齐 CPVC）。
+    """写入索引文件，保留 Windows 隐藏属性与 ACL（与真机原片行为一致）。
 
       那是隐藏文件，`wb`（CREATE_ALWAYS）会因隐藏属性+ACL 报
       PermissionError [Errno 13]（即使管理员/属主也会被拒）。
@@ -1716,7 +1720,7 @@ def _read_index(path: str) -> bytes:
     return open(path, "rb").read() if os.path.isfile(path) else b""
 
 def _backup_once(path: str) -> str | None:
-    """写入前做时间戳备份（与 CPVC 行为一致）。仅备份一次。"""
+    """写入前做时间戳备份（与真机原片行为一致）。仅备份一次。"""
     if not os.path.isfile(path):
         return None
     import shutil
@@ -1815,7 +1819,7 @@ def register_to_card(card_root: str, media_paths: list[str],
             src_abs = os.path.join(cam_dir, name)
 
         #   真机卡实测：fileinfo_list.list 里条目全是 VID，LRV 一条都没有；
-        #   CPVC 的 build_indexes() 也只写 main 一条记录（catalog_path）。
+        #   真机索引也只写 main 一条记录（catalog_path）。
         #   把 LRV 也登记会多出一个 proxy 条目（f26.2=1），
         #   相机把它显示成 0 KB 且无法播放。
         if name.lower().endswith(".lrv"):
@@ -2398,7 +2402,7 @@ def _attach_prepare_and_attach(tf, rw, gen_p, native_p, label, is_proxy,
     # c) 接上模板的 inst box
     tmp_with_inst.write_bytes(gen_p.read_bytes() + tpl_inst)
 
-    # c2)  缩略图必须在 rebuild_media 【之前】写入（对齐 CPVC main()）。
+    # c2)  缩略图必须在 rebuild_media 【之前】写入（与真机原片行为一致）。
     if (os.environ.get("INSTA_NO_THUMB_PATCH") != "1"
             and thumbnail and len(thumbnail) == 896 * 512 * 3 // 2):
         try:
@@ -2514,7 +2518,7 @@ def _meta_equivalent(a: bytes, b: bytes) -> bool:
     / f26 路径与 proxy 标记。逐字节比全量反而易因 f9 可变长而误判。
     这里比较：长度近似 + 关键字段逐个相等。
     """
-    import instbox.inst_transplant as _tf
+    import insta360_tf_import as _tf
     try:
         fa = _tf.parse_message(a)
         fb = _tf.parse_message(b)
