@@ -100,10 +100,10 @@ fun ConsentGate(
     var checked by rememberSaveable { mutableStateOf(false) }
     var showFull by remember { mutableStateOf(false) }
 
-    // 协议全文：随包 assets/docs/使用协议与隐私政策.md
+    // 协议全文：随包 assets/docs/privacy-policy.md（ASCII 文件名，避免 AAPT 编码问题）
     val policyText = remember {
         runCatching {
-            ctx.assets.open("docs/使用协议与隐私政策.md")
+            ctx.assets.open("docs/privacy-policy.md")
                 .bufferedReader().use { it.readText() }
         }.getOrElse { "无法读取协议全文：${it.message}" }
     }
@@ -125,15 +125,16 @@ fun ConsentGate(
         text = {
             Column(Modifier.verticalScroll(rememberScrollState())) {
                 Text(
-                    "本应用是完全离线的本地工具：所有转码与索引处理都在你的手机上完成，" +
-                        "不联网、不收集、不上传任何数据。",
+                    "本应用的转码与索引处理全部在你的手机上本地完成，" +
+                        "不收集、不上传任何数据。",
                     style = MaterialTheme.typography.bodyMedium
                 )
                 Spacer(Modifier.height(10.dp))
                 Text(
                     "开始使用前，请阅读并同意《使用协议与隐私政策》。" +
                         "要点：\n" +
-                        "· 不申请任何危险权限，也不申请网络权限\n" +
+                        "· 不申请任何危险权限\n" +
+                        "· 唯一的联网行为是启动时查一次新版本（不下载、不上传）\n" +
                         "· 存储访问需你在系统目录选择器中亲自授权，随时可撤销\n" +
                         "· 导入会改写相机卡的索引文件，导入前建议备份 DCIM 目录\n" +
                         "· 请确保你对导入的视频内容拥有合法权利",

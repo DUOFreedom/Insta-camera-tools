@@ -90,6 +90,7 @@ private const val KEY_IGNORED_TAG = "ignored_update_tag"
 fun InstaAceApp() {
     val ctx = LocalContext.current
     var docName by remember { mutableStateOf<String?>(null) }
+    var docTitle by remember { mutableStateOf<String>("") }
     val state = remember { AppState() }
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
@@ -106,7 +107,7 @@ fun InstaAceApp() {
 
     if (!consented) {
         ConsentGate(
-            onOpenFullPolicy = { docName = it },
+            onOpenFullPolicy = { docName = "privacy-policy.md"; docTitle = "使用协议与隐私政策" },
             onAgree = {
                 Consent.setAgreed(ctx)
                 consented = true
@@ -251,7 +252,10 @@ fun InstaAceApp() {
                 },
                 modifier = Modifier.padding(inner)
             )
-            else -> SettingsScreen(state, onOpenDoc = { docName = it }, modifier = Modifier.padding(inner))
+            else -> SettingsScreen(state, onOpenDoc = { file: String, title: String ->
+                docName = file
+                docTitle = title
+            }, modifier = Modifier.padding(inner))
         }
     }
 
@@ -557,7 +561,11 @@ private fun EmptyState(modifier: Modifier = Modifier) {
 /* -------------------------------------------------------------------- 设置 */
 
 @Composable
-private fun SettingsScreen(state: AppState, onOpenDoc: (String) -> Unit, modifier: Modifier = Modifier) {
+private fun SettingsScreen(
+    state: AppState,
+    onOpenDoc: (file: String, title: String) -> Unit,
+    modifier: Modifier = Modifier
+) {
     Column(
         modifier.fillMaxSize().padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -658,16 +666,17 @@ private fun SettingsScreen(state: AppState, onOpenDoc: (String) -> Unit, modifie
                     Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    FilledTonalButton(onClick = { onOpenDoc("使用协议与隐私政策.md") }) {
+                    FilledTonalButton(onClick = { onOpenDoc("privacy-policy.md", "使用协议与隐私政策") }) {
                         Text("使用协议与隐私", style = MaterialTheme.typography.labelMedium)
                     }
-                    FilledTonalButton(onClick = { onOpenDoc("开源合规声明.md") }) {
+                    FilledTonalButton(onClick = { onOpenDoc("open-source-notices.md", "开源合规声明") }) {
                         Text("开源合规声明", style = MaterialTheme.typography.labelMedium)
                     }
                 }
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "权限：仅 1 项 AndroidX 自定义签名权限；无危险权限、无网络权限。" +
+                    "权限：无危险权限。仅申请 INTERNET 用于启动时检查新版本" +
+                        "（单次 GET，不下载、不上传、无遥测）；" +
                         "存储访问通过系统目录选择器按需授权，随时可撤销。",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
