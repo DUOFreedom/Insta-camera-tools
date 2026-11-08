@@ -699,6 +699,10 @@ pre {
 }
 
 .card__title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
   font-size: 16px;
   font-weight: 600;
 }

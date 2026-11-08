@@ -128,7 +128,7 @@
               把普通视频变成影石 Ace Pro 2 的「原生」素材
             </h1>
             <p class="hero__tagline">
-              转码成相机原生结构（VID + LRV）、移植 inst box、登记相机索引。Windows 桌面端与安卓端同源，插回相机，相册里能识别、能播放、封面正确。
+              转码成相机原生结构（VID + LRV）、移植 inst box、登记相机索引。插回相机，相册里能识别、能播放、封面正确。桌面端已发布，安卓端开发中。
             </p>
             <div class="hero__actions">
               <a
@@ -159,7 +159,7 @@
             <ul class="hero__meta" aria-label="项目基本信息">
               <li class="tag">GPL-3.0</li>
               <li class="tag">Windows 10 / 11</li>
-              <li class="tag">Android 8.0+</li>
+              <li class="tag">安卓端源码可构建</li>
               <li class="tag">双端同源</li>
             </ul>
           </div>
@@ -207,7 +207,7 @@
           <div class="section__head">
             <h2 class="section__title" id="platforms-title">两端同源，一套核心</h2>
             <p class="section__lead">
-              转码、inst box 移植、索引登记这三件事由同一份 Python 核心实现，桌面端与安卓端各自套一层界面。
+              转码、inst box 移植、索引登记这三件事由同一份 Python 核心实现，桌面端与安卓端各自套一层界面。桌面端已发布，安卓端源码可用但还在打磨。
             </p>
           </div>
 
@@ -246,9 +246,10 @@
                   <path d="M10.5 5.5h3" /><circle cx="12" cy="18.5" r="0.9" />
                 </svg>
               </span>
-              <h3 class="card__title">Android 安卓端</h3>
+              <h3 class="card__title">Android 安卓端<span class="tag">开发中</span></h3>
               <p class="card__text">
                 Kotlin + Jetpack Compose 界面，内嵌 Chaquopy CPython 运行同一份导入核心，随包带静态 ffmpeg。
+                源码可构建，尚未发布安装包。
               </p>
               <dl class="dl">
                 <div class="dl__row">
@@ -525,7 +526,7 @@
           <div class="section__head">
             <h2 class="section__title" id="download-title">下载</h2>
             <p class="section__lead">
-              桌面端是单文件 exe，双击运行、无需安装；安卓端是 APK，覆盖安装即可。
+              桌面端是单文件 exe，双击运行、无需安装。安卓端开发中，暂不提供安装包。
             </p>
           </div>
 
@@ -588,56 +589,47 @@
             <article class="release">
               <div class="release__head">
                 <p class="release__name">Android 安卓端</p>
-                <span class="tag tag--soft">v1.2.0</span>
+                <span class="tag">暂未发布</span>
               </div>
 
               <dl class="meta">
                 <div>
-                  <dt class="meta__key">文件</dt>
-                  <dd class="meta__value">InstaAceAndroid-1.2.0.apk</dd>
+                  <dt class="meta__key">状态</dt>
+                  <dd class="meta__value">开发中，暂不提供安装包</dd>
                 </div>
                 <div>
                   <dt class="meta__key">平台</dt>
                   <dd class="meta__value">Android 8.0+（arm64-v8a / armeabi-v7a）</dd>
                 </div>
                 <div>
-                  <dt class="meta__key">大小</dt>
-                  <dd class="meta__value">69.46 MB（72,830,862 字节）</dd>
+                  <dt class="meta__key">源码</dt>
+                  <dd class="meta__value">已在仓库中，可自行构建</dd>
                 </div>
                 <div>
-                  <dt class="meta__key">版本码</dt>
-                  <dd class="meta__value">versionCode 14</dd>
+                  <dt class="meta__key">依赖</dt>
+                  <dd class="meta__value">需自备 jniLibs 下的 ffmpeg</dd>
                 </div>
               </dl>
 
               <div class="actions">
                 <a
-                  class="btn btn--filled"
-                  href="https://github.com/DUOFreedom/Insta-camera-tools/releases/latest"
+                  class="btn btn--alt"
+                  href="https://github.com/DUOFreedom/Insta-camera-tools/blob/main/docs/BUILD.md"
                   target="_blank"
                   rel="noopener noreferrer"
                 >
                   <svg class="btn__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
-                    <path d="M12 4v11" /><path d="M7 11l5 5 5-5" /><path d="M4 19h16" />
+                    <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H19v18H6.5A2.5 2.5 0 0 1 4 18.5z" />
+                    <path d="M8 7h7" /><path d="M8 11h7" />
                   </svg>
-                  前往 Releases 下载
+                  查看构建说明
                 </a>
               </div>
 
-              <div>
-                <span class="code-label" id="sha-and-label">SHA256</span>
-                <div class="sha-row">
-                  <code class="code code--wrap" id="sha-and"
-                    >60C76774D12F3F5F412C0C2B394BC49B319840E2C1769C6F6D628C4540D401BC</code
-                  >
-                  <button class="copy-btn" data-copy="sha-and" data-label="copy-and-label" type="button">
-                    <svg class="copy-btn__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
-                      <rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15V5a1 1 0 0 1 1-1h10" />
-                    </svg>
-                    <span id="copy-and-label">复制</span>
-                  </button>
-                </div>
-              </div>
+              <p class="section__lead">
+                安卓端仍在打磨，真机导入链路与部分机型兼容性尚未验证完毕，因此暂不随 Release 分发 APK。
+                仓库内的 Kotlin、Chaquopy Python 与 Gradle 配置是完整可构建的，愿意自己编译的话见构建说明。
+              </p>
             </article>
           </div>
 
@@ -656,21 +648,6 @@
             </div>
           </div>
 
-          <div class="notice mt-24">
-            <svg class="notice__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
-              <circle cx="12" cy="12" r="9" /><path d="M12 8v4.5" /><path d="M12 16h.01" />
-            </svg>
-            <div>
-              <p class="notice__title">安卓端已内置 ffmpeg</p>
-              <p class="notice__body">
-                APK 内已打包静态链接的 ffmpeg 7.1（含 libx264 + libx265）与 ffprobe，双 ABI 合计约 92 MB，不需要额外下载。
-              </p>
-              <p class="notice__body">
-                安装包使用调试证书签名，与早期版本一致，可直接覆盖升级。若手机上是更旧的版本且提示签名冲突，先卸载再安装。
-              </p>
-            </div>
-          </div>
-
           <p class="section__lead mt-24">
             从源码自行打包得到的哈希会与此不同——PyInstaller 与 Gradle 都会把构建时间写进产物，同样的代码每次构建结果都不一致。请以本页面公布的哈希为准核对 Release 下载的文件。
           </p>
@@ -683,7 +660,7 @@
         <div class="container">
           <div class="section__head">
             <h2 class="section__title" id="quickstart-title">快速开始</h2>
-            <p class="section__lead">两端都不需要命令行。</p>
+            <p class="section__lead">桌面端不需要命令行；安卓端需先自行构建 APK。</p>
           </div>
 
           <h3 class="subhead">Windows 桌面端</h3>
@@ -706,11 +683,11 @@
             </li>
           </ol>
 
-          <h3 class="subhead">Android 安卓端</h3>
+          <h3 class="subhead">Android 安卓端（需自行构建）</h3>
           <ol class="steps">
             <li class="steps__item">
               <span class="steps__num" aria-hidden="true">1</span>
-              <p class="steps__text">安装 APK，首次启动需勾选同意使用协议。</p>
+              <p class="steps__text">自行构建 APK 并安装，首次启动需勾选同意使用协议。</p>
             </li>
             <li class="steps__item">
               <span class="steps__num" aria-hidden="true">2</span>
@@ -1161,7 +1138,7 @@
         <div class="footer__inner">
           <div class="footer__brand">
             <p class="footer__name">影石相机工具</p>
-            <p class="footer__meta">v1.2.0 · GPL-3.0 · Windows 10 / 11 · Android 8.0+</p>
+            <p class="footer__meta">桌面端 v1.2.0 · GPL-3.0 · Windows 10 / 11 · 安卓端源码可构建</p>
           </div>
           <div class="footer__links">
             <a class="btn btn--ghost" href="https://github.com/DUOFreedom/Insta-camera-tools" target="_blank" rel="noopener noreferrer">
