@@ -36,9 +36,13 @@ from pathlib import Path
 # 早期只做 (b)：把 shared/ 放进 sys.path 后 `import inst_transplant`，而该模块
 # 实际位于 shared/instbox/ 下，于是 (a) 必然 ModuleNotFoundError —— 桌面端
 # 从源码运行与 desktop/tests/test_insta.py 都会在收集阶段直接失败。
-try:
+#
+# 用 __package__ 判定而不是 try/except ImportError：后者会把 inst_transplant
+# 内部真实的 ImportError 也当成「没有父包」，从而再加载一份顶层副本，
+# 得到两个状态互不相干的模块对象。
+if __package__:
     from . import inst_transplant as insta  # noqa: E402
-except ImportError:  # 平铺导入：模块与本文件同目录
+else:  # 平铺导入：模块与本文件同目录
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     import inst_transplant as insta  # noqa: E402
 

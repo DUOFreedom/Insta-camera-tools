@@ -1245,10 +1245,12 @@ def main() -> int:
         #   裸 `from moov_rewrap import ...` 会 ModuleNotFoundError —— 而这条正是
         #   桌面端 core._load_inst_modules() 的加载方式，即主移植路径。
         #   故先走包内相对导入，失败再回退平铺导入（PyInstaller hiddenimports）。
-        try:
+        #   同样用 __package__ 判定而非 try/except：避免把 moov_rewrap 内部真实的
+        #   ImportError 误当成「没有父包」，加载出第二份模块对象。
+        if __package__:
             from .moov_rewrap import rebuild_media
             from .moov_rewrap import filter_avc1_children as _filter
-        except ImportError:  # 平铺导入：两个模块同目录
+        else:  # 平铺导入：两个模块同目录
             from moov_rewrap import rebuild_media
             from moov_rewrap import filter_avc1_children as _filter
         # 保留原有注入点：调用方可通过 globals() 预置同名函数覆盖默认实现。
