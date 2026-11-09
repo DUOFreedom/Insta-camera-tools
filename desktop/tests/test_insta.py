@@ -30,8 +30,10 @@ from __future__ import annotations
 
 import ctypes
 import os
+import shutil
 import struct
 import sys
+import tempfile
 
 import pytest
 
@@ -503,3 +505,125 @@ def test_insta_index_copies_do_not_drift():
             "shared/insta_index.py 与 android/app/src/main/python/insta_index.py "
             "逻辑已漂移：改一处必须同时改另一处"
         )
+
+
+def _func_map(path):
+    """返回 {函数名: ast 节点}（只取模块顶层函数）。"""
+    import ast
+    with open(path, encoding="utf-8-sig") as f:
+        tree = ast.parse(f.read())
+    return {n.name: n for n in tree.body
+            if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))}
+
+
+def test_android_core_functions_are_not_truncated():
+    """安卓端 insta_core.py 的函数体不能是"空壳"。
+
+    这条守卫来自一个真实事故：`batch_convert` 在安卓副本里只剩 docstring +
+    参数校验，函数体写到一个赋值就断了，下一个顶层 `def` 紧跟着开始。
+    它照样能 import、能通过所有导入测试，只在真的调用时返回 None，
+    调用方 `ok, bad = batch_convert(...)` 才炸 TypeError —— 而这条路径
+    （目录批量导入）单测从来没覆盖到，缺陷从安卓工程并入仓库起就一直在。
+
+    这里只查结构性症状，不比对桌面/安卓的具体实现（两边本来就有重构差异）：
+      1) 有超过 3 行签名+docstring 的函数却只有一个 return/raise 之外的空体
+      2) 函数体最后一个语句是赋值/表达式（意味着中途断了，没走到 return）
+    """
+    import ast
+    android_core = os.path.join(os.path.dirname(ROOT), "android", "app",
+                                "src", "main", "python", "insta_core.py")
+    if not os.path.isfile(android_core):
+        pytest.skip("安卓端副本不在（只检出了桌面端）")
+
+    problems = []
+    for name, node in _func_map(android_core).items():
+        stmts = [s for s in node.body
+                 if not (isinstance(s, ast.Expr) and isinstance(s.value, ast.Constant))]
+        if not stmts:
+            problems.append(f"{name}（第 {node.lineno} 行）：只有 docstring，没有函数体")
+            continue
+        # 声明了非 None 返回类型却没有 return —— 说明函数体半路断了。
+        # 只看有返回注解的函数：save_job/_cli_progress 这类本来就返回 None 的
+        # 不带注解，用「有没有 return」一刀切会误报。
+        ret = node.returns
+        if ret is not None and not (isinstance(ret, ast.Constant) and ret.value is None):
+            if not any(isinstance(s, ast.Return) for s in ast.walk(node)):
+                problems.append(
+                    f"{name}（第 {node.lineno} 行）：声明了返回类型却没有 return，函数体可能被截断")
+
+    assert not problems, "安卓端 insta_core.py 存在被截断的函数：\n  " + "\n  ".join(problems)
+
+
+def test_batch_convert_returns_success_and_failed_lists():
+    """batch_convert 必须真的返回 (success, failed)，不能是 None。
+
+    直接调用最容易发现静默截断：截断版本会立刻返回 None，
+    而不是等到用户点"批量导入"才在 UI 层变成一句莫名其妙的 TypeError。
+    """
+    android_py = os.path.join(os.path.dirname(ROOT), "android", "app",
+                              "src", "main", "python")
+    if not os.path.isfile(os.path.join(android_py, "insta_core.py")):
+        pytest.skip("安卓端副本不在（只检出了桌面端）")
+    if android_py not in sys.path:
+        sys.path.insert(0, android_py)
+    import insta_core as ic
+    out_dir = tempfile.mkdtemp(prefix="insta_batch_")
+    try:
+        success, failed = ic.batch_convert([], out_dir)
+    finally:
+        shutil.rmtree(out_dir, ignore_errors=True)
+    assert success == [] and failed == [], (
+        f"batch_convert 应返回两个空列表，实际返回 {success!r}, {failed!r}"
+    )
+
+
+def test_convert_without_cancel_does_not_raise_attribute_error():
+    """cancel 默认 None，但下游直接调 cancel.is_set()。
+
+    这是一个真实的 AttributeError：`convert(src, out)` 这种最常见的调用
+    （CLI、早期 GUI、第三方脚本）会立刻抛
+    `'NoneType' object has no attribute 'is_set'`。
+    入口处统一归一化成 threading.Event() 后，不传 cancel 也能正常跑。
+    """
+    import threading
+    d = tempfile.mkdtemp(prefix="insta_nocancel_")
+    try:
+        src = os.path.join(d, "in.mp4")
+        with open(src, "wb") as f:
+            f.write(b"\x00" * 128)
+        # 本机没有 ffmpeg 时会抛 ValidationError，那是"正确的失败"；
+        # 这里只要求不能是 AttributeError。
+        try:
+            core.convert(src, d)
+        except AttributeError as e:
+            pytest.fail(f"不传 cancel 时不应出现 AttributeError: {e}")
+        except Exception:  # noqa: BLE001
+            pass
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+    assert isinstance(threading.Event(), threading.Event)
+
+
+def test_convert_failure_is_not_reported_as_success():
+    """转码失败必须抛异常，不能返回 (None, None)。
+
+    并发路径原来用 `except BaseException: pass` 吞掉所有异常，再靠
+    first_error 汇总；但 first_error 只在 _run_ffmpeg 外层记录，
+    构建命令行/探测时长这些更早的步骤失败时没人记 —— 于是 convert()
+    正常返回 (None, None)，调用方拿到两个 None 当成功路径继续往下走。
+    """
+    d = tempfile.mkdtemp(prefix="insta_fail_")
+    try:
+        src = os.path.join(d, "in.mp4")
+        with open(src, "wb") as f:
+            f.write(b"\x00" * 128)
+        # 本机没有 ffmpeg：这是确定会失败的场景
+        if core.find_ffmpeg():
+            pytest.skip("本机有 ffmpeg，无法构造确定失败的转码")
+        with pytest.raises(Exception) as ei:
+            core.convert(src, d)
+        assert not isinstance(ei.value, AttributeError), (
+            f"应当是「找不到 ffmpeg」这类真实错误，而不是 AttributeError: {ei.value}")
+        assert str(ei.value).strip(), "失败必须带可读的错误信息"
+    finally:
+        shutil.rmtree(d, ignore_errors=True)

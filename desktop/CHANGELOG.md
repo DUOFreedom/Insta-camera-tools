@@ -2,6 +2,26 @@
 
 ## 未发布
 
+### 修复（安卓端 `batch_convert` 截断 / `cancel=None` / 失败被静默吞掉）
+
+三个都是「不报错、只是结果错了」的缺陷，因此全部通过了此前所有测试。
+
+- **安卓端 `batch_convert` 的函数体整段丢失**：只剩 docstring 与参数校验，写到 `base_seq = next_seq(...)` 就断在下一个顶层 `def` 之前，函数永远返回 `None`；唯一调用方 `ok, bad = batch_convert(...)`（CLI 目录批量导入）必然 `TypeError: cannot unpack non-iterable NoneType object`。用 `git log` 回溯 7 个版本直到安卓工程并入仓库的 `234b756`，`body_loop=0` 恒定成立 —— **缺陷从安卓工程进仓库的第一天起就在**，不是本轮改动引入。已按桌面端实现补齐函数体，并补上它依赖、但安卓副本里同样缺失的 `_source_stamp()`（容器 `creation_time` → 文件系统时间 → 当前时间三级回退）。
+- **`cancel` 参数默认 `None`，下游却直接调 `cancel.is_set()`**：`convert()` / `batch_convert()` / `_run_ffmpeg()` / `import_with_inst()` 四个入口全部中招，`convert(src, out)` 这种最常见的调用（CLI、早期 GUI、第三方脚本）会立刻抛 `AttributeError: 'NoneType' object has no attribute 'is_set'`。改为在入口处统一归一化成 `threading.Event()`，下游不再逐处判 `None`。桌面端 5 处、安卓端 4 处。
+- **桌面端并发路径把失败当成功**：`except BaseException: pass` 吞掉所有异常后靠 `first_error` 汇总，但 `first_error` 只在 `_run_ffmpeg` 外层记录；构建命令行、探测时长这些更早的步骤失败时无人记录，`convert()` 于是正常返回 `(None, None)`，调用方拿两个 `None` 当成功路径继续往下走。已在该 `except` 里兜底记录 `first_error`，并单独跟踪 `canceled` 标志（取消不是「某一路失败」）。
+- **`_build_transcode_cmd` / `_build_hw_transcode_cmd` 在缺 ffmpeg 时把 `None` 塞进 argv**：报出来的是「命令列表为空」，真正原因被掩盖。改为显式抛 `ValidationError("未找到 ffmpeg，无法构建转码命令")`。
+
+### 测试（截断守卫 / 取消归一化 / 失败不可静默）
+
+新增 4 条，每条都做过回滚验证（还原成缺陷版本确认变红，再恢复确认变绿）：
+
+- `test_android_core_functions_are_not_truncated` —— 结构性守卫：声明了非 `None` 返回类型却没有 `return` 的函数一律判失败。只按返回注解判断，避免 `save_job` 这类本来就返回 `None` 的函数误报。
+- `test_batch_convert_returns_success_and_failed_lists` —— 直接调用 `batch_convert([], tmp)` 断言返回两个空列表；截断版本会立刻返回 `None`，不必等到用户点批量导入。
+- `test_convert_without_cancel_does_not_raise_attribute_error`
+- `test_convert_failure_is_not_reported_as_success` —— 断言失败必须抛异常且带可读信息，不能返回 `(None, None)`。
+
+全套 **53 passed, 2 skipped**（此前 49 passed）。
+
 ### 修复（`shared/instbox` 与安卓端的模块导入）
 
 同一类缺陷的三份副本：把「同目录兄弟模块」当成顶层模块平铺导入，能跑通纯靠调用方预先改过 `sys.path`。三种加载方式（包导入 / PyInstaller 平铺冻结 / 直接跑脚本）里只要有一种不满足就 `ModuleNotFoundError`，而失败又常常被宽 `except` 吞掉，表现为功能静默退化。

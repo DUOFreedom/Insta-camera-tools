@@ -626,6 +626,9 @@ def _run_ffmpeg(cmd: list[str], duration: float, progress=None, cancel=None,
         raise ValidationError("duration 不得为负数")
     if cancel is not None and not isinstance(cancel, threading.Event):
         raise ValidationError("cancel 必须为 threading.Event 或 None")
+    if cancel is None:
+        # 归一化成真实 Event：下游一律直接 cancel.is_set()，不再逐处判 None。
+        cancel = threading.Event()
 
     if cancel.is_set():
         raise CanceledError("已取消")
@@ -1033,6 +1036,9 @@ def convert(input_path: str, output_dir: str, start_number: int | None = None,
             raise ValidationError("jobs 必须为正整数")
     if cancel is not None and not isinstance(cancel, threading.Event):
         raise ValidationError("cancel 必须为 threading.Event 或 None")
+    if cancel is None:
+        # 归一化成真实 Event：下游一律直接 cancel.is_set()，不再逐处判 None。
+        cancel = threading.Event()
 
     if cancel.is_set():
         raise CanceledError("已取消")
@@ -1139,17 +1145,26 @@ def convert(input_path: str, output_dir: str, start_number: int | None = None,
 
     if workers > 1 and n > 1:
         say(f"并行转码: {workers} 路")
+        canceled = False
         with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as ex:
             futures = [ex.submit(_run_one, i, t) for i, t in enumerate(tasks)]
             for fut in concurrent.futures.as_completed(futures):
                 try:
                     results[futures.index(fut)] = fut.result()
-                except BaseException:
-                    # 第一条错误已由 _run_one 记录并取消了其余任务
-                    pass
+                except CanceledError:
+                    canceled = True
+                except BaseException as e:
+                    # _run_one 只在 _run_ffmpeg 外层记录 first_error；构建命令行、
+                    #   探测时长等更早的步骤抛异常时没人记，会被这里静默吞掉，
+                    #   于是 convert() 返回 (None, None) 而用户看不到任何报错。
+                    #   这里兜底记录，保证并发路径不会把失败变成"成功"。
+                    if first_error is None:
+                        first_error = e
         # 所有并发任务结束后，若有第一条错误，向上抛出，使 convert 失败
         if first_error is not None:
             raise first_error
+        if canceled:
+            raise CanceledError("已取消")
     else:
         for idx, t in enumerate(tasks):
             results[idx] = _run_one(idx, t)
@@ -1251,6 +1266,9 @@ def batch_convert(file_list: list[str], output_dir: str,
         raise ValidationError("spec 必须为 dict 或 None")
     if cancel is not None and not isinstance(cancel, threading.Event):
         raise ValidationError("cancel 必须为 threading.Event 或 None")
+    if cancel is None:
+        # 归一化成真实 Event：下游一律直接 cancel.is_set()，不再逐处判 None。
+        cancel = threading.Event()
 
     if cancel.is_set():
         raise CanceledError("已取消")
@@ -1860,6 +1878,9 @@ def render_cover(image_path: str, output: str,
         raise ValidationError("output 必须为非空字符串")
     if cancel is not None and not isinstance(cancel, threading.Event):
         raise ValidationError("cancel 必须为 threading.Event 或 None")
+    if cancel is None:
+        # 归一化成真实 Event：下游一律直接 cancel.is_set()，不再逐处判 None。
+        cancel = threading.Event()
     ff = find_ffmpeg()
     if not ff:
         raise ValidationError("未找到 ffmpeg，无法渲染封面")
@@ -2146,6 +2167,9 @@ def import_with_inst(source: str, card_root: str,
             raise ValidationError("template[2] reference_meta 必须为 bytes")
     if cancel is not None and not isinstance(cancel, threading.Event):
         raise ValidationError("cancel 必须为 threading.Event 或 None")
+    if cancel is None:
+        # 归一化成真实 Event：下游一律直接 cancel.is_set()，不再逐处判 None。
+        cancel = threading.Event()
     if spec is not None and not isinstance(spec, dict):
         raise ValidationError("spec 必须为 dict 或 None")
     if cover is not None and not isinstance(cover, str):

@@ -674,6 +674,9 @@ def _run_ffmpeg(cmd: list[str], duration: float, progress=None, cancel=None,
         raise ValidationError("duration 不得为负数")
     if cancel is not None and not isinstance(cancel, threading.Event):
         raise ValidationError("cancel 必须为 threading.Event 或 None")
+    if cancel is None:
+        # 归一化成真实 Event：下游一律直接 cancel.is_set()，不再逐处判 None。
+        cancel = threading.Event()
 
     if cancel.is_set():
         raise CanceledError("已取消")
@@ -850,12 +853,17 @@ def _build_transcode_cmd(src, dst, vcodec, tag, vf, enc_params,
     hw_decoder 非空时，输入侧用 MediaCodec 解码（帧为 surface），
     滤镜链最前面加 hwdownload,format=nv12 拉回系统内存。
     """
+    ff = find_ffmpeg()
+    if not ff:
+        # 别把 None 塞进 argv——那样报出来的是「命令列表为空」，
+        #   真正的原因（ffmpeg 没解出来/路径失效）会被完全掩盖。
+        raise ValidationError("未找到 ffmpeg，无法构建转码命令")
     extra_in = audio_inputs(audio_tracks, src_audio_count)
     if hw_decoder:
-        cmd = [find_ffmpeg(), "-hide_banner", "-y", "-c:v", hw_decoder, "-i", src]
+        cmd = [ff, "-hide_banner", "-y", "-c:v", hw_decoder, "-i", src]
         vf = "hwdownload,format=nv12," + vf
     else:
-        cmd = [find_ffmpeg(), "-hide_banner", "-y", "-i", src]
+        cmd = [ff, "-hide_banner", "-y", "-i", src]
     if extra_in:
         cmd += extra_in
         audio_src = "1:a:0"
@@ -908,12 +916,15 @@ def _build_hw_transcode_cmd(src, dst, vcodec, tag, vf, extra_args,
       - i-frame-interval 只能整数秒，所以 -g 16 实际会被取整为 1 秒（≈30 帧），
         拿不到相机要求的 16 帧密集关键帧 —— 这是硬编的已知取舍。
     """
+    ff = find_ffmpeg()
+    if not ff:
+        raise ValidationError("未找到 ffmpeg，无法构建硬件转码命令")
     extra_in = audio_inputs(audio_tracks, src_audio_count)
     if hw_decoder:
-        cmd = [find_ffmpeg(), "-hide_banner", "-y", "-c:v", hw_decoder, "-i", src]
+        cmd = [ff, "-hide_banner", "-y", "-c:v", hw_decoder, "-i", src]
         vf = "hwdownload,format=nv12," + vf
     else:
-        cmd = [find_ffmpeg(), "-hide_banner", "-y"]
+        cmd = [ff, "-hide_banner", "-y"]
         cmd += ["-i", src]
     if extra_in:
         cmd += extra_in
@@ -1113,6 +1124,9 @@ def convert(input_path: str, output_dir: str, start_number: int | None = None,
             raise ValidationError("jobs 必须为正整数")
     if cancel is not None and not isinstance(cancel, threading.Event):
         raise ValidationError("cancel 必须为 threading.Event 或 None")
+    if cancel is None:
+        # 归一化成真实 Event：下游一律直接 cancel.is_set()，不再逐处判 None。
+        cancel = threading.Event()
 
     if cancel.is_set():
         raise CanceledError("已取消")
@@ -1419,11 +1433,102 @@ def batch_convert(file_list: list[str], output_dir: str,
         raise ValidationError("spec 必须为 dict 或 None")
     if cancel is not None and not isinstance(cancel, threading.Event):
         raise ValidationError("cancel 必须为 threading.Event 或 None")
+    if cancel is None:
+        # 归一化成真实 Event：下游一律直接 cancel.is_set()，不再逐处判 None。
+        cancel = threading.Event()
 
     if cancel.is_set():
         raise CanceledError("已取消")
 
     base_seq = next_seq(output_dir) if start_number is None else int(start_number)
+    card_when, card_seq = _card_timeline(output_dir)
+    use_card = bool(use_card_time) and card_when is not None
+    if use_card and start_number is None:
+        base_seq = card_seq
+    success, failed = [], []
+    if encoder is None:
+        encoder = detect_hw_encoder()
+    hw = encoder if (isinstance(encoder, tuple) and len(encoder) == 3
+                     and encoder[2] != "software" and encoder[0]) else None
+
+    total = len(file_list)
+    used_names = set()
+    for i, src in enumerate(file_list):
+        if cancel is not None and cancel.is_set():
+            raise CanceledError("已取消")
+        if use_card:
+            stamp = (card_when + timedelta(seconds=i)).strftime("%Y%m%d_%H%M%S")
+        else:
+            stamp = _source_stamp(src)
+        stamp = _unique_stamp(stamp, output_dir, used_names)
+        used_names.add(stamp)
+        seq = base_seq + i
+
+        def _wrap(frac, label, spd, eta, _i=i):
+            if progress:
+                progress((_i + frac) / max(1, total),
+                         f"[{_i + 1}/{total}] {os.path.basename(src)}", spd, eta)
+
+        try:
+            main, preview = convert(src, output_dir, start_number=seq, stamp=stamp,
+                                    log=log, encoder=hw, progress=_wrap, spec=spec,
+                                    cancel=cancel)
+            success.append((src, main, preview))
+        except CanceledError:
+            raise
+        except Exception as e:  # noqa: BLE001
+            failed.append((src, str(e)))
+    return success, failed
+
+
+def _source_stamp(src: str) -> str:
+    """取【源视频自己的拍摄/创建时间】作为文件名时间戳（YYYYMMDD_HHMMSS）。
+
+    优先级与文档承诺一致：
+      1) 容器内嵌 creation_time（最准，相机原片通常都有）
+      2) 文件系统时间（ctime/mtime 取较可靠者）
+      3) 最终兜底才用当前时间
+
+    若一律用当前时间，会与文档「时间戳取自源视频自己的创建时间」直接矛盾：
+    所有导入视频在相册里都排到导入当天，用户按时间翻找会找不到。
+    """
+    # 1) 容器 creation_time：位于 format.tags.creation_time（也兜一下 stream tags）
+    try:
+        raw = probe_raw(src) or {}
+        cands = []
+        tags = (raw.get("format") or {}).get("tags") or {}
+        if tags.get("creation_time"):
+            cands.append(tags["creation_time"])
+        for st in (raw.get("streams") or []):
+            ct = ((st or {}).get("tags") or {}).get("creation_time")
+            if ct:
+                cands.append(ct)
+        for when in cands:
+            s = str(when).replace("T", " ").replace("Z", "").strip()
+            head = s.split(".")[0]           # 去掉小数秒
+            for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M"):
+                try:
+                    dt = datetime.strptime(head, fmt)
+                    if dt.year > 1970:       # 过滤 1970-01-01 这类无效值
+                        return dt.strftime("%Y%m%d_%H%M%S")
+                except ValueError:
+                    continue
+    except Exception:  # noqa: BLE001
+        pass
+
+    # 2) 文件系统时间：取 ctime 与 mtime 中较早的那个（ctime 在 NTFS 是创建时间）
+    try:
+        st = os.stat(src)
+        ts = min(x for x in (getattr(st, "st_ctime", 0), st.st_mtime) if x > 0)
+        from datetime import datetime as _dt
+        return _dt.fromtimestamp(ts).strftime("%Y%m%d_%H%M%S")
+    except Exception:  # noqa: BLE001
+        pass
+
+    # 3) 兜底
+    return datetime.now().strftime("%Y%m%d_%H%M%S")
+
+
 def _unique_stamp(stamp: str, output_dir: str, used: set) -> str:
     """保证时间戳在同一批文件与目标目录里唯一（撞了就 +1 秒）。
 
@@ -2190,6 +2295,9 @@ def import_with_inst(source: str, card_root: str,
             raise ValidationError("template[2] reference_meta 必须为 bytes")
     if cancel is not None and not isinstance(cancel, threading.Event):
         raise ValidationError("cancel 必须为 threading.Event 或 None")
+    if cancel is None:
+        # 归一化成真实 Event：下游一律直接 cancel.is_set()，不再逐处判 None。
+        cancel = threading.Event()
     if spec is not None and not isinstance(spec, dict):
         raise ValidationError("spec 必须为 dict 或 None")
     if cover is not None and not isinstance(cover, str):
