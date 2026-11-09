@@ -462,3 +462,44 @@ def test_inst_transplant_uses_relative_moov_rewrap():
              for a in n.names}
     assert {"rebuild_media", "filter_avc1_children"} <= names, \
         f"相对导入分支缺少关键符号，实际只有 {sorted(names)}"
+
+
+def _ast_without_docstrings(path: str) -> str:
+    """把源码规约成「只含逻辑」的 ast 文本，用于判断两份副本是否等价。
+
+    为什么去掉 docstring：安卓端与共享端各留一份，注释/文档是按各自读者写的
+    （桌面端提 instbox 路径，安卓端提 Chaquopy 打包），强行逐字节一致反而会
+    逼人写两边都不贴切的文档。真正必须一致的是逻辑。
+    """
+    import ast
+
+    tree = ast.parse(open(path, encoding="utf-8").read())
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.Module, ast.FunctionDef,
+                             ast.AsyncFunctionDef, ast.ClassDef)):
+            body = node.body
+            if body and isinstance(body[0], ast.Expr) and \
+                    isinstance(body[0].value, ast.Constant) and \
+                    isinstance(body[0].value.value, str):
+                node.body = body[1:] or [ast.Pass()]
+    return ast.dump(tree)
+
+
+def test_insta_index_copies_do_not_drift():
+    """shared/insta_index.py 与安卓端副本的逻辑必须一致。
+
+    仓库里这两份是手工同步的（安卓端靠 Chaquopy 从 app/src/main/python 打包，
+    不能直接引用 shared/）。改共享逻辑时漏改一边，症状是「桌面端登记正常、
+    手机端相册不认」—— 排查成本极高且不会在单测里暴露，所以在这里加守卫。
+    """
+    shared_copy = os.path.join(SHARED, "insta_index.py")
+    android_copy = os.path.join(os.path.dirname(ROOT), "android", "app",
+                                "src", "main", "python", "insta_index.py")
+    if not os.path.isfile(android_copy):
+        pytest.skip("安卓端副本不在（只检出了桌面端）")
+
+    assert _ast_without_docstrings(shared_copy) == \
+        _ast_without_docstrings(android_copy), (
+            "shared/insta_index.py 与 android/app/src/main/python/insta_index.py "
+            "逻辑已漂移：改一处必须同时改另一处"
+        )
