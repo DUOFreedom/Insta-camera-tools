@@ -2,8 +2,12 @@
 
 package com.duofreedom.instaace.ui
 
+import android.content.ActivityNotFoundException
+import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
+import android.os.Handler
+import android.os.Looper
 import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -71,6 +75,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -85,6 +90,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.duofreedom.instaace.BuildConfig
 import com.duofreedom.instaace.engine.Engine
 import com.duofreedom.instaace.engine.PythonEngine
 import com.duofreedom.instaace.engine.UpdateCheckListener
@@ -104,6 +110,10 @@ fun InstaAceApp() {
     var docName by remember { mutableStateOf<String?>(null) }
     var docTitle by remember { mutableStateOf<String>("") }
     val state = remember { AppState() }
+    // AppState 内部持有 CoroutineScope，离开组合时必须取消，否则协程泄漏。
+    DisposableEffect(state) {
+        onDispose { state.close() }
+    }
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     var tab by rememberSaveable { mutableIntStateOf(0) }
@@ -158,45 +168,65 @@ fun InstaAceApp() {
     var updateTag by remember { mutableStateOf<String?>(null) }
     var updateUrl by remember { mutableStateOf<String?>(null) }
     val prefs = remember { ctx.getSharedPreferences(PREFS_UPDATE, 0) }
-    val ignoredTag = remember { prefs.getString(KEY_IGNORED_TAG, "") ?: "" }
+    val mainHandler = remember { Handler(Looper.getMainLooper()) }
 
     LaunchedEffect(Unit) {
-        // 从 SharedPreferences 读取已忽略版本传给 Python
-        if (ignoredTag.isNotBlank()) {
-            PythonEngine.ignoreUpdate(ctx, ignoredTag)
+        val ignored = prefs.getString(KEY_IGNORED_TAG, "") ?: ""
+        if (ignored.isNotBlank()) {
+            PythonEngine.ignoreUpdate(ctx, ignored)
         }
-        // 启动检查
         PythonEngine.checkUpdate(ctx, object : UpdateCheckListener {
+            // Python 在后台线程回调，Compose 的 mutableStateOf 必须在主线程写，
+            //   否则快照系统会丢写或抛 IllegalStateException。
             override fun onUpdateAvailable(tag: String, url: String) {
-                updateTag = tag
-                updateUrl = url
+                mainHandler.post {
+                    updateTag = tag
+                    updateUrl = url
+                }
             }
         })
     }
 
-    // 更新弹窗：有新版本且未忽略时显示
-    if (consented && updateTag != null) {
-        val currentTag = updateTag
+    val pendingTag = updateTag
+    if (consented && pendingTag != null) {
+        val currentTag = pendingTag
         val currentUrl = updateUrl ?: ""
         AlertDialog(
-            onDismissRequest = { },
-            title = { Text("发现新版本：$currentTag") },
-            text = { Text("是否前往下载？") },
+            onDismissRequest = { updateTag = null },
+            title = { Text("发现新版本") },
+            text = {
+                Text("最新版本为 $currentTag，当前版本为 ${BuildConfig.VERSION_NAME}。")
+            },
             confirmButton = {
-                TextButton(onClick = {
-                    // 前往下载：打开浏览器
-                    ctx.startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(currentUrl)))
-                    updateTag = null
-                }) { Text("前往下载") }
+                TextButton(
+                    onClick = {
+                        val opened = currentUrl.isNotBlank() && openUrl(ctx, currentUrl)
+                        if (!opened) {
+                            scope.launch {
+                                snackbar.showSnackbar(
+                                    if (currentUrl.isBlank()) "下载地址缺失，请到 GitHub Releases 页面查看"
+                                    else "没有可用的浏览器"
+                                )
+                            }
+                        }
+                        updateTag = null
+                    }
+                ) { Text("前往下载") }
             },
             dismissButton = {
-                TextButton(onClick = {
-                    updateTag = null
-                }) { Text("稍后") }
+                Row {
+                    TextButton(onClick = { updateTag = null }) { Text("稍后") }
+                    Spacer(Modifier.size(4.dp))
+                    TextButton(
+                        onClick = {
+                            prefs.edit().putString(KEY_IGNORED_TAG, currentTag).apply()
+                            PythonEngine.ignoreUpdate(ctx, currentTag)
+                            updateTag = null
+                        }
+                    ) { Text("忽略此版本") }
+                }
             }
         )
-        // 忽略版本：用单独的 Snackbar 或小弹窗处理，这里用简化方式
-        // 实际项目中可在 AlertDialog 里添加第三个按钮或用自定义 Dialog
     }
 
     if (consented) Scaffold(
@@ -212,7 +242,7 @@ fun InstaAceApp() {
                         )
                     }
                 },
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background
                 )
             )
@@ -286,7 +316,8 @@ fun InstaAceApp() {
                     onOpenDoc = { file: String, title: String ->
                         docName = file
                         docTitle = title
-                    }
+                    },
+                    onMessage = { msg -> scope.launch { snackbar.showSnackbar(msg) } }
                 )
             }
         }
@@ -302,7 +333,7 @@ fun InstaAceApp() {
         }
         AlertDialog(
             onDismissRequest = { docName = null },
-            title = { Text(name.removeSuffix(".md")) },
+            title = { Text(docTitle) },
             text = {
                 Text(
                     docText,
@@ -317,7 +348,6 @@ fun InstaAceApp() {
     }
 }
 
-/* ------------------------------------------------------------------ 存储卡 */
 
 @Composable
 private fun CardScreen(state: AppState, onPick: () -> Unit, modifier: Modifier = Modifier) {
@@ -447,7 +477,6 @@ private fun StatusChip(ok: Boolean, label: String) {
     )
 }
 
-/* -------------------------------------------------------------------- 队列 */
 
 @Composable
 private fun QueueScreen(
@@ -591,12 +620,12 @@ private fun EmptyState(modifier: Modifier = Modifier) {
     }
 }
 
-/* -------------------------------------------------------------------- 设置 */
 
 @Composable
 private fun SettingsScreen(
     state: AppState,
     onOpenDoc: (file: String, title: String) -> Unit,
+    onMessage: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     // 设置项越加越多，小屏必然超过一屏；不给 verticalScroll 的话
@@ -724,21 +753,13 @@ private fun SettingsScreen(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.clickable {
-                        runCatching {
-                            ctx.startActivity(
-                                Intent(Intent.ACTION_VIEW, Uri.parse(SOURCE_URL))
-                            )
-                        }
+                        if (!openUrl(ctx, SOURCE_URL)) onMessage("没有可用的浏览器")
                     }
                 )
                 Spacer(Modifier.height(6.dp))
                 OutlinedButton(
                     onClick = {
-                        runCatching {
-                            ctx.startActivity(
-                                Intent(Intent.ACTION_VIEW, Uri.parse(SOURCE_URL))
-                            )
-                        }
+                        if (!openUrl(ctx, SOURCE_URL)) onMessage("没有可用的浏览器")
                     },
                     modifier = Modifier.fillMaxWidth()
                 ) {
@@ -783,7 +804,6 @@ private fun SettingsScreen(
     }
 }
 
-/* -------------------------------------------------------------------- 工具 */
 
 private fun humanSize(bytes: Long): String = when {
     bytes <= 0 -> "大小未知"
@@ -791,4 +811,12 @@ private fun humanSize(bytes: Long): String = when {
     bytes >= 1L shl 20 -> String.format("%.1f MB", bytes / 1048576.0)
     bytes >= 1L shl 10 -> String.format("%.0f KB", bytes / 1024.0)
     else -> "$bytes B"
+}
+
+/** 用系统浏览器打开链接。返回 false 表示设备上没有能处理 VIEW 的 Activity。 */
+private fun openUrl(ctx: Context, url: String): Boolean = try {
+    ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+    true
+} catch (_: ActivityNotFoundException) {
+    false
 }

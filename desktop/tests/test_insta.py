@@ -61,7 +61,6 @@ def _sample_paths() -> list[str]:
     return [os.path.join(SAMPLES, n) for n in sorted(names)]
 
 
-# ---------------------------------------------------------------- 索引字节级
 @pytest.mark.parametrize("path", _sample_paths() or [None])
 def test_index_bytes_roundtrip(path):
     """真机索引样本：解析 → 回写，必须与原文件逐字节相同。"""
@@ -93,7 +92,6 @@ def test_register_media_is_idempotent():
     assert sum(1 for e in ix.parse_editinfo(ei1) if e.path == path) == 1
 
 
-# ---------------------------------------------------------------- f7 位数
 @pytest.mark.parametrize("name,expected", [
     ("VID_20261016_104229_560.mp4", 20261016104229),
     ("LRV_20260915_094907_002.lrv", 20260915094907),
@@ -116,7 +114,6 @@ def test_stamp_from_name_rejects_bad_names(bad):
         core.stamp_from_name(bad)
 
 
-# ---------------------------------------------------------------- 隐藏文件写入
 HIDDEN = 0x2
 READONLY = 0x1
 
@@ -150,7 +147,6 @@ def test_write_index_file_creates_new(tmp_path):
     assert p.read_bytes() == b"\x0a\x00"
 
 
-# ---------------------------------------------------------------- inst box 探测
 def _box(typ: bytes, payload: bytes = b"") -> bytes:
     return struct.pack(">I", 8 + len(payload)) + typ + payload
 
@@ -174,7 +170,6 @@ def test_has_inst_box_absent(tmp_path):
     assert core.has_inst_box(str(p)) == (False, 0)
 
 
-# ---------------------------------------------------------------- 进度分段
 def test_stage_cb_maps_to_range():
     """子阶段 0~1 要映射到整体 [lo, hi]，并带上阶段名。"""
     got = []
@@ -203,7 +198,6 @@ def test_stage_cb_omits_empty_label():
     assert got == ["移植 inst box"]
 
 
-# ---------------------------------------------------------------- 编码器参数
 @pytest.mark.parametrize("codec,level,expected", [
     ("libx265", 123, "4.1"),
     ("hevc_qsv", 123, "4.1"),
@@ -225,7 +219,6 @@ def test_level_text_none():
     assert core._level_text(0, "libx265") is None
 
 
-# ---------------------------------------------------------------- 封面 / 体检 / 续跑
 def test_default_cover_for_sidecar(tmp_path):
     video = tmp_path / "a.mp4"
     video.write_bytes(b"\x00" * 32)
@@ -303,7 +296,6 @@ def test_set_awake_returns_bool():
     finally:
         core.set_awake(False)
 
-# ---------------------------------------------------------------- AMBA 字段
 # 铁律：AMBA box 内 0x54 (84) 是音频采样率、0x5B (91) 是音频帧数；
 # 0x20 (32) 属于 0x1D (29) 处的视频帧率分母字段的高字节。
 # 曾因 udta_with_audio_frames 误用 amba[0]+0x20 把 1001 覆写成 4160750569，

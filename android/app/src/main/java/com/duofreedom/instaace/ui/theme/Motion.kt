@@ -1,6 +1,5 @@
 package com.duofreedom.instaace.ui.theme
 
-import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.SpringSpec
 import androidx.compose.animation.core.spring
 
@@ -28,8 +27,6 @@ import androidx.compose.animation.core.spring
  */
 object Motion {
 
-    // ---- 弹簧常量 --------------------------------------------------------
-
     /** 阻尼比：位移类 0.8（有轻微回弹），效果类 1.0（不过冲）。 */
     private const val SPATIAL_DAMPING = 0.8f
     private const val EFFECTS_DAMPING = 1.0f
@@ -40,9 +37,6 @@ object Motion {
 
     private const val EFFECTS_FAST_STIFFNESS = 3800f
     private const val EFFECTS_DEFAULT_STIFFNESS = 1600f
-    private const val EFFECTS_SLOW_STIFFNESS = 800f
-
-    // ---- 位移类（展开 / 收起 / 页面切换）---------------------------------
 
     /** 位移：快速。用于按压反馈、图标微动。 */
     fun <T> spatialFast(): SpringSpec<T> =
@@ -56,8 +50,6 @@ object Motion {
     fun <T> spatialSlow(): SpringSpec<T> =
         spring(dampingRatio = SPATIAL_DAMPING, stiffness = SPATIAL_SLOW_STIFFNESS)
 
-    // ---- 效果类（透明度 / 颜色）-----------------------------------------
-
     /** 效果：快速。用于按下态、选中态。 */
     fun <T> effectsFast(): SpringSpec<T> =
         spring(dampingRatio = EFFECTS_DAMPING, stiffness = EFFECTS_FAST_STIFFNESS)
@@ -65,24 +57,4 @@ object Motion {
     /** 效果：默认。用于淡入淡出、颜色过渡。 */
     fun <T> effectsDefault(): SpringSpec<T> =
         spring(dampingRatio = EFFECTS_DAMPING, stiffness = EFFECTS_DEFAULT_STIFFNESS)
-
-    /** 效果：慢速。用于整块背景色过渡。 */
-    fun <T> effectsSlow(): SpringSpec<T> =
-        spring(dampingRatio = EFFECTS_DAMPING, stiffness = EFFECTS_SLOW_STIFFNESS)
-
-    // ---- 常用组合 --------------------------------------------------------
-
-    /** 展开/收起：位移走默认弹簧，透明度走效果弹簧。 */
-    val expandSpatial: FiniteAnimationSpec<androidx.compose.ui.unit.IntSize>
-        get() = spatialDefault()
-
-    val fadeEffects: FiniteAnimationSpec<Float>
-        get() = effectsDefault()
-
-    /** 页面切换：进入用慢速位移，退出用快速位移（退场更快，不拖沓）。 */
-    val enterTransition: FiniteAnimationSpec<androidx.compose.ui.unit.IntOffset>
-        get() = spatialSlow()
-
-    val exitTransition: FiniteAnimationSpec<androidx.compose.ui.unit.IntOffset>
-        get() = spatialFast()
 }

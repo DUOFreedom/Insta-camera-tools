@@ -6,6 +6,15 @@ import android.provider.OpenableColumns
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import androidx.compose.runtime.setValue
 import androidx.documentfile.provider.DocumentFile
 import com.duofreedom.instaace.engine.ImportCallback
@@ -14,8 +23,6 @@ import com.duofreedom.instaace.engine.Engine
 import com.duofreedom.instaace.engine.PythonEngine
 import com.duofreedom.instaace.engine.CardMirror
 import com.duofreedom.instaace.engine.SafeCard
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -45,6 +52,13 @@ data class ImportResult(
  *   → 把新增媒体与更新后的索引写回卡 → 重新扫描确认。
  */
 class AppState {
+
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+
+    /** 释放内部协程作用域。调用后不应再使用本实例。 */
+    fun close() {
+        scope.cancel()
+    }
 
     var cardUri by mutableStateOf<Uri?>(null)
         private set
@@ -93,9 +107,10 @@ class AppState {
 
     fun checkPython(ctx: Context) {
         pythonStatus = "检测中…"
-        Thread {
-            pythonStatus = PythonEngine.status(ctx)
-        }.start()
+        scope.launch {
+            val status = withContext(Dispatchers.IO) { PythonEngine.status(ctx) }
+            pythonStatus = status
+        }
     }
 
     fun scanCard(ctx: Context, tree: Uri) {
@@ -192,21 +207,29 @@ class AppState {
     /**
      * 执行完整导入：转码 + inst 移植 + 索引登记 + 写回卡。
      */
-    suspend fun startImport(ctx: Context) = withContext(Dispatchers.IO) {
-        if (running) return@withContext
+    /**
+     * 执行导入。
+     *
+     * 前置条件：queue 非空、cardUri 已授权、ffmpeg 可执行。
+     * 后置条件：results 填入每条结果；running 复位为 false。
+     * 不变量：本函数在主线程调度，所有 Compose 状态写入都在主线程；
+     *   只有文件 IO / Python 调用被 withContext(Dispatchers.IO) 包裹。
+     */
+    suspend fun startImport(ctx: Context) {
+        if (running) return
         if (queue.isEmpty()) {
             stage = "队列为空"
-            return@withContext
+            return
         }
         val tree = cardUri
         if (tree == null) {
             stage = "请先选择相机存储卡"
-            return@withContext
+            return
         }
         if (!Engine.available(ctx)) {
             stage = "引擎不可用：找不到可执行的 libffmpeg.so"
             logLine = Engine.versionLine(ctx)
-            return@withContext
+            return
         }
 
         running = true
@@ -218,18 +241,20 @@ class AppState {
         val jobDir = File(ctx.cacheDir, "job").apply { mkdirs() }
         val stageDir = File(ctx.cacheDir, "stage").apply { mkdirs() }
         val cb = ImportCallback()
-        var ticker: Thread? = null
+        var ticker: Job? = null
 
         try {
-            val card = SafeCard.open(ctx, tree)
-                ?: throw RuntimeException("卡结构不完整：需要 DCIM/Camera01 与一对真机 VID_/LRV_ 原片")
+            val card = withContext(Dispatchers.IO) {
+                SafeCard.open(ctx, tree)
+            } ?: throw RuntimeException("卡结构不完整：需要 DCIM/Camera01 与一对真机 VID_/LRV_ 原片")
 
-            val pyStatus = PythonEngine.status(ctx)
+            val pyStatus = withContext(Dispatchers.IO) { PythonEngine.status(ctx) }
             if (!pyStatus.startsWith("Python 核心就绪")) throw RuntimeException(pyStatus)
 
             stage = "准备卡镜像（模板 + 索引）…"
             val mirror = CardMirror(ctx, card, jobDir)
-            if (!mirror.build()) throw RuntimeException("卡镜像构建失败：模板或索引拷贝不出来")
+            val mirrorOk = withContext(Dispatchers.IO) { mirror.build() }
+            if (!mirrorOk) throw RuntimeException("卡镜像构建失败：模板或索引拷贝不出来")
 
             val items = queue.toList()
             items.forEachIndexed { i, item ->
@@ -245,35 +270,42 @@ class AppState {
                         "缓存空间不足：源 ${human(item.size)}，可用 ${human(stageDir.usableSpace)}"
                     )
                 }
-                ctx.contentResolver.openInputStream(item.uri)?.use { ins ->
-                    staged.outputStream().use { out -> ins.copyTo(out, 1 shl 20) }
-                } ?: throw RuntimeException("无法读取：${item.name}")
+                val copied = withContext(Dispatchers.IO) {
+                    ctx.contentResolver.openInputStream(item.uri)?.use { ins ->
+                        staged.outputStream().use { out -> ins.copyTo(out, 1 shl 20) }
+                        true
+                    } ?: false
+                }
+                if (!copied) throw RuntimeException("无法读取：${item.name}")
 
                 cb.fraction = 0f
                 cb.label = "转码"
-                val tick = Thread {
-                    while (!Thread.currentThread().isInterrupted) {
-                        progress = ((i + cb.fraction) / items.size).coerceIn(0f, 1f)
-                        if (cb.label.isNotBlank()) stage = "第 ${i + 1}/${items.size} 条 · ${cb.label}"
-                        try {
-                            Thread.sleep(250)
-                        } catch (_: InterruptedException) {
-                            break
+                // 进度轮询跑在 IO 协程里，每次写状态都切回主线程。
+                val tick = scope.launch(Dispatchers.IO) {
+                    while (isActive) {
+                        val f = ((i + cb.fraction) / items.size).coerceIn(0f, 1f)
+                        val lbl = cb.label
+                        withContext(Dispatchers.Main) {
+                            progress = f
+                            if (lbl.isNotBlank()) stage = "第 ${i + 1}/${items.size} 条 · $lbl"
                         }
+                        delay(250)
                     }
-                }.apply { isDaemon = true; start() }
+                }
                 ticker = tick
 
                 val json = try {
-                    PythonEngine.runImport(
-                        ctx, staged, mirror.root, cb,
-                        preferHardware = (encoder == "硬件")
-                    )
+                    withContext(Dispatchers.IO) {
+                        PythonEngine.runImport(
+                            ctx, staged, mirror.root, cb,
+                            preferHardware = (encoder == "硬件")
+                        )
+                    }
                 } finally {
-                    tick.interrupt()
+                    tick.cancel()
                     ticker = null
                     logLine = cb.lastLog
-                    staged.delete()
+                    withContext(Dispatchers.IO) { staged.delete() }
                 }
 
                 val ok = json.optBoolean("ok")
@@ -315,7 +347,7 @@ class AppState {
             stage = "失败：${t.message?.lineSequence()?.firstOrNull() ?: t.javaClass.simpleName}"
             logLine = t.message ?: t.toString()
         } finally {
-            ticker?.interrupt()
+            ticker?.cancel()
             stageDir.listFiles()?.forEach { it.delete() }
             running = false
         }

@@ -10,8 +10,6 @@ import java.io.ByteArrayOutputStream
  * （桌面端 insta_index.py 用同样的策略）。
  */
 object Index {
-
-    // ---------------------------------------------------------------- 原语
     private class Field(val num: Int, val wire: Int, val value: ByteArray, val uint: Long)
 
     private fun readVarint(b: ByteArray, start: Int): Pair<Long, Int> {
@@ -106,8 +104,6 @@ object Index {
         System.arraycopy(o, 0, r, size, o.size)
         return r
     }
-
-    // ---------------------------------------------------------------- 字段读写
     fun fieldStr(meta: ByteArray, num: Int): String? =
         parseFields(meta).firstOrNull { it.num == num && it.wire == 2 }
             ?.value?.toString(Charsets.UTF_8)
@@ -140,8 +136,6 @@ object Index {
         if (idx >= 0) fields[idx] = nf else fields.add(nf)
         return encodeFields(fields)
     }
-
-    // ---------------------------------------------------------------- 条目
     data class FileEntry(val path: String, val meta: ByteArray)
 
     data class EditEntry(val path: String, val flag: ByteArray)

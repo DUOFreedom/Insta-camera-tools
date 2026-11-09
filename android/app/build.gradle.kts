@@ -39,6 +39,8 @@ android {
 
     buildFeatures {
         compose = true
+        // 更新弹窗要显示当前版本号，从 BuildConfig.VERSION_NAME 取
+        buildConfig = true
     }
 
     compileOptions {

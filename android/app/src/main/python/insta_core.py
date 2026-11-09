@@ -222,14 +222,10 @@ _hw_decoder_list: set[str] | None = None
 _hw_dec_alive: dict[str, bool] = {}
 
 
-def set_hwdecode(enabled: bool) -> None:
-    """设置是否使用 Android MediaCodec 硬件解码源视频。"""
-    global _HWDECODE_ENABLED
-    _HWDECODE_ENABLED = bool(enabled)
-
-
-def hwdecode() -> bool:
-    return _HWDECODE_ENABLED
+def mark_hw_decoder_failed(decoder: str) -> None:
+    """运行期实际失败后标记该解码器不可用，避免同一批任务反复踩同一个坑。"""
+    if decoder:
+        _hw_dec_alive[decoder] = False
 
 
 def set_prefer_hardware(enabled: bool) -> None:
@@ -1170,10 +1166,11 @@ def convert(input_path: str, output_dir: str, start_number: int | None = None,
                                                hw_decoder=hwdec_name)
             if is_lrv:
                 enc_params = "keyint=16:min-keyint=16:scenecut=0:bframes=0"
+                sw_vc = vc
             else:
                 enc_params = "keyint=16:min-keyint=16:scenecut=0:bframes=0:range=full:info=0"
-                vc = "libx265" if vc not in ("libx265",) else vc
-            return _build_transcode_cmd(input_path, dst, vc, tag, vf, enc_params,
+                sw_vc = "libx265"
+            return _build_transcode_cmd(input_path, dst, sw_vc, tag, vf, enc_params,
                                         vh, ve, audio, cr, src_audio_count,
                                         is_lrv=is_lrv, fps=fps, level=level,
                                         hw_decoder=hwdec_name)
@@ -1186,6 +1183,7 @@ def convert(input_path: str, output_dir: str, start_number: int | None = None,
             progress(min(1.0, cur), _label, spd, eta)
 
         def _fail(e):
+            nonlocal first_error
             if first_error is None:
                 first_error = e
             cancel.set()
@@ -1196,12 +1194,17 @@ def convert(input_path: str, output_dir: str, start_number: int | None = None,
                     except Exception:
                         pass
 
-        def _exec(cmd):
-            _run_ffmpeg(cmd, dur, _job_cb if progress else None, cancel,
+        def _exec(cmd, cancel_evt=None):
+            _run_ffmpeg(cmd, dur, _job_cb if progress else None,
+                        cancel if cancel_evt is None else cancel_evt,
                         procs, procs_lock)
 
-        def _run_transcode(cmd_builder):
-            """执行一次转码；MediaCodec 硬件【编码】失败时回退软件编码。"""
+        def _run_transcode(cmd_builder, defer_fail: bool = False):
+            """执行一次转码；MediaCodec 硬件【编码】失败时回退软件编码。
+
+            defer_fail=True 时失败不调用 _fail()：调用方（硬解回退）会先尝试
+            自己的恢复路径，避免一次可恢复的失败就中止整批并行任务。
+            """
             try:
                 _exec(cmd_builder())
             except BaseException as e:
@@ -1227,16 +1230,41 @@ def convert(input_path: str, output_dir: str, start_number: int | None = None,
                         _fail(_e2)
                         raise
                 else:
+                    if defer_fail:
+                        # 交给外层回退；但仍要记录，否则并行汇总时会被静默吞掉
+                        if first_error is None:
+                            first_error = e
+                        raise
                     _fail(e)
                     raise
 
+        my_error = None
         try:
-            _run_transcode(lambda: _build_cmd(hwdec))
+            _run_transcode(lambda: _build_cmd(hwdec), defer_fail=bool(hwdec))
+        except CanceledError:
+            raise
         except BaseException as e:
             if not hwdec:
                 raise
-            say(f"[回退] {hwdec} 硬件解码失败（{e}），改用软件解码重试")
+            # 兄弟任务已失败时整批都要停，本任务不再单独回退。
+            if first_error is not None:
+                raise
+            my_error = e
+            # 硬解中途失败会留下半成品，先删掉再软解重跑，
+            #   否则残留的 moov/mdat 会让后续解析读到不一致的中间态。
+            try:
+                if os.path.exists(dst):
+                    os.remove(dst)
+            except OSError as rm_err:
+                say(f"[回退] 清理半成品失败（{rm_err}），将由 ffmpeg -y 覆盖")
+            mark_hw_decoder_failed(hwdec)
+            say(f"[回退] {hwdec} 硬件解码失败（{e}），本次改用软件解码重试")
             _run_transcode(lambda: _build_cmd(""))
+        # 本任务已通过软解恢复，撤掉自己记下的失败，避免整批被误判
+        if my_error is not None:
+            with lock:
+                if first_error is my_error:
+                    first_error = None
         if cancel is not None and cancel.is_set():
             raise CanceledError("已取消")
         with lock:
