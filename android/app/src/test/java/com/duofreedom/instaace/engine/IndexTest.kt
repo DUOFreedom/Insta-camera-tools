@@ -4,12 +4,19 @@ import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
+import org.junit.Assume.assumeTrue
+import org.junit.Before
 import org.junit.Test
 
 /**
  * 索引层回归测试：用真机导出的 12 个 .list 样本验证字节级幂等。
  *
  * 为什么必须字节级：相机读索引时，任何未知字段丢失都会让条目“看得见但打不开”。
+ *
+ * 样本来自真机，含设备标识，不随仓库分发（见 .gitignore 的 REVIEW*.md 说明）。
+ * 因此这里用 Assume 而不是 assert 做前置判断：没有样本时**跳过**整类测试，
+ * 而不是让 `gradle test` 在干净检出上直接红掉。此前用 assertTrue，导致
+ * 7 条里有 6 条 FileNotFoundException —— 一条永远红着的测试等于没有测试。
  */
 class IndexTest {
 
@@ -20,6 +27,14 @@ class IndexTest {
 
     private fun bytes(name: String): ByteArray =
         java.io.File("src/test/resources/samples/$name").readBytes()
+
+    @Before
+    fun requireSamples() {
+        assumeTrue(
+            "跳过：src/test/resources/samples 下没有真机索引样本（私有素材，不入库）",
+            samples().size >= 10,
+        )
+    }
 
     @Test
     fun samplesArePresent() {
