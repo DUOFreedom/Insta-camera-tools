@@ -168,7 +168,7 @@ python -m pytest desktop\tests -q
 
 ### 补充 1：APK 已重打（原未修项 1）
 
-`D:ndroid-build` 工具链齐备（JDK 21 / Gradle 8.7 / SDK 34 / Chaquopy），执行：
+`D:\android-build` 工具链齐备（JDK 21 / Gradle 8.7 / SDK 34 / Chaquopy），执行：
 
 ```bash
 cd android
@@ -177,6 +177,12 @@ export ANDROID_HOME=/d/android-build/sdk
 export GRADLE_USER_HOME=/d/android-build/.gradle
 /d/android-build/gradle-8.7/bin/gradle --no-daemon :app:assembleRelease
 ```
+
+> **2026-11-09 补注：上面的命令已失效，勿照抄。** 此后接入 Material 3 Expressive
+> 时 `compileSdk` 升到 35，AGP 升到 8.7.3，而 AGP 8.7.3 要求 **Gradle ≥ 8.9**；
+> 用 `gradle-8.7` 会直接报 `Minimum supported Gradle version is 8.9. Current version is 8.7`。
+> 现行可用的构建方式见 `docs/BUILD.md`（`gradle-8.11.1`，SDK 35）。
+> 下文记录的 APK 体积（72,830,835 B）同样是旧产物的数值。
 
 产物 `android/app/build/outputs/apk/release/app-release.apk`，72,830,835 B，
 `versionCode 14 / versionName 1.2.0`，双 ABI 均含 `libffmpeg.so` + `libffprobe.so`。

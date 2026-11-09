@@ -644,7 +644,7 @@
             <div>
               <p class="notice__title">桌面端需要自备 ffmpeg</p>
               <p class="notice__body">
-                下载 ffmpeg 后把 ffmpeg.exe 与 ffprobe.exe 放进 exe 同目录的 bin\ 文件夹。程序按「exe 目录 → exein → 系统 PATH」顺序查找，都找不到会明确报错并指出缺哪个。
+                下载 ffmpeg 后把 ffmpeg.exe 与 ffprobe.exe 放进 exe 同目录的 bin\ 文件夹。程序按「环境变量 → exe 目录 → exe\bin → 用户目录的 InstaAceImporter\bin → 常见安装位置 → 系统 PATH」顺序查找，都找不到会明确报错并指出缺哪个。
               </p>
               <p class="notice__body">
                 两个文件都要：只放 ffmpeg.exe 不够，程序需要用 ffprobe.exe 读取源文件信息。
