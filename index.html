@@ -37,6 +37,44 @@
     <link rel="stylesheet" href="./style.css" />
     <link rel="canonical" href="https://duofreedom.github.io/Insta-camera-tools/" />
     <link rel="sitemap" type="application/xml" href="./sitemap.xml" />
+    <!--
+      结构化数据：让搜索结果的标题/描述/许可证/价格直接可读，而不是靠爬虫猜。
+      price 0 + isAccessibleForFree 与「GPL-3.0、完全免费、无内购」的事实一致；
+      不要加 aggregateRating —— 本项目没有真实用户评分，编造会被判为垃圾结构化数据。
+    -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "SoftwareApplication",
+            "name": "影石相机工具",
+            "alternateName": "InstaAceImporter",
+            "applicationCategory": "MultimediaApplication",
+            "operatingSystem": "Windows 10, Windows 11",
+            "description": "把普通视频转码成影石 Ace Pro 2 原生结构：转码 VID（HEVC）+ LRV（H.264）、移植 inst box、登记相机索引。插回相机后相册可识别、可播放、封面正确。",
+            "url": "https://duofreedom.github.io/Insta-camera-tools/",
+            "downloadUrl": "https://github.com/DUOFreedom/Insta-camera-tools/releases/latest",
+            "softwareVersion": "1.2.0",
+            "license": "https://www.gnu.org/licenses/gpl-3.0.html",
+            "isAccessibleForFree": true,
+            "offers": {
+              "@type": "Offer",
+              "price": "0",
+              "priceCurrency": "CNY"
+            },
+            "fileSize": "78.8MB",
+            "inLanguage": "zh-CN"
+          },
+          {
+            "@type": "WebSite",
+            "name": "影石相机工具",
+            "url": "https://duofreedom.github.io/Insta-camera-tools/",
+            "inLanguage": "zh-CN"
+          }
+        ]
+      }
+    </script>
   </head>
 
   <body id="top">
