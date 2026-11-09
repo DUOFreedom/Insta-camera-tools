@@ -1,5 +1,20 @@
 # CHANGELOG
 
+## 未发布
+
+### 修复（`shared/instbox` 与安卓端的模块导入）
+
+同一类缺陷的三份副本：把「同目录兄弟模块」当成顶层模块平铺导入，能跑通纯靠调用方预先改过 `sys.path`。三种加载方式（包导入 / PyInstaller 平铺冻结 / 直接跑脚本）里只要有一种不满足就 `ModuleNotFoundError`，而失败又常常被宽 `except` 吞掉，表现为功能静默退化。
+
+- **`shared/instbox/moov_rewrap.py` 包导入必然失败**：原代码把 `shared/` 放进 `sys.path` 后 `import inst_transplant`，但该模块实际在 `shared/instbox/` 下，于是 `import instbox.moov_rewrap` 必然 `ModuleNotFoundError` —— 而这正是桌面端 `core._load_inst_modules()` 的加载方式，即**桌面端从源码运行时整条 inst 移植路径不可用**，`desktop/tests/test_insta.py` 也在收集阶段直接失败（此前只有 4 条回退测试真正跑起来）。改为优先包内相对导入，`ImportError` 再回退平铺导入。
+- **`desktop/core.py:_meta_equivalent()` 静默退化成逐字节比较**：裸 `import inst_transplant` 失败后被 `except Exception: return a == b` 吞掉，退化成逐字节全量比较；而 f9（inst 偏移）是可变长字段，全量比较会把合法条目误判成不匹配。改为走 `_load_inst_modules()`。`android/.../insta_core.py` 的同名函数同步修正。
+- **`shared/instbox/inst_transplant.py` 主移植路径的平铺导入**：v18–v21 成功路径里 `from moov_rewrap import rebuild_media` 位于函数体内，包导入时 `shared/instbox` 不在 `sys.path` 上，真机/真片导入时才炸。改为相对导入优先 + 平铺回退，并保留原有的 `globals()["filter_avc1_children"]` 注入点。
+- **`android/.../camera_moov_rewrap.py` 的 `sys.path` 指错目录**：`parents[1]` 解析到 `android/app/src/main`，而 `insta360_tf_import.py` 与它同在 `main/python/` 下；此前没炸只因 `insta_core` 已把该目录放进 `sys.path`。改为 `parent`。
+
+### 测试
+
+- 新增 4 条回归护栏：`instbox` 包导入、`instbox` 平铺导入（子进程验证）、`inst_transplant` 相对导入分支的 ast 静态检查、`_meta_equivalent` 在 f9 漂移时仍判等价而 f7 时间戳变化时判不等价。全套 **42 passed, 2 skipped**（此前因收集失败只跑到 4 条）。
+
 ## 1.2.0 — 2026-11-08
 
 ### 修复（全量审查后的整改）
