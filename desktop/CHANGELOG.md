@@ -11,9 +11,25 @@
 - **`shared/instbox/inst_transplant.py` 主移植路径的平铺导入**：v18–v21 成功路径里 `from moov_rewrap import rebuild_media` 位于函数体内，包导入时 `shared/instbox` 不在 `sys.path` 上，真机/真片导入时才炸。改为相对导入优先 + 平铺回退，并保留原有的 `globals()["filter_avc1_children"]` 注入点。
 - **`android/.../camera_moov_rewrap.py` 的 `sys.path` 指错目录**：`parents[1]` 解析到 `android/app/src/main`，而 `insta360_tf_import.py` 与它同在 `main/python/` 下；此前没炸只因 `insta_core` 已把该目录放进 `sys.path`。改为 `parent`。
 
+### 修复（安卓端硬解/硬编回退与取消分类）
+
+三个缺陷都在 `android/app/src/main/python/insta_core.py` 的 `convert()` 内，共同点是**都不会抛异常，只是结果错了**，所以原有的 4 条回退测试全绿。
+
+- **硬解失败日志永远是 `UnboundLocalError`**：`_run_transcode()` 的 `defer_fail` 分支读写 `first_error`，但该函数没有 `nonlocal` 声明（只有 `_run_one` 和 `_fail` 有）。于是每次硬解失败，`[回退] hevc_mediacodec 硬件解码失败（cannot access local variable 'first_error' ...）` 顶掉了真实 ffmpeg 报错，用户永远查不出硬解为什么失败。
+- **补 `nonlocal` 并不能修好，反而会彻底断掉回退**：调用方用 `if first_error is not None: raise` 区分「本任务失败，可以回退」与「兄弟任务已失败，整批要停」。defer 分支一旦先记一笔，自己的失败就冒充成兄弟失败，回退分支永远进不去 —— 硬解失败直接变成整批中止。正确做法是**根本不在 defer 分支记 `first_error`**，只把异常抛给调用方。随之删除已成死代码的 `my_error` 恢复块（它原本用来撤销自己记下的失败）。
+- **用户取消被当成编码器故障**：`CanceledError` 是 `Exception` 的子类，会落进 `except BaseException` 的「MediaCodec 硬编失败」分支，每取消一次就多跑一条注定被取消的软编 ffmpeg。硬解回退的软编阶段同样如此，且 `_fail()` 还会把取消记成 `first_error`、顶掉兄弟任务真实的 ffmpeg 报错。两处均改为优先 `except CanceledError: raise`。
+- **取消被报成转码成功**（上述修复引入的回归，本轮已一并解决）：并行驱动用 `except BaseException: pass` 吞掉所有异常、再靠 `first_error` 汇总。取消一旦不再写进 `first_error`，`convert()` 就会在用户已取消的情况下正常返回两个输出路径。改为在汇总循环里单独记 `canceled` 标志，`first_error` 之后再抛 `CanceledError`。
+
 ### 测试
 
-- 新增 4 条回归护栏：`instbox` 包导入、`instbox` 平铺导入（子进程验证）、`inst_transplant` 相对导入分支的 ast 静态检查、`_meta_equivalent` 在 f9 漂移时仍判等价而 f7 时间戳变化时判不等价。全套 **42 passed, 2 skipped**（此前因收集失败只跑到 4 条）。
+- 新增 5 条回退回归用例（`desktop/tests/test_android_fallback.py`，共 9 条）：硬解回退日志必须含真实错因、每个任务都要各自回退而不是整批中止、硬解回退途中取消必须抛 `CanceledError`、取消不得触发软编重试、软编回退阶段取消不得顶掉兄弟任务的失败原因。
+- **每条用例都做过「回滚验证」**：把对应修复逐一还原成缺陷版本，确认对应用例变红、其余保持绿，再恢复。避免写出「看着像测试、其实永远绿」的空壳。
+- 写测试时踩到一个坑并记录在注释里：`cmd` 是参数列表，`"mediacodec" in cmd` 只做整元素相等匹配，永远匹配不到 `"hevc_mediacodec"`，必须逐元素 `any("mediacodec" in a for a in cmd)`。
+- 全套 **49 passed, 2 skipped**（此前 43 passed）。
+
+### 测试（模块导入与 IndexTest）
+
+- 新增 4 条回归护栏：`instbox` 包导入、`instbox` 平铺导入（子进程验证）、`inst_transplant` 相对导入分支的 ast 静态检查、`_meta_equivalent` 在 f9 漂移时仍判等价而 f7 时间戳变化时判不等价。当时全套 **42 passed, 2 skipped**（此前因收集失败只跑到 4 条）。
 - **`IndexTest` 在干净检出上 6/7 红**：样本取自真机、含设备标识，按既有约定不入库，但测试用 `assertTrue` 做前置判断，于是每条都抛 `FileNotFoundException`。改为 JUnit `Assume.assumeTrue`：有样本时照常做字节级幂等校验，无样本时整类跳过。实测 `:app:testReleaseUnitTest` → **5 passed / 7 skipped / 0 failed**。
 
 ### 构建验证（本轮实际跑通）

@@ -1229,6 +1229,10 @@ def convert(input_path: str, output_dir: str, start_number: int | None = None,
             """
             try:
                 _exec(cmd_builder())
+            except CanceledError:
+                # 用户取消不是编码器故障：若当成「硬编失败」再试一次软编，
+                #   每取消一次都要多跑一条注定被取消的 ffmpeg。
+                raise
             except BaseException as e:
                 # MediaCodec 编码 i-frame-interval 只能整数秒，拿不到相机要求的
                 # 16 帧密集关键帧；失败时用 libx265/libx264 软编重试。
@@ -1248,19 +1252,24 @@ def convert(input_path: str, output_dir: str, start_number: int | None = None,
                                                   level=level)
                     try:
                         _exec(cmd_sw)
+                    except CanceledError:
+                        # 软编阶段被取消同样不是编码器故障，别记进 first_error，
+                        #   否则会顶掉兄弟任务真实的 ffmpeg 报错。
+                        raise
                     except BaseException as _e2:
                         _fail(_e2)
                         raise
                 else:
                     if defer_fail:
-                        # 交给外层回退；但仍要记录，否则并行汇总时会被静默吞掉
-                        if first_error is None:
-                            first_error = e
+                        # 只把错误抛给调用方，不在这里记 first_error：
+                        #   调用方就是靠 first_error is None 判断「是本任务自己
+                        #   失败，可以回退」还是「兄弟任务已失败，整批要停」。
+                        #   这里先记一笔，等于让自己的失败冒充兄弟失败，
+                        #   回退分支永远进不去（硬解失败直接变成整批中止）。
                         raise
                     _fail(e)
                     raise
 
-        my_error = None
         try:
             _run_transcode(lambda: _build_cmd(hwdec), defer_fail=bool(hwdec))
         except CanceledError:
@@ -1271,7 +1280,6 @@ def convert(input_path: str, output_dir: str, start_number: int | None = None,
             # 兄弟任务已失败时整批都要停，本任务不再单独回退。
             if first_error is not None:
                 raise
-            my_error = e
             # 硬解中途失败会留下半成品，先删掉再软解重跑，
             #   否则残留的 moov/mdat 会让后续解析读到不一致的中间态。
             try:
@@ -1282,11 +1290,6 @@ def convert(input_path: str, output_dir: str, start_number: int | None = None,
             mark_hw_decoder_failed(hwdec)
             say(f"[回退] {hwdec} 硬件解码失败（{e}），本次改用软件解码重试")
             _run_transcode(lambda: _build_cmd(""))
-        # 本任务已通过软解恢复，撤掉自己记下的失败，避免整批被误判
-        if my_error is not None:
-            with lock:
-                if first_error is my_error:
-                    first_error = None
         if cancel is not None and cancel.is_set():
             raise CanceledError("已取消")
         with lock:
@@ -1299,15 +1302,22 @@ def convert(input_path: str, output_dir: str, start_number: int | None = None,
     if workers > 1 and n > 1:
         say(f"并行转码: {workers} 路")
         import concurrent.futures as _cf
+        canceled = False
         with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as ex:
             futures = [ex.submit(_run_one, i, t) for i, t in enumerate(tasks)]
             for fut in _cf.as_completed(futures):
                 try:
                     results[futures.index(fut)] = fut.result()
+                except CanceledError:
+                    # 取消不是「某一路失败」，不能交给 first_error 汇总，
+                    #   否则取消会被当成转码成功返回给调用方。
+                    canceled = True
                 except BaseException:
                     pass
         if first_error is not None:
             raise first_error
+        if canceled:
+            raise CanceledError("已取消")
     else:
         for idx, t in enumerate(tasks):
             results[idx] = _run_one(idx, t)
