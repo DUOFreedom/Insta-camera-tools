@@ -2,6 +2,27 @@
 
 ## 未发布
 
+### 新增（安卓端导入取消）
+
+桌面端早就有取消，安卓端一直没有：导入一旦开始，用户只能等整个队列跑完，或者杀掉 App —— 后者会留下半截暂存文件和一个还在跑的 ffmpeg 子进程。补齐三层：
+
+- **Python 桥（`android_bridge.py`）**：新增 `new_cancel_event()` 返回一个真正的 `threading.Event`，Kotlin 以 `PyObject` 持有它并回传给 `run_import(..., cancel=...)`；`run_import` 再把事件透传给 `insta_core.import_with_inst`。取消令牌的生命周期由 Kotlin 的引用决定，不需要跨 JNI 的登记表。
+- **返回契约**：取消与失败在 JSON 上分开——取消返回 `{"ok": false, "canceled": true}`，失败返回 `{"ok": false, "canceled": false}`。此前两者都只有一个 `error` 字符串，Kotlin 无法区分「用户主动停」和「出错了」。
+- **Kotlin（`PythonEngine` / `AppState` / `InstaAceApp`）**：`PythonEngine.newCancelEvent()` / `cancelEventSet()`；`AppState.cancelImport()` 只置位事件、不阻塞，可从 UI 线程直接调用；队列循环在每条开始前检查取消标志，当前条被中断则不记入结果；导入中按钮换成「取消导入」，取消后显示「正在取消…」并在收尾时清空事件。
+- **取消时的写回语义**：已经转好的条目是完整产物，照常写回卡；正在转的那条只留在镜像目录里，不会写回。取消后状态显示「已取消（已完成的 N 条已写回卡）」，而不是笼统的「部分完成」。
+
+### 测试（安卓取消链路）
+
+新增 `desktop/tests/test_bridge_cancel.py`，6 条，全部离线（不依赖 ffmpeg / 相机 / Android），都做过回滚验证：
+
+- `test_new_cancel_event_is_a_threading_event`
+- `test_run_import_passes_cancel_into_core` —— 事件必须原样传到 `import_with_inst`，否则取消按钮是装饰品。
+- `test_run_import_without_cancel_passes_none` —— 旧调用点不传 cancel 时必须继续可用，不能凭空造事件。
+- `test_run_import_reports_canceled_separately_from_failure` / `test_run_import_failure_is_not_marked_canceled` —— 两个方向都验：取消不能报成失败，失败也不能报成取消。
+- `test_cancel_event_set_by_other_thread_is_visible` —— Kotlin 在 UI 线程置位、Python 在 IO 线程读取，验证跨线程可见。
+
+回滚验证结果：不传 cancel 进 core → 2 条红；取消走通用失败分支 → 1 条红；成功分支不写 `canceled` 字段 → 1 条红。全套 **61 passed, 2 skipped**（此前 55 passed）。
+
 ### 修复（安卓端 `batch_convert` 截断 / `cancel=None` / 失败被静默吞掉）
 
 三个都是「不报错、只是结果错了」的缺陷，因此全部通过了此前所有测试。
@@ -38,15 +59,18 @@
 
 ### 产物重建与核对
 
-- 安卓 release APK：75,260,052 B，sha256 `62e4294bf6746e05e180c5228f89be955b7a96129ef2f67be0b7039935af6d35`。
-  解包 `assets/chaquopy/app.imy` 核对字节码：`_source_stamp` 已存在，`batch_convert` 有 `success`/`failed` 局部变量，
-  `_build_transcode_cmd` 有 `ff` 局部变量。`:app:testReleaseUnitTest` → IndexTest 7 skipped / ConsentLogicTest 5 passed。
+- 安卓 release APK（含取消链路）：75,263,215 B。同一份源码连续两次构建哈希不同（`da…` / `e2…`），说明打包过程带进了时间戳，此包的 sha256 不能当校验和用。
+  解包 `assets/chaquopy/app.imy` 核对字节码：`new_cancel_event` 在模块 `co_names` 中，
+  `run_import` 的 `co_varnames` 含 `cancel`，其字典键常量含 `canceled`；
+  `javap` 核对 `PythonEngine.runImport(..., PyObject)` / `newCancelEvent` / `cancelEventSet`
+  与 `AppState.cancelImport()`（含 `Dispatchers.getIO` 调用）均已生成。
+  `:app:testReleaseUnitTest` → IndexTest 7 skipped / ConsentLogicTest 5 passed。
 - 桌面两个可执行文件此前都打包着旧 `core.py`（11-08 构建），已重建：
   `InstaAceQml.exe` 78,828,822 B / sha256 `2705143e589ee60029c136d6b4319eab033cad5451872c2e18eca7ecccaf55d7`；
   `InstaAceImporter.exe` 39,072,517 B / sha256 `d94aa3f60a7bf65b83ad40b4582ba20f55c55df8ada4c25bab03c332da16aede`。
   从两者内嵌的 `PYZ.pyz` 取出 `core` 模块核对：`convert` 有 `canceled`、`batch_convert` 有 `success`/`failed`、`_source_stamp` 存在。
   `InstaAceQml.exe --self-test` → `QML_OK roots=1`，exit 0。
-- `docs/BUILD.md` 的实测产物哈希同步更新，并注明该值随源码变化、不可当作固定校验和。
+- `docs/BUILD.md` 的实测产物同步更新，并记下「同一源码两次构建哈希不同、字节数稳定」，提醒不要把哈希当校验和。
 
 ### 修复（`shared/instbox` 与安卓端的模块导入）
 

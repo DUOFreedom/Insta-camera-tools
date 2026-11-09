@@ -1,6 +1,7 @@
 package com.duofreedom.instaace.engine
 
 import android.content.Context
+import com.chaquo.python.PyObject
 import com.chaquo.python.Python
 import com.chaquo.python.android.AndroidPlatform
 import org.json.JSONObject
@@ -111,13 +112,17 @@ object PythonEngine {
      * preferHardware = true 时走 MediaCodec 硬件编码（快），
      * 但其关键帧间隔受 MediaFormat 限制只能 1 秒，相机可能不识别；
      * false 时走 libx265/libx264 软件编码（与桌面端一致，最稳）。
+     *
+     * cancel 由 [newCancelEvent] 创建；调用 [cancelEventSet] 置位后，
+     * 正在跑的 ffmpeg 子进程会被 kill，本函数返回 canceled=true 的 JSON。
      */
     fun runImport(
         ctx: Context,
         source: File,
         mirrorRoot: File,
         callback: ImportCallback,
-        preferHardware: Boolean = false
+        preferHardware: Boolean = false,
+        cancel: PyObject? = null
     ): JSONObject {
         if (!requireInit(ctx)) {
             throw RuntimeException("Python 核心初始化失败：$initError")
@@ -129,9 +134,29 @@ object PythonEngine {
             mirrorRoot.absolutePath,
             callback,
             null,                 // cover
-            preferHardware        // prefer_hardware
+            preferHardware,       // prefer_hardware
+            cancel                // cancel（threading.Event 或 None）
         )?.toString() ?: throw RuntimeException("Python 未返回结果")
         return JSONObject(raw)
+    }
+
+    /** 创建一个取消事件（Python threading.Event），交给 runImport 使用。 */
+    fun newCancelEvent(ctx: Context): PyObject? = try {
+        if (!requireInit(ctx)) null
+        else Python.getInstance().getModule("android_bridge").callAttr("new_cancel_event")
+    } catch (_: Throwable) {
+        null
+    }
+
+    /**
+     * 置位取消事件。线程安全（Python Event.set 本身可跨线程调用）。
+     * 返回 false 表示事件为空或置位失败——调用方应继续等待，不要假定已取消。
+     */
+    fun cancelEventSet(ev: PyObject?): Boolean = try {
+        ev?.callAttr("set")
+        ev != null
+    } catch (_: Throwable) {
+        false
     }
 
     fun logTail(ctx: Context): String = try {

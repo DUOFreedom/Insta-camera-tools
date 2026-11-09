@@ -17,6 +17,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import androidx.compose.runtime.setValue
 import androidx.documentfile.provider.DocumentFile
+import com.chaquo.python.PyObject
 import com.duofreedom.instaace.engine.ImportCallback
 import com.duofreedom.instaace.engine.Index
 import com.duofreedom.instaace.engine.Engine
@@ -98,6 +99,47 @@ class AppState {
 
     var running by mutableStateOf(false)
         private set
+    var canceling by mutableStateOf(false)
+        private set
+
+    /** 本次导入的取消事件（Python threading.Event），导入结束即清空。 */
+    @Volatile
+    private var cancelEvent: PyObject? = null
+
+    /** 已请求取消：队列循环据此停止派发下一条。 */
+    @Volatile
+    private var cancelRequested: Boolean = false
+
+    /**
+     * 请求取消当前导入。
+     *
+     * 前置条件：无（未在导入时调用是安全的空操作）。
+     * 后置条件：正在跑的 ffmpeg 子进程被 kill；队列剩余条目不再开始；
+     *   半成品不写回相机卡。
+     * 不变量：本函数不阻塞——标志立即置上，真正去置位 Python Event 的
+     *   动作丢到 IO 线程。Chaquopy 的 callAttr 要抢 GIL，而导入线程可能
+     *   正卡在纯 Python 的 moov 重写循环里；在 UI 线程上直接等 GIL 会掉帧。
+     */
+    fun cancelImport() {
+        // 先把标志置上：running 早于事件创建就已为 true，按钮在这一小段
+        //   窗口里是可点的，此时 cancelEvent 还是 null。只置标志不置事件也
+        //   足够——队列循环每条开始前都查它，第一条都还没派发就直接收尾。
+        cancelRequested = true
+        canceling = true
+        stage = "正在取消…"
+        val ev = cancelEvent ?: return
+        scope.launch(Dispatchers.IO) {
+            if (!PythonEngine.cancelEventSet(ev)) {
+                // 置位失败（核心已回收等）：把 UI 从「正在取消」放开，
+                //   否则用户会一直盯着一个不会变的按钮。
+                withContext(Dispatchers.Main) {
+                    canceling = false
+                    cancelRequested = false
+                    stage = "取消失败：请重试"
+                }
+            }
+        }
+    }
     var logLine by mutableStateOf("")
     var outputSummary by mutableStateOf("")
     val results = mutableStateListOf<ImportResult>()
@@ -233,6 +275,8 @@ class AppState {
         }
 
         running = true
+        canceling = false
+        cancelRequested = false
         stage = "准备中…"
         progress = 0f
         results.clear()
@@ -244,6 +288,12 @@ class AppState {
         var ticker: Job? = null
 
         try {
+            // 取消事件必须早于任何耗时操作创建，否则用户在「准备卡镜像」
+            //   阶段点取消会没有东西可置位，按钮看起来失灵。
+            val ev = withContext(Dispatchers.IO) { PythonEngine.newCancelEvent(ctx) }
+            if (ev == null) throw RuntimeException("无法创建取消事件：Python 核心未就绪")
+            cancelEvent = ev
+
             val card = withContext(Dispatchers.IO) {
                 SafeCard.open(ctx, tree)
             } ?: throw RuntimeException("卡结构不完整：需要 DCIM/Camera01 与一对真机 VID_/LRV_ 原片")
@@ -257,7 +307,12 @@ class AppState {
             if (!mirrorOk) throw RuntimeException("卡镜像构建失败：模板或索引拷贝不出来")
 
             val items = queue.toList()
-            items.forEachIndexed { i, item ->
+            for (i in items.indices) {
+                val item = items[i]
+                // 取消后不再开始下一条：否则用户点了取消，剩下的每一条
+                //   仍要转码几分钟，取消等于没生效。
+                if (cancelRequested) break
+
                 val base = i.toFloat() / items.size
                 stage = "第 ${i + 1}/${items.size} 条：读取源文件"
                 progress = base
@@ -287,7 +342,12 @@ class AppState {
                         val lbl = cb.label
                         withContext(Dispatchers.Main) {
                             progress = f
-                            if (lbl.isNotBlank()) stage = "第 ${i + 1}/${items.size} 条 · $lbl"
+                            // 取消中不要用进度文字盖掉「正在取消…」：
+                            //   否则点完取消 250ms 后又变回「第 1/2 条 · 转码」，
+                            //   看起来像按钮没生效。
+                            if (lbl.isNotBlank() && !canceling) {
+                                stage = "第 ${i + 1}/${items.size} 条 · $lbl"
+                            }
                         }
                         delay(250)
                     }
@@ -298,7 +358,8 @@ class AppState {
                     withContext(Dispatchers.IO) {
                         PythonEngine.runImport(
                             ctx, staged, mirror.root, cb,
-                            preferHardware = (encoder == "硬件")
+                            preferHardware = (encoder == "硬件"),
+                            cancel = cancelEvent
                         )
                     }
                 } finally {
@@ -306,6 +367,12 @@ class AppState {
                     ticker = null
                     logLine = cb.lastLog
                     withContext(Dispatchers.IO) { staged.delete() }
+                }
+
+                if (json.optBoolean("canceled")) {
+                    // 这一条被中断，没有完整产物：不记入 results，直接收尾。
+                    cancelRequested = true
+                    break
                 }
 
                 val ok = json.optBoolean("ok")
@@ -327,20 +394,36 @@ class AppState {
                 progress = ((i + 1).toFloat() / items.size).coerceIn(0f, 1f)
             }
 
-            stage = "写回相机卡…"
+            val canceled = cancelRequested
+            // 已经转换并登记好的条目是完整产物，取消不该把它们一起丢掉；
+            //   正在转的那条只留在镜像里（jobDir），不会写回卡。
             val media = results.filter { it.ok }
                 .flatMap { listOf(it.main, it.proxy) }
                 .filter { it.isNotBlank() }
-            val (writeOk, writeErr) = mirror.writeBack(media)
+
+            val (writeOk, writeErr) = if (media.isEmpty()) {
+                true to ""
+            } else {
+                stage = if (canceled) "已取消，写回已完成的部分…" else "写回相机卡…"
+                withContext(Dispatchers.IO) { mirror.writeBack(media) }
+            }
+
             outputSummary = results.joinToString("\n") {
                 val mark = if (it.ok) "✓" else "✗"
                 "$mark ${it.main.ifBlank { it.name }}  ${it.detail}"
-            } + if (writeOk) "\n已写回相机卡（${media.size} 个文件 + 索引）"
-            else "\n写回失败：$writeErr"
+            } + when {
+                !writeOk -> "\n写回失败：$writeErr"
+                media.isEmpty() -> if (canceled) "\n已取消，没有需要写回的条目" else ""
+                else -> "\n已写回相机卡（${media.size} 个文件 + 索引）"
+            }
 
-            stage = if (results.all { it.ok } && writeOk) "全部完成"
-            else "部分完成（见下方明细）"
-            progress = 1f
+            stage = when {
+                canceled && media.isEmpty() -> "已取消"
+                canceled -> "已取消（已完成的 ${results.count { it.ok }} 条已写回卡）"
+                results.all { it.ok } && writeOk -> "全部完成"
+                else -> "部分完成（见下方明细）"
+            }
+            if (!canceled) progress = 1f
 
             scanCard(ctx, tree)
         } catch (t: Throwable) {
@@ -349,6 +432,9 @@ class AppState {
         } finally {
             ticker?.cancel()
             stageDir.listFiles()?.forEach { it.delete() }
+            cancelEvent = null
+            cancelRequested = false
+            canceling = false
             running = false
         }
     }

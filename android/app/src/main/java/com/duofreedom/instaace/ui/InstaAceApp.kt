@@ -36,6 +36,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.PlaylistPlay
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Code
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.ErrorOutline
@@ -303,13 +304,15 @@ fun InstaAceApp() {
                             state.startImport(ctx)
                             snackbar.showSnackbar(
                                 when {
+                                    state.stage.startsWith("已取消") -> state.stage
                                     state.stage.startsWith("失败") || state.stage.startsWith("部分完成") ->
                                         state.stage
                                     else -> "导入完成：已写回相机卡，拔卡插回相机查看"
                                 }
                             )
                         }
-                    }
+                    },
+                    onCancel = { state.cancelImport() }
                 )
                 else -> SettingsScreen(
                     state,
@@ -483,6 +486,7 @@ private fun QueueScreen(
     state: AppState,
     onPick: () -> Unit,
     onStart: () -> Unit,
+    onCancel: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(modifier.fillMaxSize().padding(horizontal = 16.dp)) {
@@ -579,20 +583,28 @@ private fun QueueScreen(
                 }
             }
             Spacer(Modifier.height(12.dp))
-            Button(
-                onClick = onStart,
-                enabled = state.queue.isNotEmpty() && !state.running && state.cardUri != null,
-                modifier = Modifier.fillMaxWidth().height(52.dp)
-            ) {
-                Icon(Icons.Rounded.PlayArrow, contentDescription = null)
-                Spacer(Modifier.size(8.dp))
-                Text(
-                    when {
-                        state.running -> "导入中…"
-                        state.cardUri == null -> "请先选择存储卡"
-                        else -> "开始导入"
-                    }
-                )
+            // 导入中把「开始」换成「取消」：否则用户只能杀掉 App 才能停下，
+            //   而杀进程会留下半截暂存文件和一个正在跑的 ffmpeg 子进程。
+            if (state.running) {
+                OutlinedButton(
+                    onClick = onCancel,
+                    enabled = !state.canceling,
+                    modifier = Modifier.fillMaxWidth().height(52.dp)
+                ) {
+                    Icon(Icons.Rounded.Close, contentDescription = null)
+                    Spacer(Modifier.size(8.dp))
+                    Text(if (state.canceling) "正在取消…" else "取消导入")
+                }
+            } else {
+                Button(
+                    onClick = onStart,
+                    enabled = state.queue.isNotEmpty() && state.cardUri != null,
+                    modifier = Modifier.fillMaxWidth().height(52.dp)
+                ) {
+                    Icon(Icons.Rounded.PlayArrow, contentDescription = null)
+                    Spacer(Modifier.size(8.dp))
+                    Text(if (state.cardUri == null) "请先选择存储卡" else "开始导入")
+                }
             }
         }
     }

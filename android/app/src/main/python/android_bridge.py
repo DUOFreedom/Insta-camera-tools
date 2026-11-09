@@ -18,12 +18,23 @@ import json
 import os
 import sys
 import tempfile
+import threading
 import traceback
 
 _core = None
 _tf = None
 _rw = None
 _log_file = None
+
+
+def new_cancel_event():
+    """创建一个取消事件，交给 Kotlin 侧持有并传回 run_import()。
+
+    Kotlin 拿到的是一枚 PyObject，既可以作为参数回传给 Python（Chaquopy 会
+    还原成真正的 threading.Event），也可以直接 callAttr("set") 置位。
+    这样取消令牌的生命周期由 Kotlin 的引用决定，不需要额外的登记表。
+    """
+    return threading.Event()
 
 
 def _core_version():
@@ -79,7 +90,8 @@ def _safe_log(cb, text):
         pass
 
 
-def run_import(source, card_root, callback=None, cover=None, prefer_hardware=False):
+def run_import(source, card_root, callback=None, cover=None, prefer_hardware=False,
+               cancel=None):
     """在镜像卡目录上执行完整导入，返回 JSON 字符串。
 
     source            已暂存到本地的源视频
@@ -87,6 +99,12 @@ def run_import(source, card_root, callback=None, cover=None, prefer_hardware=Fal
     callback          Kotlin 对象，含 onProgress(frac:float, text:str) / onLog(text:str)
     prefer_hardware   True = 优先 MediaCodec 硬件编码（快，但关键帧间隔只能 1 秒）；
                       False = libx265/libx264 软件编码（与桌面端一致，相机识别最稳）
+    cancel            可选 threading.Event；由 new_cancel_event() 创建、Kotlin 侧置位。
+                      置位后 ffmpeg 子进程会被 kill，返回的 JSON 带 canceled=True。
+
+    返回 JSON：成功 {"ok": True, main, proxy, inst_ok, inst_error, index_error, registered}；
+              取消 {"ok": False, canceled": True, error}；
+              失败 {"ok": False, error, trace}。
     """
     def log(msg):
         _safe_log(callback, msg)
@@ -103,9 +121,11 @@ def run_import(source, card_root, callback=None, cover=None, prefer_hardware=Fal
         res = _core.import_with_inst(
             source, card_root, log=log, progress=progress,
             cover=cover if cover else None,
+            cancel=cancel,
         )
         out = {
             "ok": True,
+            "canceled": False,
             "main": os.path.basename(res.get("main") or ""),
             "proxy": os.path.basename(res.get("proxy") or ""),
             "inst_ok": bool(res.get("inst_ok")),
@@ -116,10 +136,20 @@ def run_import(source, card_root, callback=None, cover=None, prefer_hardware=Fal
         log("导入完成：inst_ok=%s" % out["inst_ok"])
         return json.dumps(out, ensure_ascii=False)
     except Exception as e:  # noqa: BLE001
+        # 取消不是失败：Kotlin 侧据此显示「已取消」而不是「失败：…」，
+        #   也不会把半成品写回卡。
+        if isinstance(e, getattr(_core, "CanceledError", ())):
+            log("已取消")
+            return json.dumps({
+                "ok": False,
+                "canceled": True,
+                "error": "%s: %s" % (type(e).__name__, e),
+            }, ensure_ascii=False)
         tb = traceback.format_exc()
         log("导入失败：%s: %s" % (type(e).__name__, e))
         return json.dumps({
             "ok": False,
+            "canceled": False,
             "error": "%s: %s" % (type(e).__name__, e),
             "trace": tb[-3000:],
         }, ensure_ascii=False)
