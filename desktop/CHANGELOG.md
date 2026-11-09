@@ -42,8 +42,8 @@
   解包 `assets/chaquopy/app.imy` 核对字节码：`_source_stamp` 已存在，`batch_convert` 有 `success`/`failed` 局部变量，
   `_build_transcode_cmd` 有 `ff` 局部变量。`:app:testReleaseUnitTest` → IndexTest 7 skipped / ConsentLogicTest 5 passed。
 - 桌面两个可执行文件此前都打包着旧 `core.py`（11-08 构建），已重建：
-  `InstaAceQml.exe` 78,829,648 B / sha256 `3cf26977885f0ec4ac785669dc982b451d4d91e703f8d7a79038bd9ba226bcde`；
-  `InstaAceImporter.exe` 39,072,863 B / sha256 `4ffe7a64e057b019393793ce45b203556beae8bf124b65e046ecfc5c7766e9f6`。
+  `InstaAceQml.exe` 78,828,822 B / sha256 `2705143e589ee60029c136d6b4319eab033cad5451872c2e18eca7ecccaf55d7`；
+  `InstaAceImporter.exe` 39,072,517 B / sha256 `d94aa3f60a7bf65b83ad40b4582ba20f55c55df8ada4c25bab03c332da16aede`。
   从两者内嵌的 `PYZ.pyz` 取出 `core` 模块核对：`convert` 有 `canceled`、`batch_convert` 有 `success`/`failed`、`_source_stamp` 存在。
   `InstaAceQml.exe --self-test` → `QML_OK roots=1`，exit 0。
 - `docs/BUILD.md` 的实测产物哈希同步更新，并注明该值随源码变化、不可当作固定校验和。
