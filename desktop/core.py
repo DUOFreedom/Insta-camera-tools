@@ -1287,6 +1287,10 @@ def batch_convert(file_list: list[str], output_dir: str,
     total = len(file_list)
     used_names = set()
     for i, src in enumerate(file_list):
+        if cancel.is_set():
+            # 批量导入要能中途停下：否则用户点了取消，剩下的文件还会
+            #   一个个转完（每个都要几分钟），取消形同虚设。
+            raise CanceledError("已取消")
         if use_card:
             stamp = (card_when + timedelta(seconds=i)).strftime("%Y%m%d_%H%M%S")
         else:
@@ -1302,8 +1306,13 @@ def batch_convert(file_list: list[str], output_dir: str,
 
         try:
             main, preview = convert(src, output_dir, start_number=seq, stamp=stamp,
-                                    log=log, encoder=hw, progress=_wrap, spec=spec)
+                                    log=log, encoder=hw, progress=_wrap, spec=spec,
+                                    cancel=cancel)
             success.append((src, main, preview))
+        except CanceledError:
+            # 取消不是「这个文件失败」：把它塞进 failed 会让上层以为
+            #   只是这一条有问题，接着转下一条。
+            raise
         except Exception as e:  # noqa: BLE001
             failed.append((src, str(e)))
     return success, failed

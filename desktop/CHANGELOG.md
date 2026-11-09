@@ -20,7 +20,21 @@
 - `test_convert_without_cancel_does_not_raise_attribute_error`
 - `test_convert_failure_is_not_reported_as_success` —— 断言失败必须抛异常且带可读信息，不能返回 `(None, None)`。
 
-全套 **53 passed, 2 skipped**（此前 49 passed）。
+全套 **55 passed, 2 skipped**（此前 49 passed）。
+
+### 修复（`batch_convert` 的取消语义）
+
+同一类「取消不生效 / 取消被当成失败」的问题，桌面端与安卓端各一份：
+
+- **桌面端 `batch_convert` 无法中途取消**：循环体既不检查 `cancel`，也不把 `cancel` 传给 `convert`，用户点了取消，剩下的文件还是会一个个转完。已在循环开头检查，并把 `cancel` 透传下去。
+- **取消被当成「这个文件失败」**：`except Exception: failed.append(...)` 会把 `CanceledError` 也收进 `failed`，上层看到的是"这一条有问题"，接着转下一条。已改为先 `except CanceledError: raise`。
+
+### 测试（批量取消）
+
+- `test_batch_convert_stops_on_cancel` —— 取消点设**在第一条转完之后**。踩过的坑：`batch_convert` 开头本来就有一道 `if cancel.is_set(): raise`，在入口就置位只能测到那道守卫，测不到循环；第一版测试因此连缺陷版本都能通过。
+- `test_batch_convert_propagates_cancel_from_convert` —— `convert` 内部抛 `CanceledError` 时必须原样上抛，不能被塞进 `failed`。
+
+两条都做了回滚验证：还原缺陷版本后双双变红。
 
 ### 产物重建与核对
 

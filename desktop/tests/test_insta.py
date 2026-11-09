@@ -34,6 +34,7 @@ import shutil
 import struct
 import sys
 import tempfile
+import threading
 
 import pytest
 
@@ -625,5 +626,60 @@ def test_convert_failure_is_not_reported_as_success():
         assert not isinstance(ei.value, AttributeError), (
             f"应当是「找不到 ffmpeg」这类真实错误，而不是 AttributeError: {ei.value}")
         assert str(ei.value).strip(), "失败必须带可读的错误信息"
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
+
+def test_batch_convert_stops_on_cancel(monkeypatch):
+    """批量导入必须能中途停下。
+
+    注意取消点要设在【第一条转完之后】：batch_convert 开头本来就有一道
+    `if cancel.is_set(): raise`，在入口就置位只能测到那道守卫，测不到循环。
+    原实现的循环体既不检查 cancel，也不把 cancel 传给 convert，
+    于是用户点了取消，剩下的文件还会一个个转完。
+    """
+    d = tempfile.mkdtemp(prefix="insta_batch_cancel_")
+    try:
+        files = []
+        for i in range(3):
+            p = os.path.join(d, "in%d.mp4" % i)
+            with open(p, "wb") as f:
+                f.write(b"\x00" * 64)
+            files.append(p)
+        out = os.path.join(d, "out")
+        os.makedirs(out)
+
+        cancel = threading.Event()
+        calls = []
+
+        def _fake_convert(src, *a, **k):
+            calls.append(src)
+            cancel.set()          # 第一条转完，用户点了取消
+            return ("main.mp4", "lrv.mp4")
+
+        monkeypatch.setattr(core, "convert", _fake_convert)
+        with pytest.raises(core.CanceledError):
+            core.batch_convert(files, out, cancel=cancel)
+        assert len(calls) == 1, f"取消后不应继续转，实际转了 {len(calls)} 个"
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
+
+def test_batch_convert_propagates_cancel_from_convert(monkeypatch):
+    """convert 内部取消时，batch_convert 要原样上抛，而不是塞进 failed。"""
+    d = tempfile.mkdtemp(prefix="insta_batch_cancel2_")
+    try:
+        src = os.path.join(d, "in.mp4")
+        with open(src, "wb") as f:
+            f.write(b"\x00" * 64)
+        out = os.path.join(d, "out")
+        os.makedirs(out)
+
+        def _boom(*a, **k):
+            raise core.CanceledError("已取消")
+
+        monkeypatch.setattr(core, "convert", _boom)
+        with pytest.raises(core.CanceledError):
+            core.batch_convert([src], out)
     finally:
         shutil.rmtree(d, ignore_errors=True)
