@@ -157,7 +157,9 @@ gradle --offline :app:testReleaseUnitTest
 |------|------|
 | `android/app/build/outputs/apk/release/app-release.apk` | 签名 APK，versionCode 14 / versionName 1.2.0，约 75.3 MB |
 
-实测产物：75,257,546 B，sha256 `f0dbef7779be36c0a6b9942a61f79d6d801d0b0b37215bcadd27c351e8d569d0`。
+实测产物：75,260,052 B，sha256 `62e4294bf6746e05e180c5228f89be955b7a96129ef2f67be0b7039935af6d35`。
+
+> 该哈希随源码变化，每次重建都会不同；以自己构建出的值为准，不要当成校验和去比对旧包。
 
 ### 签名
 

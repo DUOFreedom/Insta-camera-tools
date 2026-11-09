@@ -22,6 +22,18 @@
 
 全套 **53 passed, 2 skipped**（此前 49 passed）。
 
+### 产物重建与核对
+
+- 安卓 release APK：75,260,052 B，sha256 `62e4294bf6746e05e180c5228f89be955b7a96129ef2f67be0b7039935af6d35`。
+  解包 `assets/chaquopy/app.imy` 核对字节码：`_source_stamp` 已存在，`batch_convert` 有 `success`/`failed` 局部变量，
+  `_build_transcode_cmd` 有 `ff` 局部变量。`:app:testReleaseUnitTest` → IndexTest 7 skipped / ConsentLogicTest 5 passed。
+- 桌面两个可执行文件此前都打包着旧 `core.py`（11-08 构建），已重建：
+  `InstaAceQml.exe` 78,829,648 B / sha256 `3cf26977885f0ec4ac785669dc982b451d4d91e703f8d7a79038bd9ba226bcde`；
+  `InstaAceImporter.exe` 39,072,863 B / sha256 `4ffe7a64e057b019393793ce45b203556beae8bf124b65e046ecfc5c7766e9f6`。
+  从两者内嵌的 `PYZ.pyz` 取出 `core` 模块核对：`convert` 有 `canceled`、`batch_convert` 有 `success`/`failed`、`_source_stamp` 存在。
+  `InstaAceQml.exe --self-test` → `QML_OK roots=1`，exit 0。
+- `docs/BUILD.md` 的实测产物哈希同步更新，并注明该值随源码变化、不可当作固定校验和。
+
 ### 修复（`shared/instbox` 与安卓端的模块导入）
 
 同一类缺陷的三份副本：把「同目录兄弟模块」当成顶层模块平铺导入，能跑通纯靠调用方预先改过 `sys.path`。三种加载方式（包导入 / PyInstaller 平铺冻结 / 直接跑脚本）里只要有一种不满足就 `ModuleNotFoundError`，而失败又常常被宽 `except` 吞掉，表现为功能静默退化。
