@@ -29,8 +29,18 @@ import sys
 from fractions import Fraction
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-import inst_transplant as insta  # noqa: E402
+# 两种加载方式都要成立：
+#   a) 作为包导入（instbox.moov_rewrap）—— 桌面端 core._load_inst_modules 走这条；
+#   b) 平铺目录导入（-m / PyInstaller hiddenimports / 直接跑脚本）—— 见
+#      InstaAceImporter.spec 的 pathex=['../shared/instbox']。
+# 早期只做 (b)：把 shared/ 放进 sys.path 后 `import inst_transplant`，而该模块
+# 实际位于 shared/instbox/ 下，于是 (a) 必然 ModuleNotFoundError —— 桌面端
+# 从源码运行与 desktop/tests/test_insta.py 都会在收集阶段直接失败。
+try:
+    from . import inst_transplant as insta  # noqa: E402
+except ImportError:  # 平铺导入：模块与本文件同目录
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import inst_transplant as insta  # noqa: E402
 
 
 def box_bytes(data: bytes, box) -> bytes:

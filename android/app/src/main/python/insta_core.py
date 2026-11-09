@@ -2568,8 +2568,11 @@ def _meta_equivalent(a: bytes, b: bytes) -> bool:
     / f26 路径与 proxy 标记。逐字节比全量反而易因 f9 可变长而误判。
     这里比较：长度近似 + 关键字段逐个相等。
     """
-    import insta360_tf_import as _tf
+    #   走 _load_inst_modules()：它保证本目录在 sys.path 上，且把 ffmpeg/ffprobe
+    #   路径写进环境变量。裸顶层导入在「模块不在 sys.path[0]」时必然失败，
+    #   被 except 吞掉后退化成逐字节全量比较，而 f9 可变长会把好条目误判成坏条目。
     try:
+        _tf, _ = _load_inst_modules()
         fa = _tf.parse_message(a)
         fb = _tf.parse_message(b)
     except Exception:  # noqa: BLE001

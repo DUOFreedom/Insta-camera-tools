@@ -2532,8 +2532,11 @@ def _meta_equivalent(a: bytes, b: bytes) -> bool:
     / f26 路径与 proxy 标记。逐字节比全量反而易因 f9 可变长而误判。
     这里比较：长度近似 + 关键字段逐个相等。
     """
-    import inst_transplant as _tf
+    #   早期这里是裸 `import inst_transplant`：该模块实际在 shared/instbox/ 下，
+    #   顶层导入必然 ModuleNotFoundError，被 except 吞掉后退化成逐字节全量比较。
+    #   而 f9（inst 偏移）本身可变长，全量比较会把好条目误判成坏条目。
     try:
+        _tf, _ = _load_inst_modules()
         fa = _tf.parse_message(a)
         fb = _tf.parse_message(b)
     except Exception:  # noqa: BLE001

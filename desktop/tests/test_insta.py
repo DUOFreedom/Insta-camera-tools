@@ -372,3 +372,63 @@ def test_camera_udta_writes_expected_amba_fields(tmp_path):
         25: 30000, 29: 1001, 41: 300000, 49: 300, 53: 16,
         67: 48000, 71: 1024, 84: 1406 * 4, 91: 1406,
     }
+
+
+# 铁律：shared/instbox 下的模块必须能被【包导入】与【平铺导入】两种方式加载。
+#   桌面端 core._load_inst_modules() 走 `import instbox.moov_rewrap`；
+#   PyInstaller（InstaAceImporter.spec 的 pathex=['../shared/instbox']）与
+#   直接跑脚本走平铺 `import moov_rewrap`。
+#   曾因 moov_rewrap 只做平铺导入（`import inst_transplant`，而该模块在
+#   shared/instbox/ 下），包导入必然 ModuleNotFoundError —— 桌面端从源码运行
+#   与整个 test_insta.py 都在收集阶段直接失败，且 core._meta_equivalent 会
+#   静默退化成逐字节比较，把 f9 可变长的好条目误判成坏条目。
+
+
+def test_instbox_imports_as_package():
+    """包导入：import instbox.moov_rewrap 必须成功且拿到真实的 inst_transplant。"""
+    import importlib
+
+    rw = importlib.import_module("instbox.moov_rewrap")
+    assert rw.insta is tf, "包导入后 rw.insta 应就是 instbox.inst_transplant"
+
+
+def test_instbox_imports_flat():
+    """平铺导入：shared/instbox 在 sys.path 上时 import moov_rewrap 也要成立。"""
+    import subprocess
+
+    shared_instbox = os.path.join(SHARED, "instbox")
+    code = (
+        "import sys;"
+        f"sys.path.insert(0, {shared_instbox!r});"
+        "import moov_rewrap;"
+        "print(moov_rewrap.insta.__name__)"
+    )
+    r = subprocess.run([sys.executable, "-c", code],
+                       capture_output=True, text=True, timeout=60)
+    assert r.returncode == 0, f"平铺导入失败: {r.stderr[-500:]}"
+    assert r.stdout.strip() == "inst_transplant"
+
+
+def test_meta_equivalent_ignores_offset_drift():
+    """f9（inst 偏移）只改数值时，两份 meta 仍应判为「同一个」。"""
+    base = tf.encode_message([
+        tf.Field(7, 0, 20261109143000),
+        tf.Field(9, 0, 100),
+        tf.Field(10, 0, 12),
+        tf.Field(19, 2, b"1920x1080"),
+    ])
+    moved = tf.encode_message([
+        tf.Field(7, 0, 20261109143000),
+        tf.Field(9, 0, 1000000),   # 偏移变了，长度也变了
+        tf.Field(10, 0, 12),
+        tf.Field(19, 2, b"1920x1080"),
+    ])
+    assert core._meta_equivalent(base, moved) is True
+
+    changed = tf.encode_message([
+        tf.Field(7, 0, 20261109143001),   # 时间戳变了 → 必须判为不同
+        tf.Field(9, 0, 100),
+        tf.Field(10, 0, 12),
+        tf.Field(19, 2, b"1920x1080"),
+    ])
+    assert core._meta_equivalent(base, changed) is False
