@@ -15,7 +15,11 @@ import sys
 from fractions import Fraction
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+#   insta360_tf_import 与本文件同目录，所以这里要放的是 parent 而非 parents[1]
+#   （parents[1] 是 android/app/src/main，里面没有该模块）。此前之所以没炸，
+#   只是因为调用方 insta_core 已把本目录放进 sys.path —— 单独运行本文件或
+#   从别处导入时会 ModuleNotFoundError。与 shared/instbox/moov_rewrap.py 同源缺陷。
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 import insta360_tf_import as insta  # noqa: E402
 
 
