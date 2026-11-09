@@ -2,6 +2,33 @@
 
 ## 未发布
 
+### 新增（安卓端导入操作卡）
+
+导入页底部原来是一段内联布局：进度行、进度条、日志、明细卡、开始/取消按钮堆在一个 `Column` 里，五种数据状态全靠 `if/else` 散在 JSX 式条件里，按下反馈用的是 Material 默认 ripple（tween）。
+
+抽成 `ImportActionCard`（`ui/ImportActionCard.kt`），六个状态各自有明确分支：
+
+- **empty**：队列为空，主按钮显示「先添加视频」并禁用。占位大图标仍由列表区的 `EmptyState` 负责，卡片内不重复同一句话。
+- **disabled**：有视频但没选存储卡，按钮显示「请先选择存储卡」。
+- **ready**：可开始，按钮显示「开始导入」。
+- **loading**：阶段文字 + 弹簧补间的进度条 + 实时日志，按钮变成「取消导入」，取消中显示「正在取消…」并禁用。
+- **error**：卡片底色切 `errorContainer`，顶部出现错误文案区，按钮变成「重新导入」（`error` 底色）。
+- **pressed**：`Animatable` 驱动 `graphicsLayer` 缩放 0.96，松手弹回，不走 tween。
+
+动效按设计稿要求用 `spring(dampingRatio = 0.75f, stiffness = 400f)`（位移/缩放）与 `spring(dampingRatio = 1f, stiffness = 500f)`（透明度/颜色），与项目 `theme/Motion.kt` 的 Expressive 令牌（0.8/380 与 1.0/1600）不同——差异只在本组件内，全局令牌未动。进度条用 effects 弹簧而非 spatial，因为 spatial 的过冲会把进度顶过 100%。
+
+错峰入场：`StaggeredIn` 按 index 延后 40ms 再打开 `AnimatedVisibility`，而不是给 tween 加 `delayMillis`——后者是固定时长动画，与「全部走弹簧」的约束冲突。
+
+顺带清掉 `InstaAceApp.kt` 里因此不再使用的 4 个 import（`Icons.Rounded.Close`、`Icons.Rounded.PlayArrow`、`Button`、`LinearProgressIndicator`）。
+
+验证：`:app:compileReleaseKotlin` 零 Kotlin 警告；`:app:assembleRelease` BUILD SUCCESSFUL，APK 75,272,122 B；`:app:testReleaseUnitTest` IndexTest 7 skipped / ConsentLogicTest 5 passed。
+
+### 新增（README 重写）
+
+按「陌生人 5 分钟跑通」的目标重写根目录 `README.md`：首屏只留项目名、一句话定位、5 个同风格徽章和一条最小命令；章节顺序改为 安装 → 快速开始 → 配置 → 常见问题 → 贡献 → 许可证，架构与设计说明折进文末 `<details>`。
+
+内容全部来自仓库实际状态，新增的部分是之前 README 缺的：ffmpeg 的五级查找顺序表、命令行三个位置参数的默认值表、安卓设置页两个开关的说明、以及 5 个真实报错的排查步骤（未找到 ffmpeg、目标不是相机卡、卡里没有真机模板、缓存空间不足、Gradle 插件找不到）。演示图位置标注为 TODO——仓库里确实没有演示素材，不编造。
+
 ### 新增（安卓端导入取消）
 
 桌面端早就有取消，安卓端一直没有：导入一旦开始，用户只能等整个队列跑完，或者杀掉 App —— 后者会留下半截暂存文件和一个还在跑的 ffmpeg 子进程。补齐三层：

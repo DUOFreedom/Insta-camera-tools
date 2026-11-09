@@ -1,175 +1,222 @@
-# InstaAce — 影石 Ace Pro 2 第三方视频导入工具
+# InstaAce
 
-融合仓库：**桌面端（Windows，双界面）+ 安卓端（Chaquopy / Gradle）** 的影石 Ace Pro 2 视频导入工具。
+**把普通视频转成影石 Ace Pro 2 相册认得的原生格式** —— 生成 VID + LRV 双文件、移植 `inst` box、登记相机索引，让相机和官方 App 能识别并播放。
 
-普通视频转码为影石相机相册可识别的原生格式（VID + LRV 双文件、移植 `inst` box、登记相机索引），使相机相册与 App 能识别并播放。
+[![License](https://img.shields.io/badge/license-GPL--3.0--or--later-blue?style=flat-square)](LICENSE)
+[![Python](https://img.shields.io/badge/python-3.10%2B-3776ab?style=flat-square)](desktop/requirements.txt)
+[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Android-6f42c1?style=flat-square)](#安装)
+[![Version](https://img.shields.io/badge/version-1.2.0-success?style=flat-square)](desktop/CHANGELOG.md)
+[![Tests](https://img.shields.io/badge/tests-61%20passed-brightgreen?style=flat-square)](desktop/tests)
 
-## 仓库结构
-
-```
-instaace-fusion/
-├── shared/                        # 共享核心库（桌面端唯一引用源）
-│   ├── __init__.py
-│   ├── insta_index.py             # 相机索引 protobuf 解析/生成
-│   └── instbox/                   # inst box 移植与 moov 重封装
-│       ├── __init__.py
-│       ├── inst_transplant.py     # camera_udta / inst box 移植 / ftyp 补丁 / 索引登记
-│       └── moov_rewrap.py         # moov 骨架重封装 / 样本重排 / avc1 条目精简
-├── desktop/                       # 桌面端（Windows）
-│   ├── core.py                    # 转码核心（含 QML/CLI 调用接口）
-│   ├── gui.py                     # 经典版界面（PyQt5）
-│   ├── main.py                    # QML 版入口（PySide6）
-│   ├── bridge.py                  # QML 版与 core.py 的槽/信号桥
-│   ├── updater.py                 # QML 版更新检查
-│   ├── qml/                       # 24 个 QML 组件与视图
-│   ├── build.bat / run.bat        # 经典版一键构建 / 一键运行
-│   ├── build_qml.bat / run_qml.bat# QML 版一键构建 / 一键运行
-│   ├── InstaAceImporter.spec      # 经典版 PyInstaller 配置（onefile）
-│   ├── InstaAceQml.spec           # QML 版 PyInstaller 配置（onefile）
-│   ├── requirements.txt           # 运行时依赖（PyQt5 + PySide6）
-│   ├── requirements-dev.txt       # 开发依赖（+ pytest）
-│   ├── assets/                    # 图标、图片等打包资源
-│   ├── tests/                     # pytest 离线回归
-│   ├── tools/                     # make_icon.py 等辅助工具
-│   ├── CHANGELOG.md               # 桌面端变更日志
-│   └── LICENSE                    # GPL-3.0
-├── android/                       # 安卓端（Gradle + Chaquopy）
-│   ├── app/build.gradle.kts       # 应用构建配置（双 ABI）
-│   ├── app/src/main/AndroidManifest.xml
-│   ├── app/src/main/python/       # Chaquopy Python 源码
-│   │   ├── insta_core.py          # 转码核心（安卓版）
-│   │   ├── android_bridge.py      # 桥接层（初始化、导入、日志、更新检查）
-│   │   ├── camera_moov_rewrap.py  # moov 重封装（安卓副本）
-│   │   ├── insta360_tf_import.py  # inst box 移植（安卓副本）
-│   │   └── insta_index.py         # 相机索引（安卓副本）
-│   ├── app/src/main/java/         # Kotlin（Compose UI + Python 引擎封装）
-│   ├── build.gradle.kts
-│   ├── settings.gradle.kts
-│   ├── gradle.properties
-│   ├── local.properties           # SDK 路径，本机配置，不入库
-│   └── LICENSE                    # GPL-3.0
-├── docs/
-│   └── BUILD.md                   # 双端构建指南
-└── README.md                      # 本文件
+```bash
+python desktop/core.py D:/clips/holiday.mp4 D:/card/DCIM/Camera01
+# 输入：任意 mp4/mov/mkv，输出目录指向相机卡
+# 输出：VID_20261109_183000_000.mp4 + LRV_20261109_183000_000.lrv
 ```
 
-## 桌面端两套界面
+> 演示图 / GIF：TODO（仓库内暂无演示素材，需补一段真机相册识别录屏）
 
-两套界面功能等价，共用同一份 `core.py` 与 `shared/`：
+## 安装
 
-| 界面 | 技术栈 | 入口 | 构建脚本 | 产物 |
-|---|---|---|---|---|
-| 经典版 | PyQt5 5.15 | `gui.py` | `build.bat` | 单文件 `InstaAceImporter.exe` |
-| QML 版 | PySide6 6.5+ | `main.py` + `bridge.py` + `qml/` | `build_qml.bat` | 单文件 `InstaAceQml.exe`（约 79 MB） |
+桌面端分两套界面，功能等价、共用同一份 `desktop/core.py`。任选其一，或两个都装。
 
-## 核心设计
+### 桌面端（Windows）
 
-### 共享库（`shared/`）
-
-`shared/` 是**桌面端唯一的引用源**：`desktop/` 下没有 `insta_index.py`，也没有 `instbox/` 目录，
-靠 spec 的 `pathex` 指向 `../shared` 与 `../shared/instbox`。
-
-安卓端因为 Chaquopy 只打包 `android/app/src/main/python/` 一个目录，保留了同名副本
-（`insta360_tf_import.py` / `camera_moov_rewrap.py` / `insta_index.py`）。
-**两套副本逻辑等价但不是字节级一致**：安卓副本去掉了 GPL 头与部分中文注释，模块名也不同。
-修改共享逻辑时必须两处同时改，`desktop/tests/` 只覆盖桌面端。
-
-已修复的关键缺陷：
-
-- **AMBA 字段重叠写**：`udta_with_audio_frames` 曾把「音频采样率」写到 `amba[0]+0x20`，
-  而 `0x20-0x23` 实际是视频帧率（fps_num/fps_den），与 `camera_udta` 写入的
-  `(29, 1001)` 在 AMBA 内字节 **32** 处重叠，导致每次导入都把帧率分母写成垃圾值。
-  现改为 `amba[0]+0x54`（与 `camera_udta` 的 `(84, frames*4)` 对齐）。
-- **AMBA 越界校验**：`camera_udta` 的 9 个偏移改为表驱动 `_amba_fields`，
-  逐字段做 `_off + 4 > amba_size` 校验，超界抛 `ValueError`。
-- **安卓端模块加载**：`insta_core.py` 的 `_INST_ORIGIN` 指向自身所在目录，
-  并用顶层模块名 `import insta360_tf_import` / `import camera_moov_rewrap`
-  （Android 侧没有 `instbox` 包，旧写法会让 `init()` 直接抛异常）。
-
-### 桌面端（`desktop/`）
-
-- 语言：Python 3.10+，PyQt5 / PySide6 双界面
-- 打包：PyInstaller（两版均为 onefile 单文件）
-- 构建与运行命令见 `docs/BUILD.md`
-
-### 安卓端（`android/`）
-
-- 语言：Python 3.11（Chaquopy）+ Kotlin（Compose）
-- 构建：Gradle，双 ABI `arm64-v8a` + `armeabi-v7a`
-- 签名：默认 `~/.android/debug.keystore`，**对外分发前须换成正式签名**
-- APK：`versionCode 14 / versionName 1.2.0`
-
-## 快速开始
-
-### 桌面端构建（Windows）
-
-```cmd
-cd desktop
+```bash
+git clone https://github.com/DUOFreedom/Insta-camera-tools.git
+cd Insta-camera-tools/desktop
 pip install -r requirements.txt
-build.bat          rem 经典版 -> dist\InstaAceImporter.exe
-build_qml.bat      rem QML 版 -> dist\InstaAceQml\
 ```
 
-### 安卓端构建
+装完还需要 **ffmpeg**。程序按下面的顺序自己找，找到就跳过下载：
+
+| 查找位置 | 说明 |
+|---|---|
+| `FFMPEG_PATH` / `FFPROBE_PATH` | 环境变量，优先级最高 |
+| exe 所在目录及其 `bin/` | 打包版解压后自带 |
+| `%LOCALAPPDATA%\InstaAceImporter\bin` | 程序自己的下载目录 |
+| `C:\ffmpeg\bin` 等常见路径 | 含 Chocolatey 的 `bin` |
+| 系统 `PATH` | 最后兜底 |
+
+<details>
+<summary>不想让它自己下载，手动指定 ffmpeg</summary>
+
+```bash
+set FFMPEG_PATH=D:\tools\ffmpeg\bin\ffmpeg.exe
+set FFPROBE_PATH=D:\tools\ffmpeg\bin\ffprobe.exe
+```
+
+必须是带 **libx264 + libx265** 的构建，否则转码会报编码器不存在。
+</details>
+
+### 安卓端
 
 ```bash
 cd android
-# 先在 local.properties 配置 sdk.dir 与 chaquopy.python（或用环境变量）
-export JAVA_HOME=<JDK 21 路径>
-gradle --no-daemon assembleRelease
+# 先在 local.properties 写 sdk.dir 与 chaquopy.python，或改用环境变量
+export JAVA_HOME=D:/android-build/jdk21/jdk-21.0.12.1+1
+export ANDROID_HOME=D:/android-build/sdk
+export CHAQUOPY_PYTHON=D:/android-build/py311/python.exe
+export GRADLE_USER_HOME=D:/android-build/.gradle
+gradle --offline :app:assembleRelease
 ```
 
 产物：`android/app/build/outputs/apk/release/app-release.apk`
 
-### 环境要求
+> **只 clone 仓库不能直接构建安卓端**：`jniLibs/` 里的 4 个 ffmpeg 二进制约 92 MB，被 `.gitignore` 排除；仓库也**没有** Gradle wrapper（无 `gradlew`）。补齐方法见 [`docs/BUILD.md`](docs/BUILD.md)。
 
-| 平台 | 关键依赖 | 构建工具 |
-|------|---------|---------|
-| 桌面端 | Python 3.10+，PyQt5>=5.15，PySide6>=6.5，PyInstaller 6.x | PyInstaller |
-| 安卓端 | JDK 21，Gradle 8.7，Android SDK 34，NDK r27，Chaquopy Python 3.11，ffmpeg 7.1（静态 libx264+libx265） | Gradle |
+## 快速开始
 
-> 桌面端不锁定具体 Python 小版本；安卓端必须 Python 3.11（Chaquopy 的 armeabi-v7a 构件只到 3.11）。
+```bash
+cd desktop
+python core.py D:/clips/holiday.mp4 D:/card/DCIM/Camera01
+# 输入：一个视频文件，输出目录 = 相机卡里的 DCIM/Camera01
+# 输出：打印 "生成完成:" 以及 VID 与 LRV 两个文件路径
+# 拔卡插回相机，相册里应该能看到这段视频
+```
 
-## 已知限制
+批量转换：把第一个参数换成一个目录即可，程序会自动接续卡里已有的序号。
 
-### 安卓端 `jniLibs/` 不随仓库分发
+```bash
+python core.py D:/clips D:/card/DCIM/Camera01
+# 输出：成功 N 个，失败 M 个。（失败的逐条列出原因）
+```
 
-`android/app/src/main/jniLibs/<abi>/libffmpeg.so` 与 `libffprobe.so` 共 4 个文件、
-约 92 MB，被 `.gitignore` 排除。**只克隆本仓库无法直接 `assembleRelease`**，
-需要先补齐这两个二进制：
+## 配置
 
-- 它们本质是 **PIE 可执行文件**（静态链接的 ffmpeg 7.1，含 libx264 + libx265），
-  只是沿用 `lib*.so` 命名，以便随 APK 打进 `nativeLibraryDir`（Android 10+ 只允许
-  从该目录执行自带二进制）。
-- 必须保持 `jniLibs { useLegacyPackaging = true }`，否则不会解压到磁盘、无法执行。
-- 重建方式见 [`docs/BUILD.md`](docs/BUILD.md) 的「jniLibs 里的 ffmpeg」一节。
+命令行只有三个位置参数，全部可省略后两个：
 
-### 真机链路未端到端验证
+| 参数 | 默认值 | 说明 |
+|---|---|---|
+| 输入路径 | 无（必填） | 视频文件，或含视频的目录 |
+| 输出目录 | 输入文件所在目录 | 建议指向 `DCIM/Camera01` |
+| 起始序号 | 自动接续 | 省略时会扫描卡里已有文件的最大序号 |
 
-- AMBA 字段修复只做了合成模板的偏移级验证，未在相机上实拍确认。
-- MediaCodec 硬件解码 / 硬件编码路径带自动回退，但未经真机验证。
-- 首次真机导入后，建议用 `ffprobe` 比对产物与真机原片的 `avg_frame_rate` / `nb_frames`，
-  并检查 `import.log` 中的 `[硬件解码]` / `[回退]` 行。
+环境变量：
 
-### 签名
+| 变量 | 默认值 | 说明 |
+|---|---|---|
+| `FFMPEG_PATH` | 自动查找 | ffmpeg 可执行文件绝对路径 |
+| `FFPROBE_PATH` | 自动查找 | ffprobe 可执行文件绝对路径 |
 
-默认回退到 `~/.android/debug.keystore`，仅为能覆盖手机上的旧版。
-**正式分发必须配置自有证书**（环境变量 `INSTA_KEYSTORE` / `INSTA_KEYSTORE_PASSWORD` /
-`INSTA_KEY_ALIAS` / `INSTA_KEY_PASSWORD`，或 `local.properties` 的 `insta.keystore*`），
-否则任何持有 debug.keystore 的人都能伪造升级包。
+安卓端在「设置」页有两个开关：
+
+| 选项 | 默认值 | 说明 |
+|---|---|---|
+| 编码器 | `自动` | `自动` = 软件编码 libx265 + libx264，相机识别最稳 |
+| 登记相机索引 | 开 | 写入 DCIM 下的 fileinfo / editinfo，相册才出现 |
+
+<details>
+<summary>为什么「硬件」编码可能让相机不认</summary>
+
+MediaCodec 的关键帧间隔受系统 `MediaFormat` 限制，只能按**整数秒**设置。相机要求 16 帧的密集 GOP，30fps 下约 0.53 秒，硬编只能给到 1 秒（约 30 帧）。
+
+结果是文件能生成、也能播，但相机可能不显示缩略图或干脆不识别。导入后若相册看不到，切回「自动」重导一次。
+</details>
+
+## 常见问题
+
+### 报 `ValidationError: 未找到 ffmpeg，无法构建转码命令`
+
+程序没找到 ffmpeg。按上面的查找顺序检查，最快是直接指定：
+
+```bash
+set FFMPEG_PATH=D:\tools\ffmpeg\bin\ffmpeg.exe
+set FFPROBE_PATH=D:\tools\ffmpeg\bin\ffprobe.exe
+```
+
+注意 `ffmpeg -version` 必须能正常输出。装的是精简构建（不带 libx264/libx265）也会在转码阶段失败。
+
+### 报 `目标不是影石相机卡（缺少 DCIM/Camera01 结构）`
+
+索引登记前会校验目标确实是相机卡，防止在普通文件夹里误建 `DCIM` 污染数据。把输出目录指到卡上的 `DCIM` 或 `DCIM/Camera01` 再跑。
+
+### 报 `卡里找不到真机原片作模板（DCIM/Camera01/VID_*.mp4 + LRV_*.lrv）`
+
+程序需要一对**相机原生录制**的 VID/LRV 当模板 —— 它要抄模板里的 `inst` box 结构和索引条目格式，这些没法凭空构造。
+
+解决：先用相机随手录一小段（几秒即可），让它留在卡里，再跑转换。
+
+### 报 `缓存空间不足：源 2.1 GB，可用 800 MB`
+
+安卓端导入会先把源文件复制到应用私有目录，并按源大小的 3 倍预留（转码中间产物 + 输出）。清理手机存储，或先删掉队列里的大文件。
+
+### 报 `Plugin [id: 'com.android.application', version: '8.7.3'] was not found`
+
+Gradle 在错误的目录找依赖缓存。项目需要 AGP 8.7.3，而 `~/.gradle` 里通常只有旧版本：
+
+```bash
+export GRADLE_USER_HOME=D:/android-build/.gradle
+```
+
+如果报 `Minimum supported Gradle version is 8.9. Current version is 8.7`，那是 Gradle 版本太低 —— 必须用 8.11.1，`D:\android-build` 下同时存在 8.7 和 8.11.1，只有后者能构建。
+
+## 贡献
+
+```bash
+cd desktop
+pip install -r requirements-dev.txt
+python -m pytest tests/ -q
+```
+
+预期 `61 passed, 2 skipped`。跳过的两条依赖真机索引样本（`desktop/samples/`、`android/app/src/test/resources/samples/`），样本含设备标识，按约定不入库。
+
+改代码前请先读 [`docs/BUILD.md`](docs/BUILD.md)。两处容易踩：
+
+- **共享逻辑有两份**：`shared/instbox/` 是桌面端唯一引用源，安卓端因为 Chaquopy 只打包一个目录而保留了同名副本。改 `insta_index.py` / inst 移植逻辑必须两边同时改。
+- **改完要更新产物**：`desktop/CHANGELOG.md` 记录了每次重建的尺寸与核对方法，提交前跑一遍双端构建。
 
 ## 许可证
 
-本项目采用 **GPL-3.0-or-later** 许可。因为链接了 libx264/libx265（GPL-2.0-or-later），
-FFmpeg 7.1 实际为 GPL-2.0-or-later，与项目 GPL-3.0 兼容。
+[GPL-3.0-or-later](LICENSE)。
 
-详见根目录 `LICENSE`（以及 `desktop/LICENSE`、`android/LICENSE` 副本）。
+项目链接了 libx264 / libx265（GPL-2.0-or-later），实际使用的 FFmpeg 7.1 因此也是 GPL-2.0-or-later，与 GPL-3.0 兼容。
 
-## 变更日志
+## 架构
 
-桌面端变更请见 `desktop/CHANGELOG.md`。
+<details>
+<summary>仓库结构与模块职责</summary>
 
-## 真机验证
+```
+instaace-fusion/
+├── shared/                    # 桌面端唯一引用源
+│   ├── insta_index.py         # 相机索引 protobuf 解析 / 生成
+│   └── instbox/
+│       ├── inst_transplant.py # inst box 移植、ftyp 补丁、索引登记
+│       └── moov_rewrap.py     # moov 重封装、样本重排、avc1 精简
+├── desktop/                   # Windows 桌面端
+│   ├── core.py                # 转码核心（GUI / QML / CLI 共用）
+│   ├── gui.py                 # 经典版界面（PyQt5）
+│   ├── main.py + bridge.py    # QML 版入口（PySide6）
+│   ├── qml/                   # 22 个 QML 组件 + main.qml 主视图
+│   ├── build.bat              # 经典版构建 -> InstaAceImporter.exe
+│   └── build_qml.bat          # QML 版构建 -> InstaAceQml.exe
+├── android/                   # Gradle + Chaquopy
+│   ├── app/src/main/python/   # insta_core.py / android_bridge.py 等
+│   └── app/src/main/java/     # Kotlin（Compose UI + Python 引擎封装）
+└── docs/BUILD.md              # 双端构建指南
+```
 
-安卓 APK 需在实际 Insta360 Ace Pro 2 设备上验证：覆盖安装 APK，导入一段视频，
-确认相机相册能识别并播放。构建机上无 adb，验证依赖真机侧导出的 `import.log` 或截图。
+</details>
+
+<details>
+<summary>为什么需要「转码 + 移植」两步</summary>
+
+相机不只看文件扩展名，它同时校验三件事：
+
+1. **文件名与索引**：`VID_YYYYMMDD_HHMMSS_NNN.mp4` 格式，且 DCIM 下的 `fileinfo_list.list` 里有对应条目。
+2. **`inst` box**：moov 里一段影石私有的元数据，记着时间戳、帧率、缩略图等。缺了它文件能播但相册不认。
+3. **AMBA 字段**：`udta` 里一段相机专属字段表，帧率、音频参数等按固定偏移写入，越界或错位都会让相机拒收。
+
+所以流程是：先用 ffmpeg 转出符合相机参数的 VID/LRV 双文件（16 帧密集 GOP、hvc1/avc1 标签、指定色彩范围），再从真机模板里抄 `inst` box 结构移植过去，最后把新条目追加进索引 —— 追加而非重建，所以卡里原有的视频不受影响。
+
+</details>
+
+<details>
+<summary>已知限制</summary>
+
+- **真机链路未端到端验证**：AMBA 字段修复只做了合成模板的偏移级验证，MediaCodec 硬件解码/编码路径带自动回退但未经真机确认。首次真机导入后建议用 `ffprobe` 比对产物与真机原片的 `avg_frame_rate` / `nb_frames`。
+- **安卓端未随 Release 分发 APK**：真机导入链路与部分机型兼容性尚未验证完毕。
+- **签名**：默认回退到 `~/.android/debug.keystore`，仅为能覆盖安装旧版。正式分发必须配置自有证书（`INSTA_KEYSTORE` / `INSTA_KEYSTORE_PASSWORD` / `INSTA_KEY_ALIAS` / `INSTA_KEY_PASSWORD`），否则任何持有 debug.keystore 的人都能伪造升级包。
+
+</details>

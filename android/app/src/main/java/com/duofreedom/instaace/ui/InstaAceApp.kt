@@ -36,19 +36,16 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.PlaylistPlay
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.CheckCircle
-import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Code
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Movie
-import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.SdCard
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
@@ -57,7 +54,6 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
@@ -512,6 +508,8 @@ private fun QueueScreen(
             LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(state.queue, key = { it.uri.toString() }) { item ->
                     ListItem(
+                        // animateItem 只在增删/重排时生效，不改布局尺寸，也不触发整表重组。
+                        modifier = Modifier.animateItem(),
                         leadingContent = {
                             Icon(
                                 Icons.Rounded.Movie,
@@ -540,73 +538,37 @@ private fun QueueScreen(
             }
         }
 
-        Column(Modifier.fillMaxWidth().padding(vertical = 12.dp)) {
-            Row(Modifier.fillMaxWidth()) {
-                Text(
-                    state.stage,
-                    style = MaterialTheme.typography.labelMedium,
-                    modifier = Modifier.weight(1f)
-                )
-                Text(
-                    "${(state.progress * 100).toInt()}%",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            Spacer(Modifier.height(6.dp))
-            LinearProgressIndicator(
-                progress = { state.progress },
-                modifier = Modifier.fillMaxWidth().height(8.dp)
-            )
-            if (state.logLine.isNotBlank()) {
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    state.logLine,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 3,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-            if (state.outputSummary.isNotBlank()) {
-                Spacer(Modifier.height(8.dp))
-                OutlinedCard(Modifier.fillMaxWidth()) {
-                    Column(Modifier.padding(12.dp)) {
-                        Text("导入明细", style = MaterialTheme.typography.labelMedium)
-                        Spacer(Modifier.height(4.dp))
-                        Text(
-                            state.outputSummary,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            }
-            Spacer(Modifier.height(12.dp))
-            // 导入中把「开始」换成「取消」：否则用户只能杀掉 App 才能停下，
-            //   而杀进程会留下半截暂存文件和一个正在跑的 ffmpeg 子进程。
-            if (state.running) {
-                OutlinedButton(
-                    onClick = onCancel,
-                    enabled = !state.canceling,
-                    modifier = Modifier.fillMaxWidth().height(52.dp)
-                ) {
-                    Icon(Icons.Rounded.Close, contentDescription = null)
-                    Spacer(Modifier.size(8.dp))
-                    Text(if (state.canceling) "正在取消…" else "取消导入")
-                }
-            } else {
-                Button(
-                    onClick = onStart,
-                    enabled = state.queue.isNotEmpty() && state.cardUri != null,
-                    modifier = Modifier.fillMaxWidth().height(52.dp)
-                ) {
-                    Icon(Icons.Rounded.PlayArrow, contentDescription = null)
-                    Spacer(Modifier.size(8.dp))
-                    Text(if (state.cardUri == null) "请先选择存储卡" else "开始导入")
+        if (state.outputSummary.isNotBlank()) {
+            OutlinedCard(Modifier.fillMaxWidth().padding(bottom = 12.dp)) {
+                Column(Modifier.padding(12.dp)) {
+                    Text("导入明细", style = MaterialTheme.typography.labelMedium)
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        state.outputSummary,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
         }
+        ImportActionCard(
+            // 数据态优先级：导入中 > 空队列 > 未选卡 > 上一条失败 > 可开始
+            state = when {
+                state.running -> ImportCardState.Loading
+                state.queue.isEmpty() -> ImportCardState.Empty
+                state.cardUri == null -> ImportCardState.Disabled
+                state.stage.startsWith("失败") -> ImportCardState.Error
+                else -> ImportCardState.Ready
+            },
+            stage = state.stage,
+            progress = state.progress,
+            logLine = state.logLine,
+            errorText = state.stage.removePrefix("失败："),
+            canceling = state.canceling,
+            onStart = onStart,
+            onCancel = onCancel,
+            modifier = Modifier.padding(bottom = 12.dp)
+        )
     }
 }
 
