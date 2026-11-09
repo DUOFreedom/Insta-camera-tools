@@ -14,6 +14,15 @@
 ### 测试
 
 - 新增 4 条回归护栏：`instbox` 包导入、`instbox` 平铺导入（子进程验证）、`inst_transplant` 相对导入分支的 ast 静态检查、`_meta_equivalent` 在 f9 漂移时仍判等价而 f7 时间戳变化时判不等价。全套 **42 passed, 2 skipped**（此前因收集失败只跑到 4 条）。
+- **`IndexTest` 在干净检出上 6/7 红**：样本取自真机、含设备标识，按既有约定不入库，但测试用 `assertTrue` 做前置判断，于是每条都抛 `FileNotFoundException`。改为 JUnit `Assume.assumeTrue`：有样本时照常做字节级幂等校验，无样本时整类跳过。实测 `:app:testReleaseUnitTest` → **5 passed / 7 skipped / 0 failed**。
+
+### 构建验证（本轮实际跑通）
+
+- **Android 构建此前被误判为「本机做不了」**：仓库确实没有 gradle wrapper，`gradle` 也不在 PATH 上，但工具链其实齐备 —— `D:\android-build\gradle-8.11.1`、JDK 21（`D:\android-build\jdk21`）、SDK（`D:\android-build\sdk`）、Python 3.11.9（`D:\android-build\py311`），且真正的依赖缓存位于 `D:\android-build\.gradle`（`~/.gradle` 里只有 AGP 8.5.2，联网又拿不到 8.7.3）。
+- 构建命令：`GRADLE_USER_HOME=D:/android-build/.gradle JAVA_HOME=... ANDROID_HOME=... CHAQUOPY_PYTHON=... gradle --offline assembleRelease`。
+- `:app:compileReleaseKotlin`、`:app:assembleRelease` 均通过；产物 `app-release.apk` 75,257,546 B，versionCode 14 / versionName 1.2.0，sha256 `f0dbef7779be36c0a6b9942a61f79d6d801d0b0b37215bcadd27c351e8d569d0`。
+- **验证修复确实进了产物**：解开 `assets/chaquopy/app.imy` 反序列化模块字节码 —— `camera_moov_rewrap` 的 `co_names` 里是 `parent`（不再是 `parents`），`insta_core._meta_equivalent` 的 `co_names` 里是 `_load_inst_modules`（不再是裸 `insta360_tf_import`）。
+- `debug` 变体离线编译不可行：`ui-tooling` 与 `junit` 只在联网时可解析（`--offline` 下 `checkDebugAarMetadata` 失败），release 变体不受影响。
 
 ## 1.2.0 — 2026-11-08
 
