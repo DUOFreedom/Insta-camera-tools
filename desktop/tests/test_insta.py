@@ -432,3 +432,33 @@ def test_meta_equivalent_ignores_offset_drift():
         tf.Field(19, 2, b"1920x1080"),
     ])
     assert core._meta_equivalent(base, changed) is False
+
+
+def test_inst_transplant_uses_relative_moov_rewrap():
+    """inst_transplant 的 v18-v21 路径必须能用相对导入拿到 moov_rewrap。
+
+    这里是同一类缺陷的第二份副本：函数内 `from moov_rewrap import ...` 在包导入
+    下（桌面端 _load_inst_modules）必然 ModuleNotFoundError，而它正好位于主移植
+    路径上 —— 测试不会跑到，只有真机/真片导入时才炸。用 ast 静态检查替代：
+    该表达式必须存在相对形式的分支。
+    """
+    import ast
+
+    src = open(os.path.join(SHARED, "instbox", "inst_transplant.py"),
+               encoding="utf-8").read()
+    tree = ast.parse(src)
+
+    rel, flat = [], []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom) and node.module and \
+                node.module.endswith("moov_rewrap"):
+            key = node.module
+            (rel if node.level and node.level > 0 else flat).append(key)
+
+    assert rel, "inst_transplant 里缺少 `from .moov_rewrap import ...` 相对导入分支"
+    names = {a.name for n in ast.walk(tree)
+             if isinstance(n, ast.ImportFrom) and n.module and
+             n.module.endswith("moov_rewrap")
+             for a in n.names}
+    assert {"rebuild_media", "filter_avc1_children"} <= names, \
+        f"相对导入分支缺少关键符号，实际只有 {sorted(names)}"

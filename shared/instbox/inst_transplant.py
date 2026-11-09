@@ -1241,10 +1241,18 @@ def main() -> int:
         # The successful v18-v21 path is not FFmpeg's moov.  Rebuild both
         # files around the camera-style one-sample-per-chunk skeleton, then
         # apply the two firmware-sensitive sample-entry rules.
-        from moov_rewrap import rebuild_media
-        filter_avc1_children = globals().get("filter_avc1_children")
-        if filter_avc1_children is None:
-            from moov_rewrap import filter_avc1_children
+        #   包导入（instbox.inst_transplant）时 shared/instbox 不在 sys.path 上，
+        #   裸 `from moov_rewrap import ...` 会 ModuleNotFoundError —— 而这条正是
+        #   桌面端 core._load_inst_modules() 的加载方式，即主移植路径。
+        #   故先走包内相对导入，失败再回退平铺导入（PyInstaller hiddenimports）。
+        try:
+            from .moov_rewrap import rebuild_media
+            from .moov_rewrap import filter_avc1_children as _filter
+        except ImportError:  # 平铺导入：两个模块同目录
+            from moov_rewrap import rebuild_media
+            from moov_rewrap import filter_avc1_children as _filter
+        # 保留原有注入点：调用方可通过 globals() 预置同名函数覆盖默认实现。
+        filter_avc1_children = globals().get("filter_avc1_children") or _filter
 
         main_rewrapped = work / "main-camera.mp4"
         proxy_rewrapped = work / "proxy-camera.lrv"
