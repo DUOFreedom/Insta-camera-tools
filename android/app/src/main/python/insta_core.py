@@ -216,10 +216,28 @@ _PREFER_HW = False
 
 # 硬件解码映射：输出编码侧仍为 libx265/libx264（相机兼容性不依赖解码路径），
 # 解码失败有自动回退，默认启用让 SoC 视频引擎承担 4K/8K 源解码。
-_ANDROID_HW_DECODERS = {"hevc": "hevc_mediacodec", "h264": "h264_mediacodec"}
+_ANDROID_HW_DECODERS = {
+    "hevc": "hevc_mediacodec",
+    "h264": "h264_mediacodec",
+    "vp9": "vp9_mediacodec",
+    "av1": "av1_mediacodec",
+}
 _HWDECODE_ENABLED = True
 _hw_decoder_list: set[str] | None = None
 _hw_dec_alive: dict[str, bool] = {}
+
+
+
+
+def _get_sw_encoder_for_decoder(decoder: str) -> str:
+    """根据解码器类型返回对应的软编码器用于探测"""
+    if decoder in ("hevc_mediacodec", "h264_mediacodec"):
+        return "libx264"
+    elif decoder == "vp9_mediacodec":
+        return "libvpx-vp9"
+    elif decoder == "av1_mediacodec":
+        return "libaom-av1"
+    return "libx264"
 
 
 def mark_hw_decoder_failed(decoder: str) -> None:
@@ -363,6 +381,10 @@ def probe_hw_decoder(source_codec: str) -> str:
         key = "hevc"
     elif c in ("h264", "avc"):
         key = "h264"
+    elif c in ("vp9",):
+        key = "vp9"
+    elif c in ("av1", "av01"):
+        key = "av1"
     else:
         return ""
     dec = _ANDROID_HW_DECODERS[key]
@@ -371,7 +393,7 @@ def probe_hw_decoder(source_codec: str) -> str:
     if dec not in _hw_decoder_list:
         _hw_dec_alive[dec] = False
         return ""
-    if not _probe_hw_decoder_alive(dec, "libx265" if key == "hevc" else "libx264"):
+    if not _probe_hw_decoder_alive(dec, _get_sw_encoder_for_decoder(dec)):
         return ""
     return dec
 
