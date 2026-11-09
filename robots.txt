@@ -1,0 +1,13 @@
+# 说明：Google 只在主机根目录读取 robots.txt
+#   https://duofreedom.github.io/robots.txt
+# 该根域由 GitHub 托管、本仓库无法写入，因此这份子路径下的 robots.txt
+# 不会被 Google 采用。保留它的用途：
+#   1. 若将来绑定自有域名并部署到根路径，它会立即生效
+#   2. 部分第三方爬虫与 SEO 工具会按子路径读取
+#
+# 真正的收录入口是 sitemap.xml —— 请在 Search Console 里直接提交该地址。
+
+User-agent: *
+Allow: /
+
+Sitemap: https://duofreedom.github.io/Insta-camera-tools/sitemap.xml
