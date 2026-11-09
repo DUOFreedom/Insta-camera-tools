@@ -94,9 +94,10 @@ python main.py --self-test
 
 | 组件 | 版本 | 说明 |
 |------|------|------|
-| JDK | **21** | 必须 21；Gradle 8.7 不支持 Java 27，构建会直接失败 |
-| Gradle | 8.7 | 或使用 Android Studio 自带的兼容版本 |
-| Android SDK | 34 | `compileSdk = 34` |
+| JDK | **21** | AGP 8.7 要求 17+；实测 JDK 21 可用（Temurin 21.0.12.1+1） |
+| Gradle | **8.11.1** | 仓库**没有** gradle wrapper，必须自备 `gradle` 可执行文件 |
+| AGP | 8.7.3 | 见根 `build.gradle.kts` |
+| Android SDK | **35** | `compileSdk = 35`、`targetSdk = 35`、`minSdk = 26` |
 | NDK | r27 | 仅在重建 `jniLibs/` 里的 ffmpeg 时需要 |
 | Python | **3.11** | Chaquopy 用；3.12/3.13 没有 armeabi-v7a 构件，无法出 32 位包 |
 
@@ -114,21 +115,49 @@ chaquopy.python=<你的 Python 3.11 解释器路径>
 
 ### 构建命令
 
+仓库里没有 wrapper（`gradlew` / `gradle/wrapper/` 均不存在），直接调用本机 `gradle`：
+
 ```bash
 cd android
 export JAVA_HOME=<你的 JDK 21 路径>
 export ANDROID_HOME=<你的 Android SDK 路径>
-export GRADLE_USER_HOME=<可写的 Gradle 缓存目录>
-gradle --no-daemon assembleRelease
+export CHAQUOPY_PYTHON=<你的 Python 3.11 路径>
+export GRADLE_USER_HOME=<Gradle 依赖缓存目录>
+gradle assembleRelease
 ```
 
 > 首次构建会从 Maven 拉 Chaquopy 与 Compose 依赖，耗时数分钟。
+
+**`GRADLE_USER_HOME` 是最容易踩的坑**：AGP 8.7.3 必须在该缓存目录里已有构件，
+否则 `--offline` 会报 `Plugin [id: 'com.android.application', version: '8.7.3'] was not found`，
+联网又被墙时完全无法构建。缓存里只有 AGP 8.5.2 的目录不能直接用，换一个放对了缓存的目录。
+
+离线构建（依赖已缓存时）：
+
+```bash
+gradle --offline assembleRelease
+```
+
+`debug` 变体额外需要 `ui-tooling` 和 `junit:4.13.2`，缓存里通常没有；
+只发版的话用 `release` 变体即可，不受影响。
+
+### 单元测试
+
+```bash
+gradle --offline :app:testReleaseUnitTest
+```
+
+预期 **5 passed / 7 skipped / 0 failed**。
+`IndexTest` 的 7 条依赖 `android/app/src/test/resources/samples/` 下的真机 `.list` 样本；
+样本含设备标识，按约定不入库，缺失时用 JUnit `Assume` **跳过**而不是判失败。
 
 ### 产物
 
 | 文件 | 说明 |
 |------|------|
-| `android/app/build/outputs/apk/release/app-release.apk` | 签名 APK，versionCode 14 / versionName 1.2.0 |
+| `android/app/build/outputs/apk/release/app-release.apk` | 签名 APK，versionCode 14 / versionName 1.2.0，约 75.3 MB |
+
+实测产物：75,257,546 B，sha256 `f0dbef7779be36c0a6b9942a61f79d6d801d0b0b37215bcadd27c351e8d569d0`。
 
 ### 签名
 
