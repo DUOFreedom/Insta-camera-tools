@@ -28,29 +28,41 @@ import insta_core as ic  # noqa: E402
 
 
 class _FakeCore:
-    """冒充 insta_core：只需要 CanceledError 与 import_with_inst。"""
+    """冒充 insta_core：只需要 CanceledError、template_from_names 与 import_with_inst。"""
 
     __version__ = "test"
     CanceledError = ic.CanceledError
 
-    def __init__(self, behaviour):
+    def __init__(self, behaviour, template_ok=True):
         self._behaviour = behaviour
+        self._template_ok = template_ok
         self.seen_cancel = "unset"
+        self.seen_template = "unset"
+        self.seen_template_names = "unset"
 
     def set_prefer_hardware(self, _enabled):
         pass
 
-    def import_with_inst(self, source, card_root, log=None, progress=None,
-                         cover=None, cancel=None):
+    def template_from_names(self, card_root, vid_name, lrv_name):
+        self.seen_template_names = (card_root, vid_name, lrv_name)
+        if not self._template_ok:
+            return None
+        return ("/card/DCIM/Camera01/" + vid_name,
+                "/card/DCIM/Camera01/" + lrv_name,
+                b"\x0a\x0e" + b"0" * 14)
+
+    def import_with_inst(self, source, card_root, template=None, log=None,
+                         progress=None, cover=None, cancel=None):
         self.seen_cancel = cancel
+        self.seen_template = template
         return self._behaviour(cancel)
 
 
 @pytest.fixture()
 def bridge(monkeypatch):
     """把 _core 换成桩，保留 android_bridge 的真实取消逻辑。"""
-    def install(behaviour):
-        fake = _FakeCore(behaviour)
+    def install(behaviour, template_ok=True):
+        fake = _FakeCore(behaviour, template_ok=template_ok)
         monkeypatch.setattr(br, "_core", fake)
         return fake
     return install
@@ -148,3 +160,45 @@ def test_cancel_event_set_by_other_thread_is_visible(bridge):
 
     assert seen["canceled"] is True
     assert ev.is_set()
+
+
+def test_run_import_passes_template_names_into_core(bridge):
+    """Kotlin 指定了模板名，就必须按名字取，不能退回去让核心猜。
+
+    镜像目录里上一轮的产物同样带 inst box，猜错的后果是相机不认且不报错。
+    """
+    fake = bridge(lambda _cancel: _ok_result())
+
+    out = json.loads(br.run_import(
+        "in.mp4", "/card",
+        template_names=("VID_20240101_090000_000.mp4",
+                        "LRV_20240101_090000_000.lrv"),
+    ))
+
+    assert out["ok"] is True
+    assert fake.seen_template_names[1:] == (
+        "VID_20240101_090000_000.mp4", "LRV_20240101_090000_000.lrv")
+    assert fake.seen_template is not None, "取到的模板对必须传给 import_with_inst"
+
+
+def test_run_import_without_template_names_lets_core_decide(bridge):
+    """不传模板名时保持旧行为：template=None，由核心自己找。"""
+    fake = bridge(lambda _cancel: _ok_result())
+
+    br.run_import("in.mp4", "/card")
+
+    assert fake.seen_template is None
+    assert fake.seen_template_names == "unset"
+
+
+def test_run_import_rejects_unusable_template_pair(bridge):
+    """指定了名字但取不到模板对时，必须直接失败，不能硬着头皮跑。"""
+    fake = bridge(lambda _cancel: _ok_result(), template_ok=False)
+
+    out = json.loads(br.run_import(
+        "in.mp4", "/card", template_names=("VID_x.mp4", "LRV_x.lrv")))
+
+    assert out["ok"] is False
+    assert out["canceled"] is False
+    assert "模板对不可用" in out["error"]
+    assert fake.seen_template == "unset", "模板不可用时不应继续调用导入"

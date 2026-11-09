@@ -6,6 +6,7 @@ import android.provider.OpenableColumns
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -155,58 +156,107 @@ class AppState {
         }
     }
 
-    fun scanCard(ctx: Context, tree: Uri) {
-        cardUri = tree
+    /**
+     * 扫描卡结构并解析索引。
+     *
+     * IO 部分必须离开主线程：`DocumentFile.fromTreeUri` / `listFiles()` 每次都要
+     * 走 ContentResolver 往返，索引还要整块读进来解 protobuf。卡里几百个文件时
+     * 这些调用足以触发 ANR，而且同步执行时 `scanning` 根本来不及渲染。
+     * 结果回到调用线程再写状态——Compose 的状态只能在主线程改。
+     */
+    suspend fun scanCard(ctx: Context, tree: Uri) {
         scanning = true
+        cardUri = tree
+        try {
+            val scan = withContext(Dispatchers.IO) { readCard(ctx, tree) }
+            cardLabel = scan.label
+            dcimFound = scan.dcim
+            camDirFound = scan.cam
+            vidCount = scan.vids
+            lrvCount = scan.lrvs
+            templateName = scan.template
+            indexFound = scan.indexFound
+            indexCount = scan.indexCount
+            indexEmptyMeta = scan.indexEmptyMeta
+            indexError = scan.indexError
+        } finally {
+            // 无论成功、失败还是被取消，都不能让界面一直停在「扫描中」。
+            scanning = false
+        }
+    }
+
+    private class CardScan(
+        val label: String,
+        val dcim: Boolean,
+        val cam: Boolean,
+        val vids: Int,
+        val lrvs: Int,
+        val template: String,
+        val indexFound: Boolean,
+        val indexCount: Int,
+        val indexEmptyMeta: Int,
+        val indexError: String
+    )
+
+    private fun readCard(ctx: Context, tree: Uri): CardScan {
+        var label = tree.lastPathSegment ?: "存储卡"
+        var dcim = false
+        var camOk = false
+        var vids = 0
+        var lrvs = 0
+        var template = ""
+        var indexFound = false
+        var indexCount = 0
+        var emptyMeta = 0
+        var indexError = ""
         try {
             val root = DocumentFile.fromTreeUri(ctx, tree)
-            cardLabel = root?.name?.takeIf { it.isNotBlank() }
-                ?: tree.lastPathSegment ?: "存储卡"
+            label = root?.name?.takeIf { it.isNotBlank() } ?: label
 
-            val dcim = root?.findFile("DCIM")
-            dcimFound = dcim?.isDirectory == true
+            val dcimDir = root?.findFile("DCIM")
+            dcim = dcimDir?.isDirectory == true
 
-            val cam = dcim?.findFile("Camera01")
-            camDirFound = cam?.isDirectory == true
+            val camDir = dcimDir?.findFile("Camera01")
+            camOk = camDir?.isDirectory == true
 
-            val files = cam?.listFiles() ?: emptyArray()
-            vidCount = files.count { it.isFile && it.name?.startsWith("VID_") == true }
-            lrvCount = files.count { it.isFile && it.name?.startsWith("LRV_") == true }
+            val files = camDir?.listFiles() ?: emptyArray()
+            vids = files.count { it.isFile && it.name?.startsWith("VID_") == true }
+            lrvs = files.count { it.isFile && it.name?.startsWith("LRV_") == true }
 
-            val pair = cam?.let { SafeCard.findTemplatePair(it) }
-            templateName = pair?.let { "${it.first.name} + ${it.second.name}" } ?: ""
+            val pair = camDir?.let { SafeCard.findTemplatePair(it) }
+            template = pair?.let { "${it.first.name} + ${it.second.name}" } ?: ""
 
-            indexFound = dcim?.findFile("fileinfo_list.list") != null
-
-            // 真正解析索引：条目数 + 空 meta 条目（相机把它们显示成 0KB 且打不开）
-            indexCount = 0
-            indexEmptyMeta = 0
-            indexError = ""
-            val idxFile = dcim?.findFile("fileinfo_list.list")
+            val idxFile = dcimDir?.findFile("fileinfo_list.list")
+            indexFound = idxFile != null
             if (idxFile != null) {
                 try {
                     ctx.contentResolver.openInputStream(idxFile.uri)?.use { ins ->
                         val entries = Index.parseFileInfo(ins.readBytes())
                         indexCount = entries.size
-                        indexEmptyMeta = entries.count { it.meta.isEmpty() }
+                        // 空 meta 的条目在相机里显示成 0KB 且打不开，单独计数。
+                        emptyMeta = entries.count { it.meta.isEmpty() }
                     }
                 } catch (e: Exception) {
                     indexError = e.message ?: "索引读取失败"
                 }
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
-            cardLabel = "读取失败：${e.message}"
-            dcimFound = false
-            camDirFound = false
-            indexFound = false
-            vidCount = 0
-            lrvCount = 0
-            indexCount = 0
-            indexEmptyMeta = 0
-            templateName = ""
-        } finally {
-            scanning = false
+            label = "读取失败：${e.message}"
         }
+        return CardScan(
+            label = label,
+            dcim = dcim,
+            cam = camOk,
+            vids = vids,
+            lrvs = lrvs,
+            template = template,
+            indexFound = indexFound,
+            indexCount = indexCount,
+            indexEmptyMeta = emptyMeta,
+            indexError = indexError
+        )
     }
 
     fun addVideos(ctx: Context, uris: List<Uri>) {
@@ -359,7 +409,14 @@ class AppState {
                         PythonEngine.runImport(
                             ctx, staged, mirror.root, cb,
                             preferHardware = (encoder == "硬件"),
-                            cancel = cancelEvent
+                            cancel = cancelEvent,
+                            // 明确告诉核心用哪一对文件当模板。镜像目录里除了
+                            //   刚拷进来的真机原片，还可能躺着上一轮的产物，
+                            //   而它们同样带 inst box —— 让核心自己按字典序猜
+                            //   会选中错的，产出的东西相机不认且不报错。
+                            templateNames = card.templateVid.name?.let { vid ->
+                                card.templateLrv.name?.let { lrv -> vid to lrv }
+                            }
                         )
                     }
                 } finally {

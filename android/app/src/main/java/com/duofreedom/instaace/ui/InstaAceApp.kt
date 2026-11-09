@@ -151,7 +151,7 @@ fun InstaAceApp() {
             } catch (_: SecurityException) {
                 // 只读授权也能扫描，写回阶段再提示
             }
-            state.scanCard(ctx, uri)
+            scope.launch { state.scanCard(ctx, uri) }
         }
     }
 
@@ -553,13 +553,12 @@ private fun QueueScreen(
         }
         ImportActionCard(
             // 数据态优先级：导入中 > 空队列 > 未选卡 > 上一条失败 > 可开始
-            state = when {
-                state.running -> ImportCardState.Loading
-                state.queue.isEmpty() -> ImportCardState.Empty
-                state.cardUri == null -> ImportCardState.Disabled
-                state.stage.startsWith("失败") -> ImportCardState.Error
-                else -> ImportCardState.Ready
-            },
+            state = cardStateFor(
+                running = state.running,
+                queueEmpty = state.queue.isEmpty(),
+                noCard = state.cardUri == null,
+                stage = state.stage
+            ),
             stage = state.stage,
             progress = state.progress,
             logLine = state.logLine,

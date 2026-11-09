@@ -1726,6 +1726,32 @@ def extract_inst_meta(path: str) -> bytes | None:
     enc = tf.encode_message(fields)
     return enc if len(enc) == pos else (blob[:pos] if pos > 0 else None)
 
+
+def template_from_names(card_root: str, vid_name: str, lrv_name: str) -> tuple | None:
+    """按指定文件名取模板对，不做任何猜测。
+
+    `find_native_template` 的规则是「字典序第一个带 inst meta 的 VID_」。
+    安卓端在镜像目录上跑导入，而镜像里同时有真机原片和上一轮的转码产物
+    ——后者自带 inst box，完全符合挑选条件。只要它的名字排在真机原片前面，
+    就会被当成模板，产出的东西相机不认，且不抛任何异常。
+    所以安卓侧改为把「从卡上复制过来的是哪两个文件」直接告诉核心。
+    """
+    cam = camera_dir(card_root)
+    main = os.path.join(cam, vid_name)
+    proxy = os.path.join(cam, lrv_name)
+    if not os.path.isfile(main) or not os.path.isfile(proxy):
+        return None
+    # VID_ 与 LRV_ 后面那段必须一致，否则是把两段不同的素材凑成一对：
+    #   分辨率/帧率/音频参数都对不上，移植出来的东西相机同样不认。
+    #   比到扩展名前为止——两者扩展名本来就不一样（.mp4 / .lrv）。
+    if os.path.splitext(vid_name)[0][4:].lower() != os.path.splitext(lrv_name)[0][4:].lower():
+        return None
+    meta = extract_inst_meta(main)
+    if not meta:
+        return None
+    return main, proxy, bytes(meta)
+
+
 def find_native_template(card_root: str) -> tuple | None:
     """在卡里找一对真机原片 (VID_*.mp4, LRV_*.lrv) 作为模板。
 

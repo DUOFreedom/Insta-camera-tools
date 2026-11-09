@@ -147,7 +147,7 @@ gradle --offline assembleRelease
 gradle --offline :app:testReleaseUnitTest
 ```
 
-预期 **5 passed / 7 skipped / 0 failed**。
+预期 **11 passed / 7 skipped / 0 failed**（`ConsentLogicTest` 5 + `ImportCardStateTest` 6，`IndexTest` 7 条跳过）。
 `IndexTest` 的 7 条依赖 `android/app/src/test/resources/samples/` 下的真机 `.list` 样本；
 样本含设备标识，按约定不入库，缺失时用 JUnit `Assume` **跳过**而不是判失败。
 
@@ -157,10 +157,17 @@ gradle --offline :app:testReleaseUnitTest
 |------|------|
 | `android/app/build/outputs/apk/release/app-release.apk` | 签名 APK，versionCode 14 / versionName 1.2.0，约 75.3 MB |
 
-实测产物：75,263,215 B。同一份源码两次构建的 sha256 不同（打包带进了时间戳），所以这个值只能用来确认「装的是不是这一轮构建出来的包」，不能当校验和去比对。
+实测产物约 75.3 MB（75,276,100～75,276,114 B 之间浮动，原因见下）。
 
-> 想确认装上去的就是这一轮构建的包，比对**字节数**比比对哈希可靠：同一份源码连编两次，
-> 字节数稳定，哈希会变。
+**这个 APK 既不可复现哈希，也不可复现字节数。** 连编五次，字节数与 sha256 都不同。
+逐条比对两次构建，差异只有 5 个：`META-INF/CERT.RSA`、`META-INF/CERT.SF`、
+`META-INF/MANIFEST.MF`（签名）、`assets/chaquopy/build.json`、`assets/chaquopy/app.imy`。
+把 `app.imy` 里的 pyc 逐个比对，每个文件只有第 8～12 字节不同——CPython 的源文件 mtime
+字段；清零后六个条目逐字节相同。
+
+> 要核对「装上去的是不是这一轮代码」，只能解包 `assets/chaquopy/app.imy`
+> 比对 pyc（清零 mtime 后应逐字节相同），或者直接比对 APK 里 Kotlin 的 class。
+> 字节数和 sha256 都只能用来确认「大概是这一轮」。
 
 ### 签名
 

@@ -73,6 +73,26 @@ enum class ImportCardState {
     Error
 }
 
+/**
+ * 由界面状态推导卡片态。
+ *
+ * 抽成纯函数是为了能在没有真机/模拟器的环境下用 JUnit 覆盖五个分支 ——
+ * 渲染测试跑不了，但这套优先级规则（导入中压过一切，失败只在上一条结果
+ * 里读）是可以断言的。
+ */
+fun cardStateFor(
+    running: Boolean,
+    queueEmpty: Boolean,
+    noCard: Boolean,
+    stage: String
+): ImportCardState = when {
+    running -> ImportCardState.Loading
+    queueEmpty -> ImportCardState.Empty
+    noCard -> ImportCardState.Disabled
+    stage.startsWith("失败") -> ImportCardState.Error
+    else -> ImportCardState.Ready
+}
+
 private object Space {
     val s1 = 8.dp
     val s2 = 16.dp

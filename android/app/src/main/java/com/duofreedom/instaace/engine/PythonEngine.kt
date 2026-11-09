@@ -15,7 +15,6 @@ class ImportCallback {
     @Volatile var fraction: Float = 0f
     @Volatile var label: String = ""
     @Volatile var lastLog: String = ""
-    @Volatile var lastLogAt: Long = 0L
 
     fun onProgress(frac: Double, text: String) {
         fraction = frac.toFloat().coerceIn(0f, 1f)
@@ -24,7 +23,6 @@ class ImportCallback {
 
     fun onLog(line: String) {
         lastLog = line
-        lastLogAt = System.currentTimeMillis()
     }
 }
 
@@ -82,20 +80,6 @@ object PythonEngine {
         }
     }
 
-    @Suppress("unused")
-    private fun statusVerbose(ctx: Context): String {
-        if (!requireInit(ctx)) return "init 失败：$initError"
-        return try {
-            val bridge = Python.getInstance().getModule("android_bridge")
-            val arr = bridge.callAttr("self_check")?.asList()
-            val ok = arr?.getOrNull(0)?.toBoolean() ?: false
-            val msg = arr?.getOrNull(1)?.toString().orEmpty()
-            if (ok) "Python 核心就绪（$msg）" else "Python 核心异常：$msg"
-        } catch (t: Throwable) {
-            "Python 自检失败：${t.message}"
-        }
-    }
-
     /** 诊断信息：把初始化异常与最近一次日志一起给出，便于真机排查。 */
     fun diagnostics(ctx: Context): String {
         val sb = StringBuilder()
@@ -122,7 +106,8 @@ object PythonEngine {
         mirrorRoot: File,
         callback: ImportCallback,
         preferHardware: Boolean = false,
-        cancel: PyObject? = null
+        cancel: PyObject? = null,
+        templateNames: Pair<String, String>? = null
     ): JSONObject {
         if (!requireInit(ctx)) {
             throw RuntimeException("Python 核心初始化失败：$initError")
@@ -135,7 +120,10 @@ object PythonEngine {
             callback,
             null,                 // cover
             preferHardware,       // prefer_hardware
-            cancel                // cancel（threading.Event 或 None）
+            cancel,               // cancel（threading.Event 或 None）
+            // Chaquopy 把 Kotlin 数组转成 Python list；Python 侧按二元序列解包，
+            //   不要求是 tuple。
+            templateNames?.let { arrayOf(it.first, it.second) }  // template_names
         )?.toString() ?: throw RuntimeException("Python 未返回结果")
         return JSONObject(raw)
     }
@@ -152,11 +140,14 @@ object PythonEngine {
      * 置位取消事件。线程安全（Python Event.set 本身可跨线程调用）。
      * 返回 false 表示事件为空或置位失败——调用方应继续等待，不要假定已取消。
      */
-    fun cancelEventSet(ev: PyObject?): Boolean = try {
-        ev?.callAttr("set")
-        ev != null
-    } catch (_: Throwable) {
-        false
+    fun cancelEventSet(ev: PyObject?): Boolean {
+        if (ev == null) return false
+        return try {
+            ev.callAttr("set")
+            true
+        } catch (_: Throwable) {
+            false
+        }
     }
 
     fun logTail(ctx: Context): String = try {

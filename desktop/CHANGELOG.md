@@ -2,6 +2,35 @@
 
 ## 未发布
 
+### 修复（代码审查发现的镜像污染与几处静默失败）
+
+对本轮待合并的导入操作卡与取消链路做了一次审查，发现一个会让产物「相机不认」的缺陷，以及若干「不报错但结果不对」的问题。
+
+- **镜像目录不清空，上一轮的产物会被当成真机模板**（最严重）。安卓端把卡结构镜像到 `cacheDir/job/card`，转码产物也直接写进镜像的 `DCIM/Camera01`，与真机原片同目录；`CardMirror.build()` 只 `mkdirs()` + 拷贝，从不删旧文件，`jobDir` 全程没有任何清理代码。上一轮产物自带 inst box（正是上一轮自己移植进去的），完全符合 `find_native_template` 的挑选条件「字典序第一个带 inst meta 的 VID_」。只要它的文件名排在真机原片之前，就会被当成模板 —— moov 骨架、帧率、分辨率、音频参数全部来自上一轮产物，产出的东西相机不认，且不抛任何异常、不写任何错误日志，只在用户手里表现为「导进去相机看不见」。错误还会逐轮累积。已用脚本复现：镜像里放 `VID_20240101_090000_000.mp4`（真机）与 `VID_20230101_080000_000.mp4`（上一轮产物）时，`sorted(vids)[0]` 取到的是后者。修法双保险：`CardMirror.build()` 开头 `root.deleteRecursively()` 并校验确实清空（删不掉就返回 false，脏镜像比直接报错难查得多）；同时 Kotlin 把「从卡上拷过来的是哪两个文件」显式传给 Python，核心不再猜。
+- **`template_from_names()` 新增**：按指定文件名取模板对，两个文件都存在、`VID_`/`LRV_` 去掉扩展名后主名一致、主文件带 inst box，三者缺一即返回 `None`。`android_bridge.run_import(..., template_names=...)` 与 `PythonEngine.runImport(..., templateNames=...)` 一路透传；取不到模板对时直接返回 `{"ok": false, "error": "模板对不可用：…"}`，不硬着头皮跑。
+- **`writeBack` 把部分失败吞掉**：产物缺失时 `continue` 静默跳过，用户看到「全部完成」但卡上少文件；`writeDocument` 返回 `readableSize()`，而刚写完的文件在部分 provider 上读不到 SIZE 列，会把成功报成「写入失败」。改为 `writeDocument` 返回 `Boolean`，大小核对交给新增的 `verifySize()`，并区分「产物缺失 / 写入失败 / 大小不符」三种错误文案。
+- **`scanCard()` 在主线程做 SAF IO 与 protobuf 解析**：`DocumentFile.fromTreeUri` / `listFiles()` 每次都要走 ContentResolver 往返，索引整块读进来解析。卡里几百个文件时足以触发 ANR，而且同步执行时 `scanning` 根本来不及渲染。拆成 `scanCard()`（suspend，写状态）+ `readCard()`（IO 线程，只读不写），并加 `try/finally` 保证任何情况下都退出「扫描中」。
+- **`cancelEventSet()` 改成三态显式**：原写法 `try { ev?.callAttr("set"); ev != null } catch { false }` 三态恰好都对，但读起来像 bug，改成先判空再 try。
+- **回调异常不再完全静默**：`_safe_call` / `_safe_log` 原来 `except Exception: pass`，Kotlin 侧抛异常时表现为「进度条卡在某个值 + 日志一片空白」，现场无法判断是编码慢还是桥接坏了。改为写一行到 `import.log`。
+- **`android_bridge.py` 重复 import**：`threading` / `json` 在顶部已导入，第 188 行附近又导了一遍；`re` 与 `urllib.request` 是新增的却留在函数体里。统一提到顶部。
+- **死代码清理**：`ImportCallback.lastLogAt`（只有声明与赋值，无任何读取）、`PythonEngine.statusVerbose()`（带 `@Suppress("unused")`，与 `status()` 重复，无调用）删除。
+- **`ImportCardState` 推导抽成纯函数 `cardStateFor()`**：五态优先级从 `InstaAceApp` 的内联 `when` 移到可测的位置。
+
+### 测试（镜像污染 / 模板固定 / 卡片状态）
+
+新增 `desktop/tests/test_template_pick.py`（4 条）与 `desktop/tests/test_bridge_cancel.py` 的 3 条模板相关用例，以及 `android/app/src/test/java/com/duofreedom/instaace/ui/ImportCardStateTest.kt`（6 条 JUnit，纯逻辑无需设备）。
+
+- `test_find_native_template_picks_stale_product_when_name_sorts_first` —— 记录危险行为本身。看着像「在测 bug」，但它守的是前提：一旦 `find_native_template` 改成别的挑选规则，这条会失败，提醒重新评估安卓侧是否还需要显式传模板名。
+- `test_template_from_names_ignores_sort_order` / `test_template_from_names_rejects_missing_pair` / `test_template_from_names_rejects_file_without_inst_meta` —— 显式传名时必须拿到指定的那一对；只存在一半、主名不一致、或没有 inst box 时必须返回 `None`。
+- `test_run_import_passes_template_names_into_core` / `test_run_import_without_template_names_lets_core_decide` / `test_run_import_rejects_unusable_template_pair` —— 桥接层三个方向：传了要用上、没传保持旧行为、取不到要失败。
+- `ImportCardStateTest` 六条覆盖五态优先级：「导入中」压过一切（取消时不能跳回可点）、空队列优先于未选卡、「已取消」不算失败。
+
+回滚验证：忽略 `template_names` → 2 条红；不把 `template` 传给 `import_with_inst` → 1 条红；模板对取不到时继续跑 → 1 条红；`cardStateFor` 里把 `queueEmpty` 提到 `running` 之前 → `runningWinsOverEverything` 红。恢复后全绿。
+
+写测试时暴露出一处真实遗漏：`template_from_names` 最初只检查两个文件是否存在，不检查它们是不是一对。`test_template_from_names_rejects_missing_pair` 立刻抓到 —— `VID_20240101_090000_000.mp4` 与 `LRV_20230101_080000_000.lrv` 这种拼凑对会被接受。已补上主名一致性校验（比到扩展名前，因为两者扩展名本来就不同）。
+
+全套 **68 passed, 2 skipped**（此前 61 passed）；Android `:app:testReleaseUnitTest` → IndexTest 7 skipped / ConsentLogicTest 5 passed / ImportCardStateTest 6 passed，零失败。
+
 ### 新增（安卓端导入操作卡）
 
 导入页底部原来是一段内联布局：进度行、进度条、日志、明细卡、开始/取消按钮堆在一个 `Column` 里，五种数据状态全靠 `if/else` 散在 JSX 式条件里，按下反馈用的是 Material 默认 ripple（tween）。
@@ -86,7 +115,16 @@
 
 ### 产物重建与核对
 
-- 安卓 release APK（含取消链路）：75,263,215 B。同一份源码连续两次构建哈希不同（`da…` / `e2…`），说明打包过程带进了时间戳，此包的 sha256 不能当校验和用。
+- 安卓 release APK（含审查修复）：约 75,276,100 B（实测 75,276,100～75,276,114 之间浮动，见下）。核对内容同下，另确认
+  `template_from_names` 在 `insta_core` 模块函数表中、`run_import` 的 `co_varnames`
+  含 `template_names`、`_swallow` 在 `android_bridge` 模块 `co_names` 中；
+  `javap` 确认 `PythonEngine.runImport(..., kotlin.Pair<String,String>)`、
+  `SafeCard.writeDocument` 返回 `boolean`、`SafeCard.verifySize` 返回 `long`、
+  `AppState.scanCard` 带 `Continuation` 参数（suspend）、`ImportActionCardKt.cardStateFor`
+  为 `(boolean, boolean, boolean, String) -> ImportCardState`。
+  `:app:testReleaseUnitTest` → IndexTest 7 skipped / ConsentLogicTest 5 passed / ImportCardStateTest 6 passed。
+- **构建不可复现的实测结论（更正此前的说法）**：此前记录为「哈希不稳定、字节数稳定」，连编五次后发现字节数也在浮动（75,276,100 / 75,276,106 / 75,276,108 / 75,276,109 / 75,276,114）。逐条比对两次构建的产物，差异只有 5 个条目：`META-INF/CERT.RSA`、`META-INF/CERT.SF`、`META-INF/MANIFEST.MF`（签名，因为摘要变了）、`assets/chaquopy/build.json`（里面 `app.imy` 的摘要）、`assets/chaquopy/app.imy`。把 `app.imy` 里的 pyc 逐个比对，**每个文件只有第 8～12 字节不同**——那是 CPython 的源文件 mtime 字段；把这段清零后六个条目全部逐字节相同。所以：源码与字节码本身是可复现的，浮动来自 pyc 头部的时间戳，以及它带来的 zip 压缩长度变化和签名重算。**结论：这个 APK 的字节数与 sha256 都不能当校验和，只能用来确认「大概是不是这一轮」；要真正核对代码，得解包 `app.imy` 比对 pyc（清零 mtime 后应当逐字节相同）。**
+- 上一轮安卓 release APK（含取消链路）：75,263,215 B。
   解包 `assets/chaquopy/app.imy` 核对字节码：`new_cancel_event` 在模块 `co_names` 中，
   `run_import` 的 `co_varnames` 含 `cancel`，其字典键常量含 `canceled`；
   `javap` 核对 `PythonEngine.runImport(..., PyObject)` / `newCancelEvent` / `cancelEventSet`

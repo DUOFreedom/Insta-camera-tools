@@ -86,27 +86,29 @@ object SafeCard {
 
     /**
      * 把本地文件写入 SAF 文档，已存在则覆盖，不存在则按精确文件名创建。
-     * 返回写入后的字节数；失败返回 -1。
+     * 返回是否写入成功。
+     *
+     * 不返回字节数：`readableSize` 对刚写完的文件经常读不到（部分 provider
+     * 要等媒体扫描后才有 SIZE 列），拿它判成败会把成功写成失败。
      */
     fun writeDocument(
         ctx: Context,
         parent: DocumentFile,
         displayName: String,
         src: File
-    ): Long {
+    ): Boolean {
         val mime = mimeFor(displayName)
         val targetUri: Uri = parent.findFile(displayName)?.uri
             ?: DocumentsContract.createDocument(
                 ctx.contentResolver, parent.uri, mime, displayName
-            ) ?: return -1L
+            ) ?: return false
 
         return try {
-            ctx.contentResolver.openOutputStream(targetUri, "wt")?.use { out ->
-                src.inputStream().use { input -> input.copyTo(out, 1 shl 20) }
-            } ?: return -1L
-            readableSize(ctx, targetUri)
+            val out = ctx.contentResolver.openOutputStream(targetUri, "wt") ?: return false
+            out.use { o -> src.inputStream().use { i -> i.copyTo(o, 1 shl 20) } }
+            true
         } catch (_: Exception) {
-            -1L
+            false
         }
     }
 
@@ -138,6 +140,10 @@ object SafeCard {
     } catch (_: Exception) {
         -1L
     }
+
+    /** 写回后核对卡上文件大小；读不到返回 -1。 */
+    fun verifySize(ctx: Context, parent: DocumentFile, name: String): Long =
+        parent.findFile(name)?.let { readableSize(ctx, it.uri) } ?: -1L
 }
 
 /**
@@ -154,6 +160,17 @@ class CardMirror(
     val camDir = File(dcimDir, "Camera01")
 
     fun build(): Boolean {
+        // 必须先清空：上一轮的转码产物就留在这个目录里，且它们自带 inst box
+        //   （正是上一轮自己移植进去的）。Python 侧挑模板的规则是「字典序第一个
+        //   带 inst meta 的 VID_」，所以只要上一轮产物名字比卡上真机原片早，
+        //   它就会被当成真机模板，moov 骨架/帧率/分辨率全部来自上一轮产物。
+        //   错误会逐轮累积，表现为「相机不认」，且不报任何异常。
+        root.deleteRecursively()
+        if (root.exists() && root.listFiles()?.isNotEmpty() == true) {
+            // 删不掉就别往下跑：脏镜像会污染模板，产出的东西相机不认，
+            //   比直接报错难查得多。
+            return false
+        }
         camDir.mkdirs()
         dcimDir.mkdirs()
         card.fileInfo?.let { SafeCard.copyToLocal(ctx, it, File(dcimDir, "fileinfo_list.list")) }
@@ -173,9 +190,20 @@ class CardMirror(
 
         for (name in mediaNames) {
             val src = File(camDir, name)
-            if (!src.isFile) continue
-            val written = SafeCard.writeDocument(ctx, card.cam, name, src)
-            if (written < 0) errors += "写入失败: $name"
+            if (!src.isFile) {
+                // 静默跳过会让用户看到「全部完成」但卡上少文件。
+                errors += "产物缺失: $name"
+                continue
+            }
+            if (!SafeCard.writeDocument(ctx, card.cam, name, src)) {
+                errors += "写入失败: $name"
+                continue
+            }
+            // 大小读不到（部分 provider 要等媒体扫描）不算失败，但读到了不一致要报。
+            val onCard = SafeCard.verifySize(ctx, card.cam, name)
+            if (onCard >= 0 && onCard != src.length()) {
+                errors += "大小不符: $name（本地 ${src.length()}，卡上 $onCard）"
+            }
         }
 
         for (idx in listOf("fileinfo_list.list", ".editinfo_list.list")) {

@@ -16,10 +16,12 @@
 
 import json
 import os
+import re
 import sys
 import tempfile
 import threading
 import traceback
+import urllib.request
 
 _core = None
 _tf = None
@@ -74,24 +76,38 @@ def init(ffmpeg_path, ffprobe_path, cache_dir):
     return "insta_core %s" % getattr(insta_core, "__version__", "?")
 
 
+def _swallow(where, exc):
+    """回调异常不能往上抛（会打断转码），但也不能彻底消失。
+
+    完全静默时表现为「进度条卡在某个值 + 日志一片空白」，现场无法判断是
+    编码慢还是桥接坏了。写进 import.log，至少事后能查到。
+    """
+    try:
+        if _log_file:
+            with open(_log_file, "a", encoding="utf-8") as f:
+                f.write("[bridge] %s 回调失败: %s: %s\n" % (where, type(exc).__name__, exc))
+    except Exception:  # noqa: BLE001
+        pass
+
+
 def _safe_call(cb, *args):
     try:
         if cb is not None:
             getattr(cb, "onProgress")(*args)
-    except Exception:  # noqa: BLE001
-        pass
+    except Exception as e:  # noqa: BLE001
+        _swallow("onProgress", e)
 
 
 def _safe_log(cb, text):
     try:
         if cb is not None:
             getattr(cb, "onLog")(str(text))
-    except Exception:  # noqa: BLE001
-        pass
+    except Exception as e:  # noqa: BLE001
+        _swallow("onLog", e)
 
 
 def run_import(source, card_root, callback=None, cover=None, prefer_hardware=False,
-               cancel=None):
+               cancel=None, template_names=None):
     """在镜像卡目录上执行完整导入，返回 JSON 字符串。
 
     source            已暂存到本地的源视频
@@ -101,6 +117,9 @@ def run_import(source, card_root, callback=None, cover=None, prefer_hardware=Fal
                       False = libx265/libx264 软件编码（与桌面端一致，相机识别最稳）
     cancel            可选 threading.Event；由 new_cancel_event() 创建、Kotlin 侧置位。
                       置位后 ffmpeg 子进程会被 kill，返回的 JSON 带 canceled=True。
+    template_names    可选 (vid_name, lrv_name)：明确指定用哪一对文件当模板。
+                      传了就不再让核心自己猜 —— 镜像目录里上一轮的产物同样带
+                      inst box，猜错的后果是相机不认且不报错。
 
     返回 JSON：成功 {"ok": True, main, proxy, inst_ok, inst_error, index_error, registered}；
               取消 {"ok": False, canceled": True, error}；
@@ -118,8 +137,19 @@ def run_import(source, card_root, callback=None, cover=None, prefer_hardware=Fal
             _core.set_prefer_hardware(bool(prefer_hardware))
         except Exception:  # noqa: BLE001
             pass
+        tpl = None
+        if template_names:
+            vid_name, lrv_name = template_names
+            tpl = _core.template_from_names(card_root, vid_name, lrv_name)
+            if tpl is None:
+                return json.dumps({
+                    "ok": False,
+                    "canceled": False,
+                    "error": "模板对不可用：%s / %s" % (vid_name, lrv_name),
+                }, ensure_ascii=False)
+            log("模板（指定）: %s" % vid_name)
         res = _core.import_with_inst(
-            source, card_root, log=log, progress=progress,
+            source, card_root, template=tpl, log=log, progress=progress,
             cover=cover if cover else None,
             cancel=cancel,
         )
@@ -185,11 +215,6 @@ def self_check():
 
 
 # ============== 启动更新检查（与桌面端 updater.py 对齐） ==============
-import threading
-import urllib.request
-import json
-import re
-
 _REPO = "duofreedom/Insta-camera-tools"
 _API_URL = "https://api.github.com/repos/%s/releases/latest" % _REPO
 _FALLBACK_URL = "https://github.com/%s/releases" % _REPO
