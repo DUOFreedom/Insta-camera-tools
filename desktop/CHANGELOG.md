@@ -27,6 +27,13 @@
 - 写测试时踩到一个坑并记录在注释里：`cmd` 是参数列表，`"mediacodec" in cmd` 只做整元素相等匹配，永远匹配不到 `"hevc_mediacodec"`，必须逐元素 `any("mediacodec" in a for a in cmd)`。
 - 全套 **49 passed, 2 skipped**（此前 43 passed）。
 
+### 产物验证
+
+- 重新离线构建 release APK 通过：75,257,520 B，sha256 `bd45835bc208aaa8cb115cf9824cd9a97cb6434edadfe96ada0daa087c1f1515`。
+- 解开 `assets/chaquopy/app.imy` 反序列化 `insta_core.pyc` 核对名字表：`_run_transcode` 的 `freevars`/`varnames` 里都已没有 `first_error`（缺陷的病根就是它），`convert` 有 `canceled`、无 `my_error`，两处都引用了 `CanceledError`。
+- `:app:testReleaseUnitTest` → IndexTest 7 skipped / ConsentLogicTest 5 passed / 0 failures。
+- `desktop/dist/InstaAceQml.exe --self-test` → `QML_OK roots=1`，exit 0。
+
 ### 测试（模块导入与 IndexTest）
 
 - 新增 4 条回归护栏：`instbox` 包导入、`instbox` 平铺导入（子进程验证）、`inst_transplant` 相对导入分支的 ast 静态检查、`_meta_equivalent` 在 f9 漂移时仍判等价而 f7 时间戳变化时判不等价。当时全套 **42 passed, 2 skipped**（此前因收集失败只跑到 4 条）。
