@@ -2,6 +2,12 @@
 
 ## 未发布
 
+### 产物重建与核对（本轮）
+
+- 桌面端 `desktop/dist/InstaAceQml.exe` 78,836,791 B，`--self-test` → `QML_OK roots=1`。解包 `PYZ.pyz` 核对：`core._build_hw_transcode_cmd` 常量含 `qsv`/`amf`，`instbox.inst_transplant.video_gop` 的 `co_names` 含 `Path` 与 `read_bytes` —— 两处修复都在包里。
+- 安卓 `android/app/build/outputs/apk/release/app-release.apk` 75,279,797 B；单元测试 IndexTest 7 跳过 / ConsentLogicTest 5 / ImportCardStateTest 6，失败 0。解包 `assets/chaquopy/app.imy` 核对：`insta360_tf_import.video_gop` 的 `co_names` 含 `Path`，`insta_core._build_hw_transcode_cmd` 常量含 `qsv`/`amf` 与 `-g`。
+- **APK 的字节数与 sha256 都不能当校验和**：同一份源码连编两次，签名（`META-INF/CERT.RSA`/`CERT.SF`/`MANIFEST.MF`）、`assets/chaquopy/build.json`、`assets/chaquopy/app.imy` 五项都会变。`app.imy` 里每个 pyc 只有第 8～12 字节（CPython 源文件 mtime 字段）不同，把这段清零后全部逐字节相同。要确认「装上去的就是这一轮构建的包」，解包比对 pyc 比比对哈希可靠。
+
 ### 修复（端到端跑通 GO Ultra 时发现的两处）
 
 真机素材 + 仓库自带的 `desktop/dist/bin/ffmpeg.exe` 跑完整导入链路（转码 → inst 移植 → 索引登记）时暴露两处，桩测试都拦不住：
