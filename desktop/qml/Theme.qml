@@ -48,6 +48,10 @@ QtObject {
     readonly property color accentHover: dark ? accentHoverDark : accentHoverLight
     readonly property color accentPress: dark ? accentPressDark : accentPressLight
     readonly property color info: accent
+    // 开关滑块的球：亮色下白球压灰轨最清楚；暗色下纯白会过曝，
+    // 用略暗的同一族中性色。此前 Switch.qml 里硬编码 "#FFFFFF"，
+    // 暗色主题下刺眼且改主题时漏改。
+    readonly property color switchThumb: dark ? textPrimaryDark : "#FFFFFF"
 
     readonly property color iconPrimary: textPrimary
     readonly property color iconSecondary: textSecondary

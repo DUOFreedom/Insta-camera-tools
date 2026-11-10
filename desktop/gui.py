@@ -1063,17 +1063,22 @@ class App(QWidget):
 
     # ------------------------------------------------------------ 转换
     def _resolve_encoder(self, sel: str):
-        sel = self.hw_combo.currentText()
-        if sel.startswith("自动"):
+        #   形参就是调用方选的那一项，不要在里面再读一次下拉框 ——
+        #   覆盖形参会让「传什么就用什么」失效，调用点改了这边也跟着错。
+        #   空串按「未选择」处理，直接退回软件编码。
+        sel = sel or ""
+        if not sel or sel.startswith("自动"):
             #   硬件编码器改为手动选择，避免换个机器就静默改掉编码器。
-            return "software"
+            #   返回三元组而不是字符串：core.convert 收到 None 会自动探测硬件，
+            #   而 encoder[2] == "software" 的元组才会强制走软件编码。
+            return ("", "", "software")
         if "AMD" in sel:
             return ("hevc_amf", "h264_amf", "AMD")
         if "NVIDIA" in sel:
             return ("hevc_nvenc", "h264_nvenc", "NVIDIA")
         if "Intel" in sel:
             return ("hevc_qsv", "h264_qsv", "Intel")
-        return "software"
+        return ("", "", "software")
 
     def start(self):
         if self._busy:
@@ -1162,7 +1167,7 @@ class App(QWidget):
         try:
             self._sig_status.emit("正在转换...")
             dest = out or os.path.dirname(todo[0] if todo else self.files[0])
-            enc_arg = enc if enc != "software" else ("", "", "software")
+            enc_arg = enc
             _core = core
             from datetime import datetime
             core.set_awake(True)

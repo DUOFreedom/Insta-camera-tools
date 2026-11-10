@@ -1390,3 +1390,95 @@ def test_udta_with_mcrc_recomputes_for_own_mdat():
         # 没有 MCRC 的 udta（LRV / Ace Pro 2）必须原样返回，不能凭空加一个
         plain = struct.pack(">I4s", 8, b"udta")
         assert mod.udta_with_mcrc(plain, mdat) == plain, f"{label} 给没有 MCRC 的 udta 加了 box"
+
+
+def test_resolve_encoder_returns_tuple_for_software():
+    """软件编码也必须返回三元组，且形参不能在下拉框里被覆盖。
+
+    core.convert 收到 encoder=None 会自动探测硬件编码器；只有
+    encoder[2] == "software" 的元组才会强制走软件编码。GUI 原来在「自动」
+    分支返回字符串 "software"，调用点再补一次转换 —— 两处都不该有这种
+    隐式约定。同时 _resolve_encoder 第一行把形参覆盖成下拉框的当前值，
+    等于「传什么就用什么」失效。
+    """
+    import gui as gui_mod
+
+    class _Combo:
+        def __init__(self, text):
+            self._text = text
+
+        def currentText(self):
+            return self._text
+
+    class _Stub:
+        _resolve_encoder = gui_mod.App._resolve_encoder
+
+        def __init__(self, combo_text):
+            self.hw_combo = _Combo(combo_text)
+
+    # 形参优先：下拉框停在 NVIDIA，但传进来的是「自动」，必须按自动走
+    stub = _Stub("NVIDIA")
+    assert stub._resolve_encoder("自动（软件编码）") == ("", "", "software")
+    assert stub._resolve_encoder("NVIDIA（硬件编码）") == ("hevc_nvenc", "h264_nvenc", "NVIDIA")
+    assert stub._resolve_encoder("Intel（硬件编码）") == ("hevc_qsv", "h264_qsv", "Intel")
+    assert stub._resolve_encoder("AMD（硬件编码）") == ("hevc_amf", "h264_amf", "AMD")
+    # 未知选项与空串都退回软件，且类型一致（三元组）
+    assert stub._resolve_encoder("某个没见过的") == ("", "", "software")
+    assert stub._resolve_encoder("") == ("", "", "software")
+
+
+def test_batch_convert_rejects_non_integer_start_number(tmp_path):
+    """batch_convert 的 start_number 非法时必须抛 ValidationError。
+
+    原来直接 int(start_number)，裸 ValueError 会冒到调用方 —— GUI 只处理
+    本项目定义的异常，裸 ValueError 表现为未捕获崩溃。
+    """
+    out = str(tmp_path / "out")
+    for label, path in (
+        ("desktop", os.path.join(ROOT, "core.py")),
+        ("android", os.path.join(os.path.dirname(ROOT), "android", "app",
+                                 "src", "main", "python", "insta_core.py")),
+    ):
+        src = io.open(path, encoding="utf-8-sig").read()
+        assert "start_number 必须为整数" in src, f"{label} 仍会抛裸 ValueError"
+    try:
+        core.batch_convert(["whatever.mp4"], out, start_number="abc")
+    except core.ValidationError as exc:
+        assert "start_number" in str(exc)
+    except Exception as exc:  # noqa: BLE001
+        raise AssertionError(f"应抛 ValidationError，实际 {type(exc).__name__}: {exc}")
+    else:
+        raise AssertionError("start_number='abc' 居然没报错")
+
+def test_batch_convert_does_not_override_explicit_software_choice(monkeypatch, tmp_path):
+    """显式选「软件编码」时，batch_convert 不能把它退回 None。
+
+    GUI 的「自动」档返回 ("", "", "software")。batch_convert 原来把非硬件
+    三元组一律折成 None 再传给 convert，而 convert 收到 None 会调
+    detect_hw_encoder() 自动探测 —— 在有 NVENC 的机器上，用户明确选的软件
+    编码被静默改成硬件编码。行为测试：记录 convert 实际收到的 encoder。
+    """
+    seen = []
+
+    def _fake_convert(src, out, **kw):
+        seen.append(kw.get("encoder"))
+        return (os.path.join(out, "VID_x.mp4"), None)
+
+    src = tmp_path / "in.mp4"
+    src.write_bytes(b"x" * 16)
+    monkeypatch.setattr(core, "convert", _fake_convert)
+    monkeypatch.setattr(core, "_card_timeline", lambda out: (None, 0))
+    monkeypatch.setattr(core, "_source_stamp", lambda p: "20240101_000000")
+    monkeypatch.setattr(core, "_unique_stamp", lambda stamp, out, used: stamp)
+    monkeypatch.setattr(core, "next_seq", lambda out: 0)
+    monkeypatch.setattr(core, "detect_hw_encoder",
+                        lambda: ("hevc_nvenc", "h264_nvenc", "NVIDIA"))
+
+    core.batch_convert([str(src)], str(tmp_path / "out"), encoder=("", "", "software"))
+    assert seen == [("", "", "software")], f"convert 收到 {seen!r}，软件选择被推翻"
+
+    # 硬件三元组照旧原样传下去
+    seen.clear()
+    core.batch_convert([str(src)], str(tmp_path / "out"),
+                       encoder=("hevc_nvenc", "h264_nvenc", "NVIDIA"))
+    assert seen == [("hevc_nvenc", "h264_nvenc", "NVIDIA")], seen

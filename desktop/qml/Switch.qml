@@ -16,9 +16,10 @@ Item {
         width: 32
         height: 20
         radius: 10
-        color: root.checked ? Theme.accent
-             : mouse.containsMouse ? Theme.divider
-             : Theme.divider
+        //   两个分支同色等于没有 hover 反馈：亮色下把轨道加深一档，
+        //   暗色下同理，都走 Theme 的语义色，不在这里写死。
+        color: root.checked ? (mouse.containsMouse ? Theme.accentHover : Theme.accent)
+             : (mouse.containsMouse ? Theme.sidebarBorder : Theme.divider)
         opacity: root.enabled ? 1 : 0.5
 
         Behavior on color {
@@ -35,7 +36,7 @@ Item {
         width: 16
         height: 16
         radius: 8
-        color: "#FFFFFF"
+        color: Theme.switchThumb
         anchors.verticalCenter: track.verticalCenter
         x: 2
         transform: Translate {

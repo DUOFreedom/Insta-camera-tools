@@ -4,10 +4,19 @@
 
 ### 产物重建与核对（本轮）
 
-- 桌面端 `desktop/dist/InstaAceQml.exe` 78,837,174 B，`--self-test` → `QML_OK roots=1`，exit 0。解包 `PYZ.pyz` 核对：`core._build_hw_transcode_cmd` 常量含 `qsv`/`amf`，`instbox.inst_transplant.video_gop` 的 `co_names` 含 `Path` 与 `read_bytes`，`moov_rewrap` 的 `co_names` 含 `_MAX_32BIT` 与 `zlib`、函数表含 `_chunk_offsets` 与 `udta_with_mcrc` —— 四处修复都在包里。
-- 桌面端 `desktop/dist/InstaAceImporter.exe` 39,077,617 B（经典版，同一套 `shared/` 代码）。
-- 安卓 `android/app/build/outputs/apk/release/app-release.apk` 75,281,867 B；单元测试 IndexTest 7 跳过 / ConsentLogicTest 5 / ImportCardStateTest 6，失败 0。解包 `assets/chaquopy/app.imy` 核对：`insta360_tf_import.video_gop` 的 `co_names` 含 `Path`，`insta_core._build_hw_transcode_cmd` 常量含 `qsv`/`amf` 与 `-g`，`camera_moov_rewrap` 的 `co_names` 含 `_MAX_32BIT` 与 `zlib`、函数表含 `_chunk_offsets` 与 `udta_with_mcrc`、`stco_box` 常量含 `co64`、`rebuild_stbl` 的元组常量含 `(b'stco', b'co64')`。
+- 桌面端 `desktop/dist/InstaAceQml.exe` 78,839,044 B，`--self-test` → `QML_OK roots=1`，exit 0。解包 `PYZ.pyz` 核对：`core._build_hw_transcode_cmd` 常量含 `qsv`/`amf`，`instbox.inst_transplant.video_gop` 的 `co_names` 含 `Path` 与 `read_bytes`，`moov_rewrap` 的 `co_names` 含 `_MAX_32BIT` 与 `zlib`、函数表含 `_chunk_offsets` 与 `udta_with_mcrc` —— 四处修复都在包里。
+- 桌面端 `desktop/dist/InstaAceImporter.exe` 39,079,354 B（经典版，同一套 `shared/` 代码）。
+- 安卓 `android/app/build/outputs/apk/release/app-release.apk` 75,281,949 B；单元测试 IndexTest 7 跳过 / ConsentLogicTest 5 / ImportCardStateTest 6，失败 0。解包 `assets/chaquopy/app.imy` 核对：`insta360_tf_import.video_gop` 的 `co_names` 含 `Path`，`insta_core._build_hw_transcode_cmd` 常量含 `qsv`/`amf` 与 `-g`，`camera_moov_rewrap` 的 `co_names` 含 `_MAX_32BIT` 与 `zlib`、函数表含 `_chunk_offsets` 与 `udta_with_mcrc`、`stco_box` 常量含 `co64`、`rebuild_stbl` 的元组常量含 `(b'stco', b'co64')`。
 - **APK 的字节数与 sha256 都不能当校验和**：同一份源码连编两次，签名（`META-INF/CERT.RSA`/`CERT.SF`/`MANIFEST.MF`）、`assets/chaquopy/build.json`、`assets/chaquopy/app.imy` 五项都会变。`app.imy` 里每个 pyc 只有第 8～12 字节（CPython 源文件 mtime 字段）不同，把这段清零后全部逐字节相同。要确认「装上去的就是这一轮构建的包」，解包比对 pyc 比比对哈希可靠。
+
+### 修复（审查报告里的三处小缺陷）
+
+- `desktop/gui.py:_resolve_encoder` 第一行是 `sel = self.hw_combo.currentText()`，把形参整个覆盖掉 —— 传什么进来都没用，永远读下拉框当前值。现在用形参，空串按「未选择」退回软件编码。同时把软件编码分支的返回值从字符串 `"software"` 改成三元组 `("", "", "software")`：`core.convert` 收到 `encoder=None` 会自动探测硬件，只有 `encoder[2] == "software"` 的元组才强制走软件编码；调用点原来还要再补一次 `enc if enc != "software" else (...)` 的隐式转换，两处都不该有这种约定。
+- `desktop/core.py` 与 `android/.../insta_core.py` 的 `batch_convert` 里 `base_seq = ... int(start_number)` 没有 try，非整数会抛裸 `ValueError`。GUI 只捕获本项目定义的异常，裸 `ValueError` 表现为未捕获崩溃。现在与 `_build_spec_tasks` 同口径，抛 `ValidationError("start_number 必须为整数: ...")`。
+- `desktop/core.py` 与 `android/.../insta_core.py` 的 `batch_convert` 把非硬件的 encoder 三元组一律折成 `None` 再传给 `convert`，而 `convert` 收到 `None` 会调 `detect_hw_encoder()` 自动探测 —— 用户在下拉框里明确选「自动（软件编码）」（三元组 `("", "", "software")`）时，在有 NVENC 的机器上会被静默改成硬件编码。现在原样把三元组传下去，`convert` 按 `encoder[2] == "software"` 判定走软件。
+- `desktop/qml/Switch.qml` 的轨道色两个分支都写 `Theme.divider`（等于没有 hover 反馈），滑块写死 `"#FFFFFF"`（暗色主题下刺眼）。`Theme.qml` 新增语义色 `switchThumb`（亮色 `#FFFFFF` / 暗色 `textPrimaryDark`），轨道 hover 改走 `Theme.accentHover` 与 `Theme.sidebarBorder`。
+
+新增 `test_resolve_encoder_returns_tuple_for_software`（形参优先 + 四种取值 + 空串/未知都退回三元组）、`test_batch_convert_rejects_non_integer_start_number`（两端源码都改了 + 真调一次确认抛 `ValidationError` 而不是 `ValueError`）、`test_batch_convert_does_not_override_explicit_software_choice`（桩掉 `convert` 记录它实际收到的 encoder，断言软件选择没被换成 `None`）。回滚验证：形参改回 `self.hw_combo.currentText()` → 红；`int(start_number)` 改回裸写法 → 红；`hw = encoder` 改回 `hw = None` → 红。全套 **117 passed, 2 skipped**。
 
 ### 修复（MCRC 按产物自己的 mdat 重算）
 

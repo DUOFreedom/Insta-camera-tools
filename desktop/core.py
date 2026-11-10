@@ -1319,7 +1319,16 @@ def batch_convert(file_list: list[str], output_dir: str,
     if cancel.is_set():
         raise CanceledError("已取消")
 
-    base_seq = next_seq(output_dir) if start_number is None else int(start_number)
+    if start_number is None:
+        base_seq = next_seq(output_dir)
+    else:
+        #   与 _build_spec_tasks 保持同一口径：非整数要报 ValidationError，
+        #   不能让裸 ValueError 冒到调用方（GUI 只处理本项目定义的异常）。
+        try:
+            base_seq = int(start_number)
+        except (TypeError, ValueError) as e:
+            raise ValidationError(
+                f"start_number 必须为整数: {start_number}") from e
     card_when, card_seq = _card_timeline(output_dir)
     use_card = bool(use_card_time) and card_when is not None
     if use_card and start_number is None:
@@ -1327,8 +1336,15 @@ def batch_convert(file_list: list[str], output_dir: str,
     success, failed = [], []
     if encoder is None:
         encoder = detect_hw_encoder()
-    hw = encoder if (isinstance(encoder, tuple) and len(encoder) == 3
-                     and encoder[2] != "software" and encoder[0]) else None
+    if (isinstance(encoder, tuple) and len(encoder) == 3
+            and encoder[2] != "software" and encoder[0]):
+        hw = encoder
+    else:
+        #   用户显式选了「自动（软件编码）」时，encoder 是 ("", "", "software")。
+        #   这里若退回 None，convert 收到 None 会再 detect_hw_encoder() 自动探测，
+        #   在有 NVENC 的机器上又变成硬件编码 —— 用户的显式选择被静默推翻。
+        #   传三元组本身即可：convert 判定 encoder[2] == "software" 就走软件。
+        hw = encoder
 
     total = len(file_list)
     used_names = set()
