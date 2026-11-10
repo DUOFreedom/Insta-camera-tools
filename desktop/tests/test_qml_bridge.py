@@ -189,7 +189,7 @@ def test_auto_detect_sample_picks_vid_from_output_dir(bridge, tmp_path, monkeypa
     picked = []
     monkeypatch.setattr(bridge, "setSample", lambda p: picked.append(p))
 
-    bridge.autoDetectSample(str(out))
+    bridge.autoDetectSample(str(out), sync_for_test=True)
 
     assert picked == [str(vid)]
     assert bridge.lastError == ""
@@ -206,7 +206,7 @@ def test_auto_detect_sample_prefers_vid_over_lrv(bridge, tmp_path, monkeypatch):
     picked = []
     monkeypatch.setattr(bridge, "setSample", lambda p: picked.append(p))
 
-    bridge.autoDetectSample(str(out))
+    bridge.autoDetectSample(str(out), sync_for_test=True)
 
     assert picked == [str(vid)]
 
@@ -220,7 +220,7 @@ def test_auto_detect_sample_reports_when_nothing_found(bridge, tmp_path, monkeyp
     monkeypatch.setattr(os.path, "isdir",
                         lambda p: False if p.endswith(":\\") else real_isdir(p))
 
-    bridge.autoDetectSample(str(empty))
+    bridge.autoDetectSample(str(empty), sync_for_test=True)
 
     assert "未在存储卡中自动找到原生录制视频" in bridge.lastError
 

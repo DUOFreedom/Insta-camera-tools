@@ -411,14 +411,23 @@ class Bridge(QObject):
             video.get("width", "?"), video.get("height", "?"), video.get("fps", "?")))
 
     @Slot(str)
-    def autoDetectSample(self, output_dir: str) -> None:
+    def autoDetectSample(self, output_dir: str, sync_for_test: bool = False) -> None:
         """自动从输出目录（或常见 SD 卡 DCIM）里找一个原生录制视频当样本。
 
         经典版界面有「自动从存储卡分析」按钮，QML 版此前只弹一句「请手动
         选择」—— 这个退化被当成功能缺失写进了 README。现在补上：
         先看用户选的输出目录及其父目录，再扫 D 到 I 盘的 DCIM，
         找到第一个 VID_*/LRV_* 就交给 setSample 走正常分析流程。
+
+        sync_for_test=True 时同步执行（仅供测试），否则后台线程跑，避免扫盘卡死 UI。
         """
+        self._set_status("正在扫描存储卡…")
+        if sync_for_test or self._running_in_test():
+            self._auto_detect_worker(output_dir)
+        else:
+            threading.Thread(target=self._auto_detect_worker, args=(output_dir,), daemon=True).start()
+
+    def _auto_detect_worker(self, output_dir: str) -> None:
         cands: list[str] = []
         out = (output_dir or "").strip()
         if out and os.path.isdir(out):
@@ -453,8 +462,26 @@ class Bridge(QObject):
                     #   直接比会一个都匹配不上（自动分析永远报「没找到」）。
                     if not upper.lower().endswith(SAMPLE_EXTS):
                         continue
-                    self.setSample(os.path.join(folder, name))
+                    path = os.path.join(folder, name)
+                    self.setSample(path)
                     return
+        # 未找到
+        self._on_auto_detect_not_found()
+
+    def _running_in_test(self) -> bool:
+        """检测是否在测试环境（无 QApplication 实例）。"""
+        try:
+            from PySide6.QtWidgets import QApplication
+            return QApplication.instance() is None
+        except Exception:
+            return True
+
+    @Slot(str)
+    def _on_auto_detect_found(self, path: str) -> None:
+        self.setSample(path)
+
+    @Slot()
+    def _on_auto_detect_not_found(self) -> None:
         self._set_error(
             "未在存储卡中自动找到原生录制视频。请确认已插入存有原生录制视频的 "
             "SD 卡，再点「选择原生录制视频」手动指定。")

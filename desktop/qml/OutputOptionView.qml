@@ -11,18 +11,19 @@ Rectangle {
     property string sequenceHint: ""
     property string coverSummary: ""
     property string coverImage: ""
+    property string modelOverride: "auto"
 
     signal browseOutput()
     signal locateCard()
     signal pickCover()
     signal clearCovers()
     signal verifyCard()
-    //   保留但禁用：编码器选择目前只改 root.encoder，由 start() 一并读走，
-    //   没有谁需要单独被通知。信号留着是因为外部将来可能想监听；发射点
-    //   已停，避免一个没人处理的信号每点一次都白跑一遍绑定。
     signal encoderSelected(string value)
+    signal modelOverrideSelected(string value)
 
     readonly property var encoders: ["自动", "AMD", "NVIDIA", "Intel", "软件 (CPU)"]
+    readonly property var models: ["auto", "ace_pro_2", "go_ultra"]
+    readonly property var modelLabels: ["自动（从卡里原片量出）", "Ace Pro 2", "GO Ultra"]
 
     radius: 12
     color: Theme.card
@@ -45,6 +46,43 @@ Rectangle {
             font.weight: Font.DemiBold
             lineHeightMode: Text.FixedHeight
             lineHeight: Theme.fontTitleLine
+        }
+
+        Row {
+            width: parent.width
+            spacing: 8
+
+            Text {
+                anchors.verticalCenter: parent.verticalCenter
+                width: 64
+                text: "机型"
+                color: Theme.textPrimary
+                font.family: Theme.fontFamily
+                font.pixelSize: Theme.fontBodySize
+                font.weight: Font.Normal
+            }
+
+            AppButton {
+                id: modelTrigger
+                width: 160
+                text: root.modelLabels[root.models.indexOf(root.modelOverride)]
+                btnHeight: 36
+                accent: false
+                onClicked: modelPopover.open = !modelPopover.open
+            }
+
+            Text {
+                anchors.verticalCenter: parent.verticalCenter
+                width: parent.width - 64 - 8 - 160 - 8
+                text: "选机型后按预设参数生成；选「自动」时若有原片仍优先用原片"
+                color: Theme.textSecondary
+                font.family: Theme.fontFamily
+                font.pixelSize: Theme.fontAuxSize
+                font.weight: Font.Normal
+                lineHeightMode: Text.FixedHeight
+                lineHeight: Theme.fontAuxLine
+                elide: Text.ElideRight
+            }
         }
 
         Row {
@@ -263,7 +301,56 @@ Rectangle {
                     onClicked: {
                         root.encoder = modelData
                         encoderPopover.open = false
-                        // root.encoderSelected(modelData)  // 见上方「保留但禁用」
+                    }
+                }
+            }
+        }
+    }
+
+    Popover {
+        id: modelPopover
+        parent: modelTrigger
+        width: modelTrigger.width
+
+        readonly property real winY: modelTrigger.mapToItem(null, 0, 0).y
+        readonly property real winH: modelTrigger.Window ? modelTrigger.Window.height : 720
+        readonly property bool flipUp: winY + modelTrigger.height + 8 + height > winH
+
+        x: 0
+        y: flipUp ? -height - 4 : modelTrigger.height + 4
+
+        Repeater {
+            model: root.models
+
+            delegate: Item {
+                width: modelPopover.width - 16
+                height: 32
+
+                Rectangle {
+                    anchors.fill: parent
+                    radius: 8
+                    color: hover.containsMouse ? Theme.divider : "transparent"
+                }
+
+                Text {
+                    anchors.left: parent.left
+                    anchors.leftMargin: 8
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: root.modelLabels[index]
+                    color: Theme.textPrimary
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.fontBodySize
+                    font.weight: Font.Normal
+                }
+
+                MouseArea {
+                    id: hover
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    onClicked: {
+                        root.modelOverride = modelData
+                        modelPopover.open = false
+                        root.modelOverrideSelected(modelData)
                     }
                 }
             }
