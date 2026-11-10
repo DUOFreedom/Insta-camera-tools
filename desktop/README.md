@@ -1,4 +1,4 @@
-﻿<div align="center">
+<div align="center">
 
 <img src="assets/app.svg" width="120" alt="影石相机工具">
 
@@ -8,6 +8,8 @@
 
 转码成相机原生结构（VID + LRV）· 移植 `inst` box · 登记相机索引
 插回相机，相册里能识别、能播放、封面正确
+
+[English](../README.en.md) · [中文](README.md)
 
 [![Version](https://img.shields.io/badge/version-1.2.0-blue?style=flat-square)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-GPL--3.0-green?style=flat-square)](LICENSE)
