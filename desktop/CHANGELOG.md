@@ -8,6 +8,16 @@
 - 安卓 `android/app/build/outputs/apk/release/app-release.apk` 75,279,797 B；单元测试 IndexTest 7 跳过 / ConsentLogicTest 5 / ImportCardStateTest 6，失败 0。解包 `assets/chaquopy/app.imy` 核对：`insta360_tf_import.video_gop` 的 `co_names` 含 `Path`，`insta_core._build_hw_transcode_cmd` 常量含 `qsv`/`amf` 与 `-g`。
 - **APK 的字节数与 sha256 都不能当校验和**：同一份源码连编两次，签名（`META-INF/CERT.RSA`/`CERT.SF`/`MANIFEST.MF`）、`assets/chaquopy/build.json`、`assets/chaquopy/app.imy` 五项都会变。`app.imy` 里每个 pyc 只有第 8～12 字节（CPython 源文件 mtime 字段）不同，把这段清零后全部逐字节相同。要确认「装上去的就是这一轮构建的包」，解包比对 pyc 比比对哈希可靠。
 
+### 修复（安卓副本补齐 co64，两份 rebuild_stbl 都认 co64）
+
+`android/app/src/main/python/camera_moov_rewrap.py` 是 `shared/instbox/moov_rewrap.py` 的手工同步副本，但只跟了一半：shared 版早就支持 64 位 chunk offset 表（`_MAX_32BIT` / `_chunk_offsets` / `make_box` 的 largesize / `stco_box` 自动切 co64），安卓副本一样都没有。后果是读 co64 模板直接 `KeyError: b'stco'`，写超过 4 GiB 的偏移会静默截断成错位的值 —— 表现为相机能列出条目但打不开。
+
+顺带发现两份的 `rebuild_stbl` 都只认 `b"stco"`：模板里若是 co64，这一块会被原样拷过去，偏移还是模板的，新文件全错位且不报错。现在改成 `if kind in (b"stco", b"co64"):`，写出时由 `stco_box` 按偏移量自动选 32/64 位。
+
+新增 2 条测试：`test_rewrap_copies_read_co64`（**行为测试**：真造一个 co64 box 喂给两份副本的 `_chunk_offsets`，断言读出正确的 64 位偏移；顺带验 32 位 stco 仍能读）与 `test_stco_box_switches_to_co64_above_4gib`。回滚验证：安卓副本的 `if b"co64" in table:` 改成 `if False:` → 红；shared 的 `rebuild_stbl` 改回只认 stco → 红。全套 **113 passed, 2 skipped**，并用真机素材重跑端到端导入确认无回归（产物 GOP 120/10、AMBA 120/10、帧数 179/89）。
+
+**教训**：这一对副本长期漂移的根因是**没有守卫测试**。第一版守卫只 grep 源码字符串，把 `if b"co64" in table:` 改成 `if False:` 仍然全绿 —— 必须真造 box 喂进去才拦得住。
+
 ### 修复（序列号定位从「碰巧对」改成有依据）
 
 `extract_inst_meta` 原先靠「inst 里最后一个 `0a 0e` + 14 字节全字母数字」找序列号。逆向报告实测：真机 inst 里裸 `0a 0e` 各出现 **27 次**，严格过滤后只剩 1 个候选 —— 这两份样本上结果是对的，但传感器数据区里只要出现 14 个连续字母数字就会选错。

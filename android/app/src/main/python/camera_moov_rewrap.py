@@ -28,8 +28,32 @@ def box_bytes(data: bytes, box) -> bytes:
     return data[off:off + size]
 
 
+_MAX_32BIT = 0xFFFFFFFF
+
+
 def make_box(kind: bytes, payload: bytes) -> bytes:
-    return struct.pack(">I4s", len(payload) + 8, kind) + payload
+    """构造一个 MP4 box；超过 4 GiB 时改用 64 位长度。
+
+    32 位 size 装不下 >4 GiB 的 payload（1080p HEVC 约 30 分钟以上就超），
+    旧实现在这里静默写出非法长度，产物相机打不开。
+    """
+    size = len(payload) + 8
+    if size <= _MAX_32BIT:
+        return struct.pack(">I4s", size, kind) + payload
+    return struct.pack(">I4sQ", 1, kind, len(payload) + 16) + payload
+
+
+def _chunk_offsets(data: bytes, table: dict) -> list:
+    """读取 chunk offset 表，同时支持 32 位的 stco 与 64 位的 co64。"""
+    if b"stco" in table:
+        box = table[b"stco"]
+        count = struct.unpack_from(">I", data, box[0] + 12)[0]
+        return list(struct.unpack_from(f">{count}I", data, box[0] + 16))
+    if b"co64" in table:
+        box = table[b"co64"]
+        count = struct.unpack_from(">I", data, box[0] + 12)[0]
+        return list(struct.unpack_from(f">{count}Q", data, box[0] + 16))
+    raise ValueError("stbl 里既没有 stco 也没有 co64，文件结构异常")
 
 
 def children(data: bytes, box):
@@ -72,9 +96,7 @@ def samples(data: bytes, trak) -> list[bytes]:
     sizes = [constant] * count if constant else list(
         struct.unpack_from(f">{count}I", data, stsz[0] + 20)
     )
-    stco = table[b"stco"]
-    chunks = struct.unpack_from(">I", data, stco[0] + 12)[0]
-    offsets = struct.unpack_from(f">{chunks}I", data, stco[0] + 16)
+    offsets = _chunk_offsets(data, table)
     stsc = table[b"stsc"]
     entry_count = struct.unpack_from(">I", data, stsc[0] + 12)[0]
     entries = [struct.unpack_from(">III", data, stsc[0] + 16 + i * 12) for i in range(entry_count)]
@@ -98,6 +120,14 @@ def samples(data: bytes, trak) -> list[bytes]:
 
 
 def stco_box(offsets: list[int]) -> bytes:
+    """写出 chunk offset 表：任一偏移超 32 位时自动改用 co64。
+
+    静默截断会写出错位的值，表现为相机能列出条目但打不开。
+    """
+    if any(value > _MAX_32BIT for value in offsets):
+        payload = b"\0\0\0\0" + struct.pack(">I", len(offsets))
+        payload += b"".join(struct.pack(">Q", value) for value in offsets)
+        return make_box(b"co64", payload)
     payload = b"\0\0\0\0" + struct.pack(">I", len(offsets))
     payload += b"".join(struct.pack(">I", value) for value in offsets)
     return make_box(b"stco", payload)
@@ -177,7 +207,9 @@ def rebuild_stbl(
     rebuilt = []
     for item in children(native_data, native_stbl):
         kind = item[2]
-        if kind == b"stco":
+        if kind in (b"stco", b"co64"):
+            #   模板里可能是 64 位的 co64（相机卡录超 4 GiB 时就是）。只认
+            #   stco 会把 co64 原样拷过去 —— 偏移还是模板的，新文件全错位。
             rebuilt.append(stco_box(offsets))
         elif kind == b"stsd":
             rebuilt.append(box_bytes(generated_data, generated[kind]))

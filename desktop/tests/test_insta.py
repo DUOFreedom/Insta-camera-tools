@@ -1308,3 +1308,55 @@ def test_extract_inst_meta_prefers_serial_followed_by_model():
         assert "Insta360" in body, f"{label} 没有用机型名做判据"
         assert "回退到宽松规则" in body, f"{label} 没有保留宽松回退"
         assert body.index("Insta360") < body.index("回退到宽松规则"),             f"{label} 的强特征分支必须排在回退之前"
+
+
+def _load_rewrap_module(path, name):
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(name, path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def test_rewrap_copies_read_co64():
+    """两份 moov_rewrap 都必须能读 64 位 chunk offset 表（co64）。
+
+    安卓副本此前只有 32 位 stco：读 co64 模板会 KeyError，写超 4 GiB 偏移会
+    截断成错位的值，产物相机能列出条目但打不开。
+    """
+    for label, path in (
+        ("shared", os.path.join(SHARED, "instbox", "moov_rewrap.py")),
+        ("android", os.path.join(os.path.dirname(ROOT), "android", "app",
+                                 "src", "main", "python", "camera_moov_rewrap.py")),
+    ):
+        mod = _load_rewrap_module(path, "rewrap_" + label)
+        assert hasattr(mod, "_chunk_offsets"), f"{label} 没有 co64 读取"
+        # 造一个 co64 box：size(4) + 'co64'(4) + version/flags(4) + count(4) + 2×u64
+        offs = [0x1_0000_0000, 0x2_0000_0000]
+        payload = b"\0\0\0\0" + struct.pack(">I", 2)
+        payload += b"".join(struct.pack(">Q", v) for v in offs)
+        data = struct.pack(">I4s", len(payload) + 8, b"co64") + payload
+        got = mod._chunk_offsets(data, {b"co64": (0, len(data), b"co64")})
+        assert got == offs, f"{label} 读 co64 得到 {got}"
+        # 32 位 stco 仍要能读
+        p32 = b"\0\0\0\0" + struct.pack(">I", 2) + struct.pack(">2I", 5, 6)
+        d32 = struct.pack(">I4s", len(p32) + 8, b"stco") + p32
+        assert mod._chunk_offsets(d32, {b"stco": (0, len(d32), b"stco")}) == [5, 6]
+        # rebuild_stbl 必须同时认两种
+        src = io.open(path, encoding="utf-8-sig").read()
+        assert 'kind in (b"stco", b"co64")' in src, (
+            f"{label} 的 rebuild_stbl 仍只认 stco")
+
+
+def test_stco_box_switches_to_co64_above_4gib():
+    """偏移超 32 位时必须改用 co64，而不是静默截断。"""
+    big = [1, 2, 0x1_0000_0000]
+    box = rw.stco_box(big)
+    kind = box[4:8]
+    assert kind == b"co64", f"超 32 位偏移仍写成 {kind!r}"
+    count = struct.unpack_from(">I", box, 12)[0]
+    assert count == 3
+    assert list(struct.unpack_from(">3Q", box, 16)) == big
+    # 普通偏移仍用 32 位的 stco（相机侧兼容性最好）
+    small = rw.stco_box([1, 2, 3])
+    assert small[4:8] == b"stco"

@@ -233,7 +233,9 @@ def rebuild_stbl(
     rebuilt = []
     for item in children(native_data, native_stbl):
         kind = item[2]
-        if kind == b"stco":
+        if kind in (b"stco", b"co64"):
+            #   模板里可能是 64 位的 co64（相机卡录超 4 GiB 时就是）。只认
+            #   stco 会把 co64 原样拷过去 —— 偏移还是模板的，新文件全错位。
             rebuilt.append(stco_box(offsets))
         elif kind == b"stsd":
             rebuilt.append(box_bytes(generated_data, generated[kind]))
