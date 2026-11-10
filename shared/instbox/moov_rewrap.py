@@ -26,6 +26,7 @@ import argparse
 import shutil
 import struct
 import sys
+import zlib
 from fractions import Fraction
 from pathlib import Path
 
@@ -186,6 +187,29 @@ def strip_sei(sample: bytes, *, hevc: bool) -> bytes:
     if pos != len(sample) or not kept:
         raise ValueError("invalid or empty access unit after stripping SEI")
     return bytes(kept)
+
+
+def udta_with_mcrc(udta: bytes, mdat: bytes) -> bytes:
+    """把 udta 里 MCRC box 的校验和改成这条 mdat 自己的。
+
+    实测 MCRC 的 body 是三个小端 u32：`crc32(mdat payload)`、payload 长度、
+    0。GO Ultra 的 VID 有这个 box、LRV 没有，Ace Pro 2 两轨都没有。
+
+    udta 是从【模板】拷过来的，MCRC 里存的是模板那条码流的校验和。不重算
+    就等于给相机一张对不上的凭据 —— 相机若校验，产物会被判成损坏；实测相机
+    目前不校验，但没理由留着一个已知是错的值。
+    """
+    buf = bytearray(udta)
+    boxes = [item for item in insta.child_boxes(buf, 8, len(buf)) if item[2] == b"MCRC"]
+    if not boxes:
+        return bytes(buf)
+    offset, size, _ = boxes[0]
+    if size < 20:
+        raise ValueError(f"MCRC box 长度异常: {size}")
+    payload = mdat[8:] if mdat[4:8] == b"mdat" else mdat
+    struct.pack_into("<III", buf, offset + 8,
+                     zlib.crc32(payload) & 0xFFFFFFFF, len(payload), 0)
+    return bytes(buf)
 
 
 def udta_with_audio_frames(data: bytes, udta_box, audio_frames: int) -> bytes:
@@ -428,7 +452,10 @@ def rebuild_media(generated: Path, native: Path, output: Path, reference_meta: b
         if kind == b"mvhd":
             moov_parts.append(box_bytes(generated_data, gen_children[kind]))
         elif kind == b"udta":
-            moov_parts.append(udta_with_audio_frames(generated_data, gen_children[kind], len(audio_samples)))
+            moov_parts.append(udta_with_mcrc(
+                udta_with_audio_frames(generated_data, gen_children[kind], len(audio_samples)),
+                mdat,
+            ))
         elif kind == b"trak":
             mdia = child(native_data, item, b"mdia")
             hdlr = child(native_data, mdia, b"hdlr")

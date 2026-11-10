@@ -33,6 +33,7 @@ import io
 import os
 import shutil
 import struct
+import zlib
 import sys
 import tempfile
 import threading
@@ -1360,3 +1361,32 @@ def test_stco_box_switches_to_co64_above_4gib():
     # 普通偏移仍用 32 位的 stco（相机侧兼容性最好）
     small = rw.stco_box([1, 2, 3])
     assert small[4:8] == b"stco"
+
+
+def test_udta_with_mcrc_recomputes_for_own_mdat():
+    """MCRC 必须按本文件自己的 mdat 重算，不能照抄模板的校验和。
+
+    真机 GO Ultra 的 VID 带 MCRC（三个小端 u32：crc32(mdat payload)、
+    payload 长度、0），LRV 没有。udta 是从模板拷来的，里面存的是模板那条
+    码流的校验和；不重算就是给相机一张对不上的凭据。
+    """
+    for label, path in (
+        ("shared", os.path.join(SHARED, "instbox", "moov_rewrap.py")),
+        ("android", os.path.join(os.path.dirname(ROOT), "android", "app",
+                                 "src", "main", "python", "camera_moov_rewrap.py")),
+    ):
+        mod = _load_rewrap_module(path, "mcrc_" + label)
+        assert hasattr(mod, "udta_with_mcrc"), f"{label} 没有 udta_with_mcrc"
+        payload = b"hello mdat payload" * 7
+        mdat = struct.pack(">I4s", len(payload) + 8, b"mdat") + payload
+        want = zlib.crc32(payload) & 0xFFFFFFFF
+        # 模板里存的是错的（随便一个值），重算后必须变成真的
+        stale = struct.pack(">I4s", 20, b"MCRC") + struct.pack("<III", 0xDEADBEEF, 999, 0)
+        udta = struct.pack(">I4s", 8 + len(stale), b"udta") + stale
+        out = mod.udta_with_mcrc(udta, mdat)
+        crc, length, zero = struct.unpack_from("<III", out, 16)
+        assert (crc, length, zero) == (want, len(payload), 0), \
+            f"{label} 没重算 MCRC: {(crc, length, zero)} != {(want, len(payload), 0)}"
+        # 没有 MCRC 的 udta（LRV / Ace Pro 2）必须原样返回，不能凭空加一个
+        plain = struct.pack(">I4s", 8, b"udta")
+        assert mod.udta_with_mcrc(plain, mdat) == plain, f"{label} 给没有 MCRC 的 udta 加了 box"

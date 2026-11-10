@@ -9,6 +9,16 @@
 - 安卓 `android/app/build/outputs/apk/release/app-release.apk` 75,280,997 B；单元测试 IndexTest 7 跳过 / ConsentLogicTest 5 / ImportCardStateTest 6，失败 0。解包 `assets/chaquopy/app.imy` 核对：`insta360_tf_import.video_gop` 的 `co_names` 含 `Path`，`insta_core._build_hw_transcode_cmd` 常量含 `qsv`/`amf` 与 `-g`，`camera_moov_rewrap` 的 `co_names` 含 `_MAX_32BIT`、函数表含 `_chunk_offsets`、`stco_box` 常量含 `co64`、`rebuild_stbl` 的元组常量含 `(b'stco', b'co64')`。
 - **APK 的字节数与 sha256 都不能当校验和**：同一份源码连编两次，签名（`META-INF/CERT.RSA`/`CERT.SF`/`MANIFEST.MF`）、`assets/chaquopy/build.json`、`assets/chaquopy/app.imy` 五项都会变。`app.imy` 里每个 pyc 只有第 8～12 字节（CPython 源文件 mtime 字段）不同，把这段清零后全部逐字节相同。要确认「装上去的就是这一轮构建的包」，解包比对 pyc 比比对哈希可靠。
 
+### 修复（MCRC 按产物自己的 mdat 重算）
+
+真机 GO Ultra 的 VID 在 udta 里有 `MCRC` box（LRV 没有，Ace Pro 2 两轨都没有），body 是三个**小端** u32：`crc32(mdat payload)`、payload 长度、0。实测真机 VID：`crc=0xbabae49c len=20843369`，与它自己 mdat 的 crc32 和长度逐项相等，语义确认。
+
+`udta` 整个是从模板拷过来的，所以 MCRC 里存的一直是**模板那条码流**的校验和。端到端跑一遍就能看出来：产物的 mdat 是 `crc=0x55076e01 len=3239859`，而 MCRC 里还写着模板的 `0xbabae49c / 20843369`。相机目前不校验这个字段，但没理由留一个已知是错的值。
+
+两份 `moov_rewrap` 各加 `udta_with_mcrc(udta, mdat)`：有 MCRC 就按本文件 mdat 重算（`zlib.crc32(payload)` + 长度 + 0），没有就原样返回 —— 不能给 LRV 凭空加一个模板里没有的 box。`rebuild_media` 里包在 `udta_with_audio_frames` 外层。
+
+新增 `test_udta_with_mcrc_recomputes_for_own_mdat`（两份副本各验一遍：错的值必须被改成真的；没有 MCRC 的 udta 必须逐字节不变）。回滚验证：在函数里加一行提前 `return bytes(buf)` → 红。全套 **114 passed, 2 skipped**，真机素材重跑端到端确认产物 `MCRC crc/len` 与自身 mdat 一致。
+
 ### 修复（安卓副本补齐 co64，两份 rebuild_stbl 都认 co64）
 
 `android/app/src/main/python/camera_moov_rewrap.py` 是 `shared/instbox/moov_rewrap.py` 的手工同步副本，但只跟了一半：shared 版早就支持 64 位 chunk offset 表（`_MAX_32BIT` / `_chunk_offsets` / `make_box` 的 largesize / `stco_box` 自动切 co64），安卓副本一样都没有。后果是读 co64 模板直接 `KeyError: b'stco'`，写超过 4 GiB 的偏移会静默截断成错位的值 —— 表现为相机能列出条目但打不开。
