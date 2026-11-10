@@ -3,6 +3,9 @@ import QtQuick
 Rectangle {
     id: root
     property string status: "未设置样本（回退到影石默认结构）"
+    //   样本结构摘要：解析成功后摊开给用户看，否则「样本已读取」四个字
+    //   分不清是真读到了还是拿到一份空结构。
+    property string summary: ""
 
     signal pickSample()
     signal autoDetect()
@@ -71,6 +74,19 @@ Rectangle {
             lineHeightMode: Text.FixedHeight
             lineHeight: Theme.fontAuxLine
             elide: Text.ElideRight
+        }
+
+        Text {
+            width: parent.width
+            visible: root.summary !== ""
+            text: root.summary
+            color: Theme.textSecondary
+            font.family: Theme.fontFamily
+            font.pixelSize: Theme.fontAuxSize
+            font.weight: Font.Normal
+            lineHeightMode: Text.FixedHeight
+            lineHeight: Theme.fontAuxLine
+            wrapMode: Text.Wrap
         }
     }
 }

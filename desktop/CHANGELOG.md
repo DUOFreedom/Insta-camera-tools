@@ -11,7 +11,26 @@
 - **开工前体检 `preflight`**：`core.preflight()` 新增 `template_names` 参数（先按用户选的样本对取模板，取不到再回落 `find_native_template`）；`desktop/bridge.py` 的 `start()` 在动手前调用它，`blocking` 非空就中止并显示「开始前检查未通过：…」，`warnings` 写进 import.log。
 - **自动分析样本**：新增 `Bridge.autoDetectSample(output_dir)`。先看输出目录及其父目录，再扫 D 到 I 盘的 `DCIM` / `DCIM\Camera01` / `DCIM\100MEDIA`，找到就用 `setSample()` 走正常分析。**VID 优先于 LRV** —— 按字母序 `LRV_` 排在 `VID_` 前面，直接取第一个会把代理轨当样本，而代理轨的分辨率/帧率/GOP 都与主轨不同。扩展名用新增的 `SAMPLE_EXTS`（在 `VIDEO_EXTS` 基础上加 `.lrv`/`.insv`/`.ins`）：`VIDEO_EXTS` 不含 `.lrv`，用它会让 LRV 分支永远匹配不到、VID 优先的逻辑形同虚设。
 - **转换中关窗**：新增 `desktop/tray.py`（`QSystemTrayIcon` 封装 + `showRequested`/`quitRequested`/`notify`）。`main.py` 改用 `QApplication`（`QMenu` 是 QWidget，`QGuiApplication` 下报 `QWidget: Cannot create a QWidget without QApplication`）并 `setQuitOnLastWindowClosed(False)`；`main.qml` 的 `onClosing` 在转换中弹窗给两个出路 —— 「停止并退出」（`bridge.cancel()` + `waitWorker(20000)` 成功才退出）与「最小化到托盘」（窗口隐藏、转换继续、跑完弹提示）。此前 QML 版只拦截、不给选择，直接退出会让 ffmpeg 变孤儿继续往相机卡写。
-- **仍缺**：封面选择（`OutputOptionView.qml` 的按钮还是 `onClicked: {}`，`bridge.py` 里 `cover` 零命中）、断点续跑（`core.load_job`/`save_job` 无调用方）、卡校验（`core.verify_card` 无界面入口）。这三项写进 README 的「桌面端还缺什么」，不再声称两套界面功能等价。
+- 删除时仍缺的封面选择、断点续跑、卡校验，已在下一节补齐（不再有缺口）。
+
+### 新增（QML 版补齐经典版全部功能）
+
+删掉经典版时 QML 侧缺九项，本节一并补齐，每项都有测试（`desktop/tests/test_qml_bridge.py`，全套 126 → 160 passed）。
+
+- **封面选择**：`Bridge.covers`（键是 `normpath`，不用原字符串，否则正反斜杠两种写法取不到）+ `pickCover` / `clearCovers`。加文件时按 `core.default_cover_for` 自动配对同名图（`a.mp4` + `a.jpg`），`clearCovers` 不是简单清空而是**重新按同名图配一遍**。多视频时 `pickCover` 直接拒绝 —— 猜「这张图配哪个视频」猜错会让 A 用上 B 的封面，而且极难发现。`_run` 里按 `os.path.normpath(src)` 取 `cover=` 传给 `import_with_inst`。
+- **断点续跑**：`Bridge.checkResume` 读 `core.load_job`，只统计「这次列表里也有」的已完成条目；`start()` 在 `_resume_only` 时把 `files` 换成未完成的那几条。`_run` 开头**先继承旧 job 再合并本次列表** —— 续跑时 `files` 只是未完成几条，直接重建会把已完成记录抹掉，再取消一次就全白跑。新增 `_job_item(job, src)` 按 `normpath` 查条目，因为合并后索引与 `files` 不再一一对应。每步 `running` → 保存 → `done`/`failed` → 再保存；`CanceledError` 时**保持 running**（下次还要跑它）。
+- **卡校验与清理**：`Bridge.verifyCard`（后台线程，卡里几百条要跑几秒）/ `repairCard`。结果拼成「共 N 条索引：正常 X，异常 Y」+ 前 15 条明细，同时写 import.log。
+- **定位 SD 卡**：`Bridge.locateCard` 扫 D 到 I 盘的 `DCIM\Camera01` / `DCIM\100MEDIA` / `DCIM`，找到后由 `locatedChanged` 反填输出目录。
+- **单条移除**：`Bridge.removeFile`，连带清掉该条的封面缓存。
+- **硬件编码器探测**：`Bridge.detectHardware`（后台线程，探测要真编一次）。`_download_ffmpeg` 成功后**重置 `_hw_checked` 并重探** —— 启动那次因为找不到 ffmpeg 直接放弃，不重置的话用户装完 ffmpeg 仍然看到「未检测到可用硬件编码器」。
+- **样本结构摘要**：`Bridge.specSummary`，摊开主视频/预览的分辨率帧率编码、色域、音频轨数。`setSample` 里必须单独 `specChanged.emit()` —— `specSummary` 是另一个 Property，漏了这行界面上「样本已读取」会亮而摘要一直空着。
+- **下一序号提示**：`Bridge.refreshSequence`，显示「自动续接，下一序号 003」。没有它用户不知道这次从几号开始，容易和卡里已有文件撞号。
+- **拖拽添加**：`main.qml` 加 `DropArea`（`z: 20`，**必须在内容之上**，压在 Column 下面怎么拖都没反应）→ `Bridge.addPaths`，文件夹展开一层，非视频文件给明确提示而不是静默无反应。
+
+顺带修掉两个真缺陷：
+
+- **封面预览永远是空的**：`Avatar` 的 `Image.source` 只认 URL，`coverImage` 原来返回裸路径 `C:/a.jpg`，QML 会解析成相对路径、加载状态是 Error 但**没有任何报错**，界面上就是一块空白（实测 `Image.status == 2`）。改为 `QUrl.fromLocalFile(path).toString()`。
+- **`lastError` 粘性**：`InputFileView` 把 `state` 接到 `bridge.lastError`，一条「请先添加要转换的视频」会让文件区永久显示「出错了」，直到下次点开始才清。改为只反映列表自身状态，错误统一由 `ActionView` 显示，并加「知道了」按钮调 `Bridge.clearError`。
 
 `desktop/tools/make_icon.py` 从 PyQt5 移植到 PySide6（否则删掉 PyQt5 后这个工具直接 ImportError）。
 

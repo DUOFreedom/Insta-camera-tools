@@ -8,6 +8,7 @@ Rectangle {
 
     signal start()
     signal cancel()
+    signal dismissError()
 
     radius: 12
     color: Theme.card
@@ -44,17 +45,30 @@ Rectangle {
             }
         }
 
-        Text {
+        Row {
             width: parent.width
             visible: root.hasError && !root.running
-            text: root.errorText
-            color: Theme.error
-            font.family: Theme.fontFamily
-            font.pixelSize: Theme.fontAuxSize
-            font.weight: Font.Normal
-            lineHeightMode: Text.FixedHeight
-            lineHeight: Theme.fontAuxLine
-            wrapMode: Text.Wrap
+            spacing: 8
+
+            Text {
+                width: parent.width - 72
+                anchors.verticalCenter: parent.verticalCenter
+                text: root.errorText
+                color: Theme.error
+                font.family: Theme.fontFamily
+                font.pixelSize: Theme.fontAuxSize
+                font.weight: Font.Normal
+                lineHeightMode: Text.FixedHeight
+                lineHeight: Theme.fontAuxLine
+                wrapMode: Text.Wrap
+            }
+
+            AppButton {
+                text: "知道了"
+                btnHeight: 28
+                accent: false
+                onClicked: root.dismissError()
+            }
         }
     }
 }

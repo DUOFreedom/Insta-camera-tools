@@ -9,6 +9,7 @@ Rectangle {
     signal addVideo()
     signal addFolder()
     signal clearAll()
+    signal removeFile(string path)
 
     radius: 12
     color: Theme.card
@@ -71,7 +72,7 @@ Rectangle {
                     anchors.left: parent.left
                     anchors.leftMargin: 8
                     anchors.right: parent.right
-                    anchors.rightMargin: 8
+                    anchors.rightMargin: 32
                     anchors.verticalCenter: parent.verticalCenter
                     text: modelData
                     elide: Text.ElideMiddle
@@ -85,6 +86,33 @@ Rectangle {
                     id: hover
                     anchors.fill: parent
                     hoverEnabled: true
+                }
+
+                //   单个移除：加错一个文件时不用整表清空重来。
+                Rectangle {
+                    id: removeBtn
+                    anchors.right: parent.right
+                    anchors.rightMargin: 4
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: 24
+                    height: 24
+                    radius: 12
+                    visible: hover.containsMouse
+                    color: removeArea.containsMouse ? Theme.divider : "transparent"
+
+                    AppIcon {
+                        anchors.centerIn: parent
+                        name: "close"
+                        size: 12
+                        color: Theme.textSecondary
+                    }
+
+                    MouseArea {
+                        id: removeArea
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        onClicked: root.removeFile(modelData)
+                    }
                 }
             }
         }

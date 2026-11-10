@@ -25,6 +25,9 @@ Window {
         if (selfTest)
             return
         updater.check()
+        bridge.checkFfmpeg()
+        bridge.detectHardware()
+        bridge.refreshSequence(outputView.outputDir, outputView.autoSequence)
         if (updateDemo)
             updateModal.open = true
     }
@@ -39,6 +42,35 @@ Window {
 
     //   窗口藏在托盘里跑完时，用户看不到状态栏 —— 必须主动提示一次，
     //   否则「最小化到托盘」等于让人干等。
+    //   列表或输出目录一变，续跑状态就得重算：用户先选目录再拖文件进来是
+    //   常见顺序，只在「开始」时算会让提示一直不出现。
+    Connections {
+        target: bridge
+        function onFilesChanged() {
+            bridge.checkResume(outputView.outputDir)
+        }
+    }
+
+    Connections {
+        target: outputView
+        function onOutputDirChanged() {
+            bridge.checkResume(outputView.outputDir)
+            bridge.refreshSequence(outputView.outputDir, outputView.autoSequence)
+        }
+        function onAutoSequenceChanged() {
+            bridge.refreshSequence(outputView.outputDir, outputView.autoSequence)
+        }
+    }
+
+    //   「定位 SD 卡」找到的目录由 bridge 反推回来，界面只负责填进去。
+    Connections {
+        target: bridge
+        function onLocatedChanged() {
+            if (bridge.locatedDir !== "")
+                outputView.outputDir = bridge.locatedDir
+        }
+    }
+
     Connections {
         target: bridge
         function onBusyChanged() {
@@ -79,7 +111,17 @@ Window {
     FolderDialog {
         id: outputDialog
         title: "选择输出目录"
-        onAccepted: outputView.outputDir = bridge.localPath(selectedFolder)
+        onAccepted: {
+            outputView.outputDir = bridge.localPath(selectedFolder)
+            bridge.checkResume(outputView.outputDir)
+        }
+    }
+
+    FileDialog {
+        id: coverDialog
+        title: "选择封面图片"
+        nameFilters: ["图片 (*.png *.jpg *.jpeg *.bmp *.webp)"]
+        onAccepted: bridge.pickCover(bridge.localPath(selectedFile))
     }
 
     Rectangle {
@@ -90,6 +132,37 @@ Window {
         border.width: 1
         border.color: Theme.divider
         clip: true
+
+        //   拖拽添加：把视频或整个 DCIM 文件夹拖进窗口即可。
+        //   经典版有拖放，QML 版此前只能靠按钮一个个点。
+        DropArea {
+            id: dropZone
+            anchors.fill: parent
+            //   必须在内容之上：拖放事件只送给最顶层的 item，压在 Column
+            //   下面的话窗口里怎么拖都没反应。
+            z: 20
+            onEntered: function (drag) {
+                if (drag.hasUrls)
+                    drag.acceptProposedAction()
+            }
+            onDropped: function (drop) {
+                var paths = []
+                for (var i = 0; i < drop.urls.length; ++i)
+                    paths.push(bridge.localPath(drop.urls[i]))
+                bridge.addPaths(paths)
+                drop.acceptProposedAction()
+            }
+        }
+
+        Rectangle {
+            anchors.fill: parent
+            visible: dropZone.containsDrag
+            radius: 12
+            color: "transparent"
+            border.width: 2
+            border.color: Theme.accent
+            z: 21
+        }
 
         Column {
             anchors.fill: parent
@@ -125,11 +198,52 @@ Window {
                         lineHeight: Theme.fontDisplayLine
                     }
 
+                    //   ffmpeg 缺失是硬阻塞：没有它一条也转不了。经典版启动就
+                    //   自动下载，QML 版此前只在点「开始」时报一句，用户没处修。
+                    Rectangle {
+                        width: parent.width
+                        visible: bridge.ffmpegMissing
+                        implicitHeight: ffCol.implicitHeight + 24
+                        radius: 12
+                        color: Theme.card
+                        border.width: 1
+                        border.color: Theme.warning
+
+                        Column {
+                            id: ffCol
+                            anchors.fill: parent
+                            anchors.margins: 12
+                            spacing: 8
+
+                            Text {
+                                width: parent.width
+                                text: bridge.ffmpegDownloading
+                                    ? "正在下载 ffmpeg… " + Math.round(bridge.ffmpegProgress * 100) + "%"
+                                    : "未找到 ffmpeg。它是转码必需组件，可点右侧按钮自动下载安装。"
+                                color: Theme.textSecondary
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontBodySize
+                                font.weight: Font.Normal
+                                wrapMode: Text.Wrap
+                                lineHeightMode: Text.FixedHeight
+                                lineHeight: Theme.fontBodyLine
+                            }
+
+                            AppButton {
+                                btnHeight: 32
+                                text: bridge.ffmpegDownloading ? "下载中…" : "下载 ffmpeg"
+                                enabled: !bridge.ffmpegDownloading
+                                onClicked: bridge.downloadFfmpeg()
+                            }
+                        }
+                    }
+
                     CameraSampleView {
                         width: parent.width
                         status: bridge.sample !== ""
                                 ? "样本：" + bridge.sample
                                 : "未设置样本（回退到影石默认结构）"
+                        summary: bridge.specSummary
                         onPickSample: sampleDialog.open()
                         //   输出目录常就是卡根或 DCIM，先按它找，找不到再扫盘符。
                         onAutoDetect: bridge.autoDetectSample(outputView.outputDir)
@@ -138,17 +252,109 @@ Window {
                     InputFileView {
                         width: parent.width
                         files: bridge.files
-                        state: bridge.lastError !== "" ? "error" : (bridge.busy ? "loading" : "empty")
-                        errorText: bridge.lastError
+                        //   这里只反映「列表本身」的状态。错误提示统一由
+                        //   ActionView 显示 —— 把 lastError 接到文件区会让
+                        //   一条「请先添加要转换的视频」把文件区永久染红。
+                        state: bridge.busy ? "loading" : "empty"
                         onAddVideo: videoDialog.open()
                         onAddFolder: folderDialog.open()
                         onClearAll: bridge.clearFiles()
+                        onRemoveFile: function (path) { bridge.removeFile(path) }
                     }
 
                     OutputOptionView {
                         id: outputView
                         width: parent.width
+                        hardwareHint: bridge.hardwareEncoder === ""
+                            ? "正在检测硬件编码器…"
+                            : (bridge.hardwareEncoder === "未检测到"
+                                ? "未检测到可用硬件编码器，将使用软件编码"
+                                : "已检测到 " + bridge.hardwareEncoder
+                                  + "，可选它加快约 1.5～2 倍（默认仍用软件，与相机已验证的路径一致）")
+                        sequenceHint: bridge.nextSequence
+                        coverSummary: bridge.coverSummary
+                        coverImage: bridge.coverImage
                         onBrowseOutput: outputDialog.open()
+                        onLocateCard: bridge.locateCard()
+                        onPickCover: coverDialog.open()
+                        onClearCovers: bridge.clearCovers()
+                        onVerifyCard: bridge.verifyCard(outputView.outputDir)
+                    }
+
+                    //   续跑提示：只有真的存在「上次未完成」时才出现，
+                    //   平时不占版面。
+                    Rectangle {
+                        width: parent.width
+                        visible: bridge.resumeSummary !== ""
+                        implicitHeight: resumeRow.implicitHeight + 24
+                        radius: 12
+                        color: Theme.card
+                        border.width: 1
+                        border.color: Theme.divider
+
+                        Row {
+                            id: resumeRow
+                            anchors.fill: parent
+                            anchors.margins: 12
+                            spacing: 12
+
+                            Text {
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: parent.width - 120 - 12
+                                text: bridge.resumeSummary
+                                color: Theme.textSecondary
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontBodySize
+                                font.weight: Font.Normal
+                                wrapMode: Text.Wrap
+                                lineHeightMode: Text.FixedHeight
+                                lineHeight: Theme.fontBodyLine
+                            }
+
+                            AppButton {
+                                width: 120
+                                btnHeight: 32
+                                text: bridge.resumeOnly ? "只跑未完成" : "全部重跑"
+                                onClicked: bridge.setResumeOnly(!bridge.resumeOnly)
+                            }
+                        }
+                    }
+
+                    //   卡校验结果：有异常时把清单摊开，并给一键清理。
+                    Rectangle {
+                        width: parent.width
+                        visible: bridge.verifyResult !== ""
+                        implicitHeight: verifyCol.implicitHeight + 24
+                        radius: 12
+                        color: Theme.card
+                        border.width: 1
+                        border.color: bridge.verifyHasBad ? Theme.error : Theme.divider
+
+                        Column {
+                            id: verifyCol
+                            anchors.fill: parent
+                            anchors.margins: 12
+                            spacing: 8
+
+                            Text {
+                                width: parent.width
+                                text: bridge.verifyResult
+                                color: bridge.verifyHasBad ? Theme.error : Theme.textSecondary
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontBodySize
+                                font.weight: Font.Normal
+                                wrapMode: Text.Wrap
+                                lineHeightMode: Text.FixedHeight
+                                lineHeight: Theme.fontBodyLine
+                            }
+
+                            AppButton {
+                                btnHeight: 32
+                                text: "清理异常条目"
+                                visible: bridge.verifyHasBad
+                                onClicked: bridge.repairCard(outputView.outputDir)
+                            }
+                        }
                     }
 
                     ProgressView {
@@ -163,12 +369,18 @@ Window {
                         running: bridge.busy
                         hasError: bridge.lastError !== ""
                         errorText: bridge.lastError
-                        onStart: bridge.start(
-                            outputView.outputDir,
-                            outputView.registerIndex,
-                            outputView.autoSequence,
-                            outputView.encoder)
+                        onStart: {
+                            //   先按当前目录刷一次续跑状态，start() 里还会再算一次
+                            //   （目录或列表可能在两者之间变过）。
+                            bridge.checkResume(outputView.outputDir)
+                            bridge.start(
+                                outputView.outputDir,
+                                outputView.registerIndex,
+                                outputView.autoSequence,
+                                outputView.encoder)
+                        }
                         onCancel: bridge.cancel()
+                        onDismissError: bridge.clearError()
                     }
                 }
             }
@@ -202,11 +414,8 @@ Window {
 
             Text {
                 width: parent.width
-                text: "当前任务尚未完成。
-
-"
-                    + "停止并退出：立刻中止，未完成的文件会留在输出目录，需要自行删除。
-"
+                text: "当前任务尚未完成。\n\n"
+                    + "停止并退出：立刻中止，未完成的文件会留在输出目录，需要自行删除。\n"
                     + "最小化到托盘：窗口隐藏，转换继续跑完，跑完会弹提示。"
                 wrapMode: Text.Wrap
                 color: Theme.textSecondary

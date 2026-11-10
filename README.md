@@ -12,7 +12,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0--or--later-blue?style=flat-square" alt="License"></a>
   <a href="desktop/CHANGELOG.md"><img src="https://img.shields.io/badge/version-1.2.0-success?style=flat-square" alt="Version"></a>
   <a href="desktop/requirements.txt"><img src="https://img.shields.io/badge/python-3.10%2B-3776ab?style=flat-square" alt="Python"></a>
-  <a href="desktop/tests"><img src="https://img.shields.io/badge/tests-126%20passed-brightgreen?style=flat-square" alt="Tests"></a>
+  <a href="desktop/tests"><img src="https://img.shields.io/badge/tests-160%20passed-brightgreen?style=flat-square" alt="Tests"></a>
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20Android-6f42c1?style=flat-square" alt="Platform">
 </p>
 
@@ -35,12 +35,25 @@ pip install -r requirements.txt
 桌面端入口 `desktop/run_qml.bat`（`pythonw main.py`），打包脚本 `desktop/build_qml.bat` → `desktop/dist/InstaAceQml.exe`（单文件，约 79 MB）。
 
 <details>
-<summary>桌面端还缺什么</summary>
+<summary>桌面端功能对照</summary>
 
-早期有两套并列界面（PyQt5 经典版 + QML 版）。经典版已删除，只保留 QML 版，功能上补回了下面几项，但仍有缺口：
+早期有两套并列界面（PyQt5 经典版 + QML 版）。经典版已删除，只保留 QML 版 —— 两套界面维护同一份逻辑，缺陷总是「修一遍、第二遍忘」，合并后这类漂移不可能再发生。
 
-- **已补**：开工前体检 `preflight`（`desktop/bridge.py` 的 `start()` 调 `core.preflight`）、自动从存储卡分析样本（`Bridge.autoDetectSample`）。
-- **仍缺**：封面选择（`desktop/qml/OutputOptionView.qml` 的按钮是 `onClicked: {}` 空处理，`bridge.py` 里 `cover` 零命中）、断点续跑（`core.load_job` / `core.save_job` 无人调用）、卡校验（`core.verify_card` 无界面入口）。
+删除时 QML 版缺的九项已全部补齐，都有测试守着（`desktop/tests/test_qml_bridge.py`）：
+
+| 能力 | 入口 |
+| --- | --- |
+| 开工前体检 | `Bridge.start()` 调 `core.preflight` |
+| 自动找样本 | `Bridge.autoDetectSample` |
+| 封面选择 | `Bridge.pickCover` / `clearCovers` |
+| 断点续跑 | `Bridge.checkResume` + `_run` 里逐步存 `core.save_job` |
+| 卡校验与清理 | `Bridge.verifyCard` / `repairCard` |
+| 定位 SD 卡 | `Bridge.locateCard` |
+| 单条移除 | `Bridge.removeFile` |
+| 硬件编码器探测 | `Bridge.detectHardware` |
+| 拖拽添加 | `DropArea` → `Bridge.addPaths` |
+
+转换中关窗给两个出路：停止并退出（`cancel()` + `waitWorker(20000)` 确认线程结束后才退出）、最小化到托盘（转换继续，跑完弹通知）。直接退出会让 ffmpeg 变孤儿继续往相机卡写，留下半截 VID/LRV 且索引没登记。
 
 </details>
 
@@ -221,7 +234,7 @@ pip install -r requirements-dev.txt
 python -m pytest tests/ -q
 ```
 
-预期 `126 passed, 2 skipped`。跳过的两条依赖真机索引样本（`desktop/samples/`、`android/app/src/test/resources/samples/`），样本含设备标识，按约定不入库。
+预期 `160 passed, 2 skipped`。跳过的两条依赖真机索引样本（`desktop/samples/`、`android/app/src/test/resources/samples/`），样本含设备标识，按约定不入库。
 
 改代码前请先读 [`docs/BUILD.md`](docs/BUILD.md)。两处容易踩：
 

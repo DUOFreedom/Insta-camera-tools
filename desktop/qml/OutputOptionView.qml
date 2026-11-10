@@ -7,8 +7,16 @@ Rectangle {
     property bool registerIndex: true
     property bool autoSequence: true
     property string encoder: "自动"
+    property string hardwareHint: ""
+    property string sequenceHint: ""
+    property string coverSummary: ""
+    property string coverImage: ""
 
     signal browseOutput()
+    signal locateCard()
+    signal pickCover()
+    signal clearCovers()
+    signal verifyCard()
     //   保留但禁用：编码器选择目前只改 root.encoder，由 start() 一并读走，
     //   没有谁需要单独被通知。信号留着是因为外部将来可能想监听；发射点
     //   已停，避免一个没人处理的信号每点一次都白跑一遍绑定。
@@ -54,7 +62,7 @@ Rectangle {
             }
 
             TextField {
-                width: parent.width - 64 - 8 - 64 - 16
+                width: parent.width - 64 - 8 - 64 - 8 - 96 - 16
                 text: root.outputDir
                 placeholder: "建议存储卡 DCIM\\Camera01"
                 onTextChanged: root.outputDir = text
@@ -65,6 +73,36 @@ Rectangle {
                 btnHeight: 36
                 accent: true
                 onClicked: root.browseOutput()
+            }
+
+            AppButton {
+                text: "定位 SD 卡"
+                btnHeight: 36
+                accent: false
+                onClicked: root.locateCard()
+            }
+        }
+
+        Row {
+            width: parent.width
+            spacing: 8
+
+            AppButton {
+                text: "校验索引"
+                btnHeight: 32
+                accent: false
+                onClicked: root.verifyCard()
+            }
+
+            Text {
+                anchors.verticalCenter: parent.verticalCenter
+                width: parent.width - 88 - 8
+                text: "检查卡内索引与文件是否一致。相册里有条目却打不开，通常是索引登记了坏条目。"
+                color: Theme.textSecondary
+                font.family: Theme.fontFamily
+                font.pixelSize: Theme.fontBodySize
+                font.weight: Font.Normal
+                elide: Text.ElideRight
             }
         }
 
@@ -107,6 +145,32 @@ Rectangle {
                 accent: false
                 onClicked: encoderPopover.open = !encoderPopover.open
             }
+
+            Text {
+                anchors.verticalCenter: parent.verticalCenter
+                width: parent.width - 64 - 8 - 160 - 8
+                text: root.hardwareHint
+                color: Theme.textSecondary
+                font.family: Theme.fontFamily
+                font.pixelSize: Theme.fontAuxSize
+                font.weight: Font.Normal
+                lineHeightMode: Text.FixedHeight
+                lineHeight: Theme.fontAuxLine
+                elide: Text.ElideRight
+            }
+        }
+
+        Text {
+            width: parent.width
+            visible: root.sequenceHint !== ""
+            text: root.sequenceHint
+            color: Theme.textSecondary
+            font.family: Theme.fontFamily
+            font.pixelSize: Theme.fontAuxSize
+            font.weight: Font.Normal
+            lineHeightMode: Text.FixedHeight
+            lineHeight: Theme.fontAuxLine
+            elide: Text.ElideRight
         }
 
         Row {
@@ -127,12 +191,31 @@ Rectangle {
                 text: "选择封面图片"
                 btnHeight: 36
                 accent: false
-                onClicked: {}
+                onClicked: root.pickCover()
+            }
+
+            AppButton {
+                text: "恢复自动"
+                btnHeight: 36
+                accent: false
+                onClicked: root.clearCovers()
             }
 
             Avatar {
                 size: 40
+                source: root.coverImage
                 fallback: "封"
+            }
+
+            Text {
+                anchors.verticalCenter: parent.verticalCenter
+                width: parent.width - 64 - 8 - 112 - 8 - 96 - 8 - 40 - 8
+                text: root.coverSummary
+                color: Theme.textSecondary
+                font.family: Theme.fontFamily
+                font.pixelSize: Theme.fontBodySize
+                font.weight: Font.Normal
+                elide: Text.ElideRight
             }
         }
     }
