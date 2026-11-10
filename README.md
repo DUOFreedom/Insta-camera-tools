@@ -12,7 +12,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0--or--later-blue?style=flat-square" alt="License"></a>
   <a href="desktop/CHANGELOG.md"><img src="https://img.shields.io/badge/version-1.2.0-success?style=flat-square" alt="Version"></a>
   <a href="desktop/requirements.txt"><img src="https://img.shields.io/badge/python-3.10%2B-3776ab?style=flat-square" alt="Python"></a>
-  <a href="desktop/tests"><img src="https://img.shields.io/badge/tests-110%20passed-brightgreen?style=flat-square" alt="Tests"></a>
+  <a href="desktop/tests"><img src="https://img.shields.io/badge/tests-111%20passed-brightgreen?style=flat-square" alt="Tests"></a>
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20Android-6f42c1?style=flat-square" alt="Platform">
 </p>
 
@@ -236,7 +236,7 @@ pip install -r requirements-dev.txt
 python -m pytest tests/ -q
 ```
 
-预期 `110 passed, 2 skipped`。跳过的两条依赖真机索引样本（`desktop/samples/`、`android/app/src/test/resources/samples/`），样本含设备标识，按约定不入库。
+预期 `111 passed, 2 skipped`。跳过的两条依赖真机索引样本（`desktop/samples/`、`android/app/src/test/resources/samples/`），样本含设备标识，按约定不入库。
 
 改代码前请先读 [`docs/BUILD.md`](docs/BUILD.md)。两处容易踩：
 

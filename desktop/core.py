@@ -1550,6 +1550,10 @@ def extract_inst_meta(path: str) -> bytes | None:
         return None
 
     # 找最后一个 0a 0e <serial>（serial 特征：ASCII 大写字母+数字）
+    # 先找强特征：f1(serial,14B) 紧接 f2(机型名) —— 0a 0e + 14B + 12 11 + "Insta360"。
+    #   真机 inst 里裸 0a 0e 各出现 27 次，其中只有这一处后面跟着机型名。
+    #   老办法（取最后一个 alnum 的 14 字节）在这两份样本上碰巧也对，但那是
+    #   运气：传感器数据区里出现 14 个连续字母数字就会选错。
     best = -1
     i = 0
     while True:
@@ -1557,9 +1561,22 @@ def extract_inst_meta(path: str) -> bytes | None:
         if i < 0:
             break
         seg = inst[i+2:i+16]
-        if len(seg) == 14 and seg.isascii() and seg.isalnum():
+        if (len(seg) == 14 and seg.isascii() and seg.isalnum()
+                and inst[i+16:i+18] == b"\x12\x11" and inst[i+18:i+26] == b"Insta360"):
             best = i
+            break
         i += 1
+    if best < 0:
+        # 回退到宽松规则（老机型或后续固件可能不带机型名）。
+        i = 0
+        while True:
+            i = inst.find(b"\x0a\x0e", i)
+            if i < 0:
+                break
+            seg = inst[i+2:i+16]
+            if len(seg) == 14 and seg.isascii() and seg.isalnum():
+                best = i
+            i += 1
     if best < 0:
         return None
 

@@ -29,6 +29,7 @@
 from __future__ import annotations
 
 import ctypes
+import io
 import os
 import shutil
 import struct
@@ -1284,3 +1285,26 @@ def test_hw_cmd_gives_qsv_and_amf_explicit_gop(monkeypatch):
         assert "-g" in cmd, f"{codec} 没给 -g"
         assert cmd[cmd.index("-g") + 1] == "120", f"{codec} 的 -g 不是模板 GOP"
         assert cmd[cmd.index("-keyint_min") + 1] == "120"
+
+
+def test_extract_inst_meta_prefers_serial_followed_by_model():
+    """序列号定位优先用「f1 紧接 f2 机型名」，而不是取最后一个像序列号的片段。
+
+    真机 inst 里裸 0a0e 各出现 27 次，只有一处后面跟着机型名。老办法靠
+    「14 字节全字母数字」过滤，两份样本上碰巧只剩 1 个候选 —— 但传感器数据
+    区里出现 14 个连续字母数字就会选错，那是运气不是设计。
+    """
+    def section(text):
+        i = text.index("def extract_inst_meta")
+        j = text.index("def ", i + 10)
+        return text[i:j]
+
+    for label, path in (
+        ("desktop", os.path.join(ROOT, "core.py")),
+        ("android", os.path.join(os.path.dirname(ROOT), "android", "app",
+                                 "src", "main", "python", "insta_core.py")),
+    ):
+        body = section(io.open(path, encoding="utf-8-sig").read())
+        assert "Insta360" in body, f"{label} 没有用机型名做判据"
+        assert "回退到宽松规则" in body, f"{label} 没有保留宽松回退"
+        assert body.index("Insta360") < body.index("回退到宽松规则"),             f"{label} 的强特征分支必须排在回退之前"

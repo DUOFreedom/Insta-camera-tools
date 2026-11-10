@@ -8,6 +8,12 @@
 - 安卓 `android/app/build/outputs/apk/release/app-release.apk` 75,279,797 B；单元测试 IndexTest 7 跳过 / ConsentLogicTest 5 / ImportCardStateTest 6，失败 0。解包 `assets/chaquopy/app.imy` 核对：`insta360_tf_import.video_gop` 的 `co_names` 含 `Path`，`insta_core._build_hw_transcode_cmd` 常量含 `qsv`/`amf` 与 `-g`。
 - **APK 的字节数与 sha256 都不能当校验和**：同一份源码连编两次，签名（`META-INF/CERT.RSA`/`CERT.SF`/`MANIFEST.MF`）、`assets/chaquopy/build.json`、`assets/chaquopy/app.imy` 五项都会变。`app.imy` 里每个 pyc 只有第 8～12 字节（CPython 源文件 mtime 字段）不同，把这段清零后全部逐字节相同。要确认「装上去的就是这一轮构建的包」，解包比对 pyc 比比对哈希可靠。
 
+### 修复（序列号定位从「碰巧对」改成有依据）
+
+`extract_inst_meta` 原先靠「inst 里最后一个 `0a 0e` + 14 字节全字母数字」找序列号。逆向报告实测：真机 inst 里裸 `0a 0e` 各出现 **27 次**，严格过滤后只剩 1 个候选 —— 这两份样本上结果是对的，但传感器数据区里只要出现 14 个连续字母数字就会选错。
+
+改成先找强特征 **`0a 0e` + 14B + `12 11` + `Insta360`**（f1 序列号紧接 f2 机型名），全 inst 唯一命中（VID@1453367 / LRV@1467082）；找不到再回退到老的宽松规则，兼顾不带机型名的老固件。桌面端与安卓端同步，新增 `test_extract_inst_meta_prefers_serial_followed_by_model` 守卫两份副本都保留强特征分支且排在回退之前（回滚验证：删掉安卓副本的回退注释即变红）。
+
 ### 修复（端到端跑通 GO Ultra 时发现的两处）
 
 真机素材 + 仓库自带的 `desktop/dist/bin/ffmpeg.exe` 跑完整导入链路（转码 → inst 移植 → 索引登记）时暴露两处，桩测试都拦不住：
