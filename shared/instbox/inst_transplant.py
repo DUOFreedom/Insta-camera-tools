@@ -240,7 +240,9 @@ def video_gop(path: Path) -> int:
     只有 1 个关键帧（全片单 GOP）时无从得知间隔，返回 0 表示「未知」，
     由调用方决定回退值。
     """
-    data = path.read_bytes()
+    # 调用方既有 Path 也有 str（analyze_native 传的是 str），统一收口；
+    # 之前只认 Path，str 会抛 AttributeError 被上层吞掉，GOP 永远退化成 16。
+    data = Path(path).read_bytes()
     try:
         moov = next(box for box in mp4_boxes(data) if box[2] == b"moov")
     except StopIteration:

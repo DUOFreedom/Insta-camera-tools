@@ -141,3 +141,6 @@ android/app/src/main/jniLibs/
 
 # 内部审查报告（含设备标识与本机路径，不随仓库分发）
 REVIEW*.md
+
+# 端到端验证用的临时假卡与素材
+.e2e/

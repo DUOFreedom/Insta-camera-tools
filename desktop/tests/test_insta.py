@@ -1239,3 +1239,48 @@ def test_cli_run_ffmpeg_uses_template_gop(monkeypatch, tmp_path):
     assert cmd[g + 1] == "120", f"CLI 的 -g 没跟着模板，实际 {cmd[g + 1]}"
     k = cmd.index("-keyint_min")
     assert cmd[k + 1] == "120"
+
+
+def test_video_gop_accepts_str_path(tmp_path):
+    """video_gop 必须同时接受 Path 和 str。
+
+    analyze_native() 传的是 str，而 video_gop 一开始只写了 path.read_bytes()。
+    结果是 AttributeError 被上层 except 吞掉，GOP 永远退化成 0 → 全项目
+    回退到写死的 16 —— 修好的机型适配在真实链路上一次都没生效。
+    """
+    p = _make_gop_mp4(tmp_path, keyframes=[1, 121, 241], total=300)
+    assert tf.video_gop(p) == 120
+    assert tf.video_gop(str(p)) == 120, "str 路径没被接受"
+
+
+def test_analyze_native_reports_gop(monkeypatch, tmp_path):
+    """analyze_native 必须真的量出 GOP，而不是静默返回 0。"""
+    p = _make_gop_mp4(tmp_path, keyframes=[1, 11, 21], total=30)
+    monkeypatch.setattr(core, "probe_raw", lambda _f: {
+        "streams": [{"codec_type": "video", "codec_name": "hevc", "width": 1280,
+                     "height": 720, "r_frame_rate": "30/1", "nb_frames": "30",
+                     "pix_fmt": "yuv420p", "color_range": "tv",
+                     "codec_tag_string": "hvc1", "tags": {}}],
+        "format": {"format_name": "mov,mp4", "duration": "1.0"},
+    })
+    monkeypatch.setattr(core, "find_ffmpeg", lambda: "ffmpeg")
+    monkeypatch.setattr(core, "find_ffprobe", lambda: "ffprobe")
+    assert core.analyze_native(str(p))["video"]["gop"] == 10
+
+
+def test_hw_cmd_gives_qsv_and_amf_explicit_gop(monkeypatch):
+    """QSV / AMF 也要显式 -g。
+
+    原先只有 nvenc 分支加 -g，QSV/AMF 用编码器默认（约 3 秒一个关键帧）。
+    实测 3 秒素材只出 1 个关键帧，AMBA 里声明 120 而码流里没有 —— 相机按
+    声明去找关键帧会失败。
+    """
+    monkeypatch.setattr(core, "find_ffmpeg", lambda: "ffmpeg")
+    for codec in ("hevc_qsv", "hevc_amf"):
+        cmd = core._build_hw_transcode_cmd(
+            "in.mp4", "out.mp4", codec, "hvc1", "scale=1920:1080",
+            [], "INS.HVC", "HVC encoder", [], "tv",
+            is_lrv=False, fps="60000/1001", level=None, bitrate=20_000_000, gop=120)
+        assert "-g" in cmd, f"{codec} 没给 -g"
+        assert cmd[cmd.index("-g") + 1] == "120", f"{codec} 的 -g 不是模板 GOP"
+        assert cmd[cmd.index("-keyint_min") + 1] == "120"

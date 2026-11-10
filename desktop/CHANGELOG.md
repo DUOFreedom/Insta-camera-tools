@@ -2,6 +2,24 @@
 
 ## 未发布
 
+### 修复（端到端跑通 GO Ultra 时发现的两处）
+
+真机素材 + 仓库自带的 `desktop/dist/bin/ffmpeg.exe` 跑完整导入链路（转码 → inst 移植 → 索引登记）时暴露两处，桩测试都拦不住：
+
+- **`video_gop` 只接受 `Path`，而调用方传的是 `str`**：`AttributeError` 被 `analyze_native` 的 `except Exception: pass` 吞掉，GOP 永远退化成 0，全项目回退到写死的 16。也就是说前一轮「GOP 跟随模板」的改动在真实链路上**一次都没生效**，只有单测里手写 `Path` 的用例是绿的。现在统一 `Path(path).read_bytes()`，两份副本同步。
+- **QSV / AMF 分支没有 `-g`**：只有 nvenc 加了关键帧参数，QSV/AMF 走编码器默认（约 3 秒一个关键帧）。3 秒素材实测只出 1 个关键帧，而 AMBA 里声明 120 —— 相机按声明去找关键帧会失败。现在 `elif "qsv" in vcodec or "amf" in vcodec:` 同样显式给 `-g/-keyint_min/-sc_threshold 0/-bf 0`。
+
+端到端验证（`.e2e/` 下自建假卡 + GO Ultra 真机模板对）：
+
+```
+[VID] codec=hevc_qsv -g=120   → keyframes=2  gap=120  AMBA_gop=120  frames=179
+[LRV] codec=libx265 -g=<none> → keyframes=9  gap=10   AMBA_gop=10   frames=89
+```
+
+与真机模板完全一致（VID 120 / LRV 10）。产物 `inst` 元数据也核对过：f1 序列号 `IBEEA2605QGDFE`、f2 机型 `Insta360 GO Ultra`、f26 proxy 标志 LRV=1 / VID=0，AMBA 时间基 60000/1001 与 30000/1001 均对。
+
+新增 3 条测试（`test_video_gop_accepts_str_path`、`test_analyze_native_reports_gop`、`test_hw_cmd_gives_qsv_and_amf_explicit_gop`），两个缺陷都做了回滚验证确认变红。全套 **110 passed, 2 skipped**。
+
 ### 新增（Go Ultra 机型适配）
 
 用户提供了 GO Ultra 真机素材（`VID_20261104_141845_024.mp4` / `LRV_20261104_141845_024.lrv`），逆向比对后发现有四处规格是照着 Ace Pro 2 写死的，GO Ultra 上全部对不上。这不是「参数微调」，是产品在两种机型上行为不同。

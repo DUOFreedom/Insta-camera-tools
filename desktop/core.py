@@ -887,6 +887,12 @@ def _build_hw_transcode_cmd(src, dst, vcodec, tag, vf, extra_args,
                 "-bf", "0", "-extra_sei", "0", "-udu_sei", "0"]
         if not is_lrv:
             cmd += ["-slices", "2"]
+    elif "qsv" in vcodec or "amf" in vcodec:
+        # QSV/AMF 也要显式给 -g：不给就是编码器默认的「约 3 秒一个关键帧」，
+        #   与 AMBA 里声明的 GOP 对不上，相机按声明去找关键帧会失败。
+        #   -sc_threshold 0 关掉场景切换插帧，否则实测出来的间隔不稳定。
+        cmd += ["-g", str(keyint), "-keyint_min", str(keyint), "-sc_threshold", "0",
+                "-bf", "0"]
     # 像素格式处理（format=yuv420p,setrange=full）
     if "amf" in vcodec:
         vf2 = vf
