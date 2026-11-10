@@ -1203,3 +1203,39 @@ def test_rewrap_and_transplant_copies_do_not_drift():
             if _fn_ast(lp, name) != _fn_ast(rp, name):
                 drifted.append(f"{name}({left} vs {right})")
     assert not drifted, f"这些函数在两份副本之间已漂移：{drifted}"
+
+
+def test_cli_run_ffmpeg_uses_template_gop(monkeypatch, tmp_path):
+    """CLI 路径的 -g 也必须跟着模板走，不能写死 16。
+
+    core.py 主路径早就按模板 GOP 生成命令了，但 inst_transplant 自己的
+    CLI（`python inst_transplant.py ...`）一直写死 `-g 16`，GO Ultra 的
+    VID 真机是 120 —— 用 CLI 产出的文件关键帧密度对不上。
+    """
+    captured = []
+
+    def fake_run(cmd, **kwargs):
+        captured.append(cmd)
+        class R:
+            returncode = 0
+        return R()
+
+    monkeypatch.setattr(tf.subprocess, "run", fake_run)
+    # run_ffmpeg 开头会找 ffmpeg 可执行文件，本机没有，桩掉。
+    monkeypatch.setattr(tf, "_tool", lambda name: name)
+    monkeypatch.setattr(tf, "ffprobe", lambda _p: {
+        "streams": [{"codec_type": "video", "codec_name": "hevc", "width": 1920,
+                     "height": 1080, "nb_frames": "228", "has_b_frames": 0,
+                     "bit_rate": "20000000", "level": 123}],
+        "format": {"duration": "3.804"},
+    })
+    src = tmp_path / "in.mp4"
+    src.write_bytes(b"\x00" * 16)
+    tf.run_ffmpeg(src, tmp_path / "out.mp4", proxy=False,
+                  created_utc="2026-11-10T00:00:00Z", width=1920, height=1080,
+                  video_frames=228, gop=120)
+    cmd = captured[0]
+    g = cmd.index("-g")
+    assert cmd[g + 1] == "120", f"CLI 的 -g 没跟着模板，实际 {cmd[g + 1]}"
+    k = cmd.index("-keyint_min")
+    assert cmd[k + 1] == "120"

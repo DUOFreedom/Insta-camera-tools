@@ -572,6 +572,7 @@ def run_ffmpeg(
     proxy_hevc: bool = False,
     dummy_video: bool = False,
     use_gpu: bool = True,
+    gop: int = 16,
 ) -> None:
     info = ffprobe(source)
     has_audio = any(stream.get("codec_type") == "audio" for stream in info.get("streams", []))
@@ -603,7 +604,7 @@ def run_ffmpeg(
     if proxy and proxy_hevc:
         command += [
             "-c:v", "hevc_nvenc", "-preset", "p4", "-profile:v", "main", "-tier", "high",
-            "-g", "16", "-keyint_min", "16", "-sc_threshold", "0", "-bf", "0",
+            "-g", str(gop), "-keyint_min", str(gop), "-sc_threshold", "0", "-bf", "0",
             "-slices", "1", "-extra_sei", "0", "-udu_sei", "0", "-tag:v", "hvc1",
         ]
         if cq is not None:
@@ -619,7 +620,7 @@ def run_ffmpeg(
         if use_gpu:
             command += [
                 "-c:v", "h264_nvenc", "-preset", "p4", "-profile:v", "high",
-                "-g", "16", "-keyint_min", "16", "-sc_threshold", "0", "-bf", str(b_frames),
+                "-g", str(gop), "-keyint_min", str(gop), "-sc_threshold", "0", "-bf", str(b_frames),
                 "-slices", "1", "-extra_sei", "0", "-udu_sei", "0", "-tag:v", "avc1",
             ]
             if cq is not None:
@@ -635,8 +636,8 @@ def run_ffmpeg(
             command += [
                 "-c:v", "libx264", "-preset", "veryfast", "-profile:v", "high",
                 "-level:v", "4.1", "-b:v", str(target_rate), "-maxrate", str(target_rate * 5 // 4),
-                "-bufsize", str(target_rate * 2), "-tag:v", "avc1", "-g", "16",
-                "-keyint_min", "16", "-sc_threshold", "0", "-bf", str(b_frames),
+                "-bufsize", str(target_rate * 2), "-tag:v", "avc1", "-g", str(gop),
+                "-keyint_min", str(gop), "-sc_threshold", "0", "-bf", str(b_frames),
             ]
             if refs is not None:
                 command += ["-refs", str(refs), "-x264-params", f"ref={refs}:weightp=0:open-gop=0"]
@@ -652,7 +653,7 @@ def run_ffmpeg(
         if use_gpu:
             command += [
                 "-c:v", "hevc_nvenc", "-preset", "p4", "-profile:v", "main", "-tier", "high",
-                "-g", "16", "-keyint_min", "16", "-sc_threshold", "0", "-bf", "0",
+                "-g", str(gop), "-keyint_min", str(gop), "-sc_threshold", "0", "-bf", "0",
                 "-slices", "2", "-extra_sei", "0", "-udu_sei", "0", "-tag:v", "hvc1",
             ]
             if cq is not None:
@@ -707,6 +708,7 @@ def run_ffmpeg(
                 width=width, height=height, video_frames=video_frames,
                 b_frames=b_frames, bitrate=bitrate, level=level, refs=refs, cq=cq,
                 proxy_hevc=proxy_hevc, dummy_video=dummy_video, use_gpu=False,
+                gop=gop,
             )
         else:
             raise
@@ -1235,6 +1237,8 @@ def main() -> int:
             video_frames=target_frames, b_frames=main_profile["b_frames"],
             bitrate=main_profile["bitrate"] or None, level=main_profile["level"] or None,
             cq=args.main_cq, dummy_video=args.dummy_main,
+            # GOP 从模板量：Ace Pro 2 是 16，GO Ultra 的 VID 是 120。
+            gop=video_gop(template_main) or 16,
         )
         run_ffmpeg(
             source, proxy_base_path, proxy=True, created_utc=created_utc,
@@ -1244,6 +1248,7 @@ def main() -> int:
             bitrate=proxy_profile["bitrate"] or None, level=proxy_profile["level"] or None,
             refs=args.proxy_refs, cq=args.proxy_cq, proxy_hevc=proxy_hevc,
             use_gpu=not args.software_proxy,
+            gop=video_gop(template_proxy) or 16,
         )
         thumbnail = make_thumbnail(source, thumbnail_path)
         main_udta = camera_udta(

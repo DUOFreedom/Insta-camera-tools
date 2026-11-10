@@ -106,11 +106,21 @@ worker 非 daemon、`waitWorker` 的两态、以及一条源码守卫（`replace
   和真机对不上。现在 `tailor_metadata` 只在非 proxy 时写 f19/f20，代理轨
   跟着模板走。
 
+- **CLI 路径的 `-g` 仍写死 16**。`inst_transplant.py` 自己的命令行入口
+  （`python inst_transplant.py ...`）与 `run_ffmpeg` 里的 NVENC/libx264 分支
+  一共四处 `"-g", "16"`，而 `core.py` 主路径早已按模板 GOP 生成。现在
+  `run_ffmpeg` 新增 `gop` 参数，两个 CLI 调用点分别传
+  `video_gop(template_main) or 16` 与 `video_gop(template_proxy) or 16`，
+  软件重试的递归调用也带上。
+
 新增 5 条回归测试：`test_visual_entry_skips_non_trak_children`（mvhd 在前）、
 `test_filter_avc1_children_keeps_hvcc_on_hevc`、`test_tailor_metadata_leaves_proxy_dimensions_alone`、
 `test_video_profile_carries_codec`、`test_rewrap_and_transplant_copies_do_not_drift`
 （AST 比对两份副本，这条守的是「moov_rewrap ↔ camera_moov_rewrap 曾漂移四处、
-漂了整整一个发布周期没被发现」）。全部做了回滚验证，逐个确认缺陷版本会变红。
+漂了整整一个发布周期没被发现」）、`test_cli_run_ffmpeg_uses_template_gop`
+（桩掉 `subprocess.run` 与 `_tool`，断言真实命令里 `-g 120`）。全部做了回滚验证，
+逐个确认缺陷版本会变红 —— 其中 CLI 那条第一次只回滚了四处中的一处，
+测试仍然全绿，把四处全部还原后才变红，说明「只改一个分支」的缺陷必须整段回滚才能验证。
 
 ### 测试（Go Ultra 机型适配）
 
