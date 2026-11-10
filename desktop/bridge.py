@@ -1,7 +1,7 @@
 import os
 import threading
 
-from PySide6.QtCore import Property, QObject, Signal, Slot
+from PySide6.QtCore import Property, QObject, QUrl, Signal, Slot
 
 import core
 
@@ -83,6 +83,26 @@ class Bridge(QObject):
     def _set_error(self, text: str) -> None:
         self._error = str(text)
         self.errorChanged.emit()
+
+    @Slot(QUrl, result=str)
+    def localPath(self, url: QUrl) -> str:
+        """把 QML 的 file:// URL 还原成本地路径。
+
+        不能用 selectedFile.toString().replace("file:///", "")：toString()
+        会把 # % [ ] ^ ` { } 这些在 Windows 上合法的字符转成 %XX，
+        替换完路径就不存在了；UNC 路径 file://server/share 只有两个斜杠，
+        连前缀都剥不掉。toLocalFile() 两种情况都对。
+        """
+        return url.toLocalFile()
+
+    @Slot(int, result=bool)
+    def waitWorker(self, timeout_ms: int = 20000) -> bool:
+        """等后台线程收尾（关窗前调用）。返回线程是否已退出。"""
+        w = self._worker
+        if w is None or not w.is_alive():
+            return True
+        w.join(timeout=max(0, int(timeout_ms)) / 1000.0)
+        return not w.is_alive()
 
     @Slot(result=str)
     def ffmpegState(self) -> str:
@@ -248,10 +268,12 @@ class Bridge(QObject):
 
         encoder = self._encoder_tuple(encoder_label)
         files = list(self._files)
+        #   非 daemon：daemon 线程在进程退出时被直接丢弃，ffmpeg 会变成
+        #   孤儿进程继续往卡里写，set_awake(False) 也不会执行。
         self._worker = threading.Thread(
             target=self._run,
             args=(files, out, bool(do_index), bool(auto_seq), encoder),
-            daemon=True,
+            daemon=False,
         )
         self._worker.start()
 

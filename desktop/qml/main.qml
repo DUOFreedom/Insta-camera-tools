@@ -36,7 +36,7 @@ Window {
         id: sampleDialog
         title: "选择原生录制视频"
         nameFilters: ["视频文件 (*.mp4 *.mov *.lrv *.insv *.ins)"]
-        onAccepted: bridge.setSample(selectedFile.toString().replace("file:///", ""))
+        onAccepted: bridge.setSample(bridge.localPath(selectedFile))
     }
 
     FileDialog {
@@ -47,7 +47,7 @@ Window {
         onAccepted: {
             var paths = []
             for (var i = 0; i < selectedFiles.length; ++i)
-                paths.push(selectedFiles[i].toString().replace("file:///", ""))
+                paths.push(bridge.localPath(selectedFiles[i]))
             bridge.addFiles(paths)
         }
     }
@@ -55,13 +55,13 @@ Window {
     FolderDialog {
         id: folderDialog
         title: "选择包含视频的文件夹"
-        onAccepted: bridge.addFolder(selectedFolder.toString().replace("file:///", ""))
+        onAccepted: bridge.addFolder(bridge.localPath(selectedFolder))
     }
 
     FolderDialog {
         id: outputDialog
         title: "选择输出目录"
-        onAccepted: outputView.outputDir = selectedFolder.toString().replace("file:///", "")
+        onAccepted: outputView.outputDir = bridge.localPath(selectedFolder)
     }
 
     Rectangle {
@@ -151,6 +151,73 @@ Window {
                             outputView.encoder)
                         onCancel: bridge.cancel()
                     }
+                }
+            }
+        }
+    }
+
+    //   转换中点 × 直接关窗的后果：进程退出 → ffmpeg 变孤儿继续往卡里写，
+    //   set_awake(False) 永不执行（防休眠锁残留），卡上留半截 VID/LRV 且索引
+    //   没登记。经典版 gui.py 的 closeEvent 早就拦过这条路，QML 版此前没有。
+    onClosing: function (close) {
+        if (!bridge.busy) {
+            close.accepted = true
+            return
+        }
+        close.accepted = false
+        closeModal.open = true
+    }
+
+    Modal {
+        id: closeModal
+        anchors.fill: parent
+        title: "正在转换"
+        dismissOnBackdrop: false
+
+        Column {
+            width: parent.width
+            spacing: 12
+
+            Text {
+                width: parent.width
+                text: "当前任务尚未完成。停止转换并退出？
+"
+                    + "未完成的文件会留在输出目录，需要自行删除。"
+                wrapMode: Text.Wrap
+                color: Theme.textSecondary
+                font.family: Theme.fontFamily
+                font.pixelSize: Theme.fontBodySize
+                font.weight: Font.Normal
+                lineHeightMode: Text.FixedHeight
+                lineHeight: Theme.fontBodyLine
+            }
+
+            Row {
+                width: parent.width
+                spacing: 8
+                layoutDirection: Qt.RightToLeft
+
+                AppButton {
+                    text: "停止并退出"
+                    btnHeight: 36
+                    onClicked: {
+                        bridge.cancel()
+                        // 等 worker 把 ffmpeg 收掉再关；20 秒还没退出就再等一轮。
+                        if (bridge.waitWorker(20000)) {
+                            closeModal.open = false
+                            Qt.quit()
+                        } else {
+                            closeModal.open = false
+                            bridge.setStatusHint("后台进程尚未退出，请稍候再关闭")
+                        }
+                    }
+                }
+
+                AppButton {
+                    text: "继续转换"
+                    btnHeight: 36
+                    accent: false
+                    onClicked: closeModal.open = false
                 }
             }
         }

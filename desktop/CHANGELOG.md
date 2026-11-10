@@ -63,6 +63,26 @@
 新增 `test_android_core_matches_desktop_on_hardened_helpers` 用 AST 比对这四个函数，
 方向明确：桌面端是基准，安卓端跟齐。
 
+### 修复（QML 版两处数据风险）
+
+审查报告里的两个 BLOCKER，都是「只有 QML 版会踩」的：
+
+- **转换中关窗不拦**。worker 是 `daemon=True`，进程退出时被直接丢弃，ffmpeg
+  变成孤儿进程继续往卡里写，`set_awake(False)` 永不执行（防休眠锁残留），卡上
+  留半截 VID/LRV 且索引没登记。经典版 `gui.py` 的 `closeEvent` 早就修过这条路，
+  QML 版从建立起就没有。现在 worker 改 `daemon=False`，`Bridge` 新增
+  `waitWorker(timeout_ms)`，`main.qml` 加 `onClosing` 弹「停止并退出 / 继续转换」，
+  选前者时先 `bridge.cancel()` 再等 worker 收尾才 `Qt.quit()`。
+- **路径用 `replace("file:///", "")` 还原**。`toString()` 默认 PrettyDecoded，会把
+  `#` `%` `[` `]` `^` `` ` `` `{` `}` 这些在 Windows 上完全合法的字符转成 `%XX`，
+  替换完路径就不存在；UNC 路径 `file://server/share/a.mp4` 只有两个斜杠，连前缀
+  都剥不掉，网络共享 100% 不可用。新增 `@Slot(QUrl, result=str) localPath(url)`
+  走 `url.toLocalFile()`，`main.qml` 四处对话框全部改用它。
+
+新增 `desktop/tests/test_qml_bridge.py`（15 条）：11 个合法字符逐个往返、UNC、
+worker 非 daemon、`waitWorker` 的两态、以及一条源码守卫（`replace("file:///")`
+再出现、`onClosing` 消失都算回归）。
+
 ### 测试（Go Ultra 机型适配）
 
 新增 11 条，全部用合成 MP4 覆盖，不需要真机素材也能守住：
