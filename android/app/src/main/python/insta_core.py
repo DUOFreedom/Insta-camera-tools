@@ -48,6 +48,90 @@ VID_FPS = "60000/1001"                 # 实测真机主视频为 60fps
 INS_PREFIX = "\x10"
 LRV_BITRATE = 4_000_000
 
+# 预设机型参数表（当没有真机模板时使用）
+CAMERA_PRESETS = {
+    "auto": {
+        "label": "自动（从卡里原片量出）",
+        "spec": None,
+    },
+    "ace_pro_2": {
+        "label": "Ace Pro 2",
+        "spec": {
+            "video": {
+                "codec": "libx265",
+                "width": 1920,
+                "height": 1080,
+                "fps": "60000/1001",
+                "pix_fmt": "yuvj420p",
+                "color_range": "pc",
+                "codec_tag": "hvc1",
+                "handler": "INS.HVC",
+                "encoder": "HVC encoder",
+                "profile": "main",
+                "level": 153,
+                "gop": 16,
+            },
+            "lrv_video": {
+                "codec": "libx264",
+                "width": 1280,
+                "height": 720,
+                "fps": "30000/1001",
+                "pix_fmt": "yuvj420p",
+                "color_range": "pc",
+                "codec_tag": "avc1",
+                "handler": "INS.AVC",
+                "encoder": "AVC encoder",
+                "profile": "high",
+                "level": 153,
+                "gop": 16,
+            },
+            "audio_tracks": [
+                {"codec": "aac", "sample_rate": "48000", "channels": "2",
+                 "bit_rate": "192k", "handler": "INS.AAC"},
+                {"codec": "aac", "sample_rate": "48000", "channels": "2",
+                 "bit_rate": "192k", "handler": "INS.TimeCode"},
+            ],
+        },
+    },
+    "go_ultra": {
+        "label": "GO Ultra",
+        "spec": {
+            "video": {
+                "codec": "libx265",
+                "width": 1920,
+                "height": 1080,
+                "fps": "60000/1001",
+                "pix_fmt": "yuvj420p",
+                "color_range": "pc",
+                "codec_tag": "hvc1",
+                "handler": "INS.HVC",
+                "encoder": "HVC encoder",
+                "profile": "main",
+                "level": 153,
+                "gop": 120,
+            },
+            "lrv_video": {
+                "codec": "libx265",
+                "width": 1280,
+                "height": 720,
+                "fps": "30000/1001",
+                "pix_fmt": "yuvj420p",
+                "color_range": "pc",
+                "codec_tag": "hvc1",
+                "handler": "INS.HVC",
+                "encoder": "HVC encoder",
+                "profile": "main",
+                "level": 153,
+                "gop": 10,
+            },
+            "audio_tracks": [
+                {"codec": "aac", "sample_rate": "48000", "channels": "2",
+                 "bit_rate": "192k", "handler": "INS.AAC"},
+            ],
+        },
+    },
+}
+
 _NO_WINDOW = 0
 if os.name == "nt":
     _NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
@@ -988,14 +1072,20 @@ def _fps_num(fps) -> float:
     except (ValueError, ZeroDivisionError, TypeError):
         return 30.0
 
-def _build_spec_tasks(input_path, output_dir, seq, stamp, hw, spec):
-    """根据原生结构 spec（或影石回退）构建本文件的任务列表。
+def _build_spec_tasks(input_path, output_dir, seq, stamp, hw, spec, model_override: str = "auto"):
+    """根据原生结构 spec（或影石回退/机型预设）构建本文件的任务列表。
 
     返回 (tasks, extra):
         tasks = [(label, dst, vcodec, tag, w, h, fps, vh, ve, color_range,
-                 pix_fmt, audio_tracks, profile)]
+                  pix_fmt, audio_tracks, profile, level, gop)]
         extra  = 硬件额外参数
     """
+    # 如果指定了机型预设，且没有真机模板 spec，用预设填补
+    if model_override != "auto" and (not spec or not spec.get("video")):
+        preset = CAMERA_PRESETS.get(model_override)
+        if preset and preset["spec"]:
+            spec = preset["spec"]
+
     #   否则会把主视频编成 854x480/h264，彻底错位。
     if (spec or {}).get("role") == "proxy":
         spec = dict(spec or {})
@@ -1082,7 +1172,8 @@ def convert(input_path: str, output_dir: str, start_number: int | None = None,
             encoder: tuple[str, str, str] | None = None,
             progress=None, spec: dict | None = None,
             jobs: int | None = None,
-            cancel: threading.Event | None = None) -> tuple[str, str | None]:
+            cancel: threading.Event | None = None,
+            model_override: str = "auto") -> tuple[str, str | None]:
     """转换一个视频为相机可识别的格式。返回 (main_path, preview_path)。
 
     参数:
@@ -1095,6 +1186,7 @@ def convert(input_path: str, output_dir: str, start_number: int | None = None,
         progress     进度回调 progress(overall_frac, label, speed, eta_sec)
         jobs         并行转码路数；None = 主视频与预览同时编
         cancel       threading.Event；置位时中断转码
+        model_override 机型预设："auto" / "ace_pro_2" / "go_ultra"
 
     前置条件:
         input_path 存在且为常规文件；
@@ -1169,7 +1261,7 @@ def convert(input_path: str, output_dir: str, start_number: int | None = None,
         except (TypeError, ValueError) as e:
             raise ValidationError(f"start_number 必须为整数: {start_number}") from e
 
-    tasks, extra = _build_spec_tasks(input_path, output_dir, seq, stamp, hw, spec)
+    tasks, extra = _build_spec_tasks(input_path, output_dir, seq, stamp, hw, spec, model_override)
 
     info = probe(input_path)
     dur = 0.0
@@ -1402,7 +1494,8 @@ def batch_convert(file_list: list[str], output_dir: str,
                   encoder: tuple[str, str, str] | None = None,
                   progress=None, spec: dict | None = None,
                   use_card_time: bool = False,
-                  cancel: threading.Event | None = None
+                  cancel: threading.Event | None = None,
+                  model_override: str = "auto"
                   ) -> tuple[list[tuple[str, str, str | None]],
                              list[tuple[str, str]]]:
     """批量转换。每个文件使用【各自的创建时间】作为文件名时间戳，
@@ -1424,6 +1517,7 @@ def batch_convert(file_list: list[str], output_dir: str,
         spec         原生视频结构；None 时回退默认结构
         use_card_time 是否接续卡里已有文件时间
         cancel       threading.Event；置位时中断整个批量任务
+        model_override 机型预设："auto" / "ace_pro_2" / "go_ultra"
 
     前置条件:
         file_list 为字符串列表，元素须为存在的文件路径；
@@ -1517,7 +1611,7 @@ def batch_convert(file_list: list[str], output_dir: str,
         try:
             main, preview = convert(src, output_dir, start_number=seq, stamp=stamp,
                                     log=log, encoder=hw, progress=_wrap, spec=spec,
-                                    cancel=cancel)
+                                    cancel=cancel, model_override=model_override)
             success.append((src, main, preview))
         except CanceledError:
             raise
@@ -2360,7 +2454,8 @@ def import_with_inst(source: str, card_root: str,
                      progress=None, cancel: threading.Event | None = None,
                      spec: dict | None = None,
                      cover: str | None = None,
-                     template_names: tuple[str, str] | None = None) -> dict:
+                     template_names: tuple[str, str] | None = None,
+                     model_override: str = "auto") -> dict:
     """【完整导入】转码 + `.inst` 移植 + 索引登记（三步全做）。
 
     相机识别的三个必要条件：
@@ -2464,7 +2559,7 @@ def import_with_inst(source: str, card_root: str,
     p_transcode = _stage_cb(progress, 0.0, 0.70, "转码")
     main_path, proxy_path = convert(source, cam, encoder=encoder,
                                     spec=spec, log=None, progress=p_transcode,
-                                    cancel=cancel)
+                                    cancel=cancel, model_override=model_override)
 
     say("步骤 2/3 移植 inst box...")
     import tempfile as _temp

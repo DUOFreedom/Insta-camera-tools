@@ -76,6 +76,7 @@ class Bridge(QObject):
         self._hw = ""
         self._hw_checked = False
         self._seq_text = ""
+        self._model_override = "auto"  # "auto" / "ace_pro_2" / "go_ultra"
 
     @Property(bool, notify=busyChanged)
     def busy(self) -> bool:
@@ -217,6 +218,22 @@ class Bridge(QObject):
     def nextSequence(self) -> str:
         """输出目录里下一个可用序号（「自动接续序号」开着时才有意义）。"""
         return self._seq_text
+
+    @Property(str, notify=seqChanged)
+    def modelOverride(self) -> str:
+        """当前选择的机型预设："auto" / "ace_pro_2" / "go_ultra"。"""
+        return self._model_override
+
+    @Slot(str)
+    def setModelOverride(self, value: str) -> None:
+        val = str(value or "auto")
+        if val not in ("auto", "ace_pro_2", "go_ultra"):
+            self._set_error("未知机型预设: %s" % val)
+            return
+        if val == self._model_override:
+            return
+        self._model_override = val
+        self.seqChanged.emit()  # 复用 seqChanged 通知
 
     @Property(bool, notify=resumeChanged)
     def resumeOnly(self) -> bool:
@@ -934,6 +951,7 @@ class Bridge(QObject):
                             start_number=next_start,
                             template_names=self._spec_pair,
                             cover=item_cover,
+                            model_override=self._model_override,
                         )
                         if not result.get("inst_ok"):
                             raise RuntimeError(result.get("inst_error") or "inst 移植失败")
@@ -942,6 +960,7 @@ class Bridge(QObject):
                             src, out, encoder=encoder, spec=self._spec,
                             progress=on_progress, cancel=self._cancel,
                             log=self._set_status, start_number=next_start,
+                            model_override=self._model_override,
                         )
                     ok_count += 1
                     _item = self._job_item(job, src)
