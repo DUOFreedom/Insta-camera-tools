@@ -361,6 +361,9 @@ class App(QWidget):
         self.auto_seq = True
         self.spec = None
         self.spec_path = None
+        #   记下用户选的那一对样本名：卡里可能还躺着之前导入的产物，
+        #   它们同样带 inst box，按字典序挑模板会挑中它们。
+        self.spec_pair = None
         self.cover_path = None
         self.covers: dict[str, str] = {}
         #   抢同一个 next_seq() 序号、同时写同一对 VID/LRV。
@@ -698,6 +701,7 @@ class App(QWidget):
                     path_for_main = path
 
                 sp = analyze_native(path_for_main)
+                pair = None
                 if os.path.basename(path_for_main).upper().startswith("VID_"):
                     lrv = os.path.join(d, stem.replace("VID_", "LRV_", 1) + ".lrv")
                     if os.path.isfile(lrv):
@@ -705,6 +709,8 @@ class App(QWidget):
                             sp["lrv_video"] = analyze_native(lrv)["video"]
                         except Exception:  # noqa: BLE001
                             pass
+                        pair = (os.path.basename(path_for_main), os.path.basename(lrv))
+                sp["__pair__"] = pair
                 self._sig_spec.emit(sp)
             except Exception as e:  # noqa: BLE001
                 self._sig_spec.emit({"__error__": f"样本分析失败: {e}"})
@@ -718,6 +724,7 @@ class App(QWidget):
             return
         self.spec = sp
         self.spec_path = sp.get("filename")
+        self.spec_pair = sp.get("__pair__")
         self.spec_label.setText(self._summarize_spec(sp))
         self.status_label.setText("已读取相机样本结构，转换将按其生成。")
 
@@ -1140,14 +1147,16 @@ class App(QWidget):
             #   避免关窗后线程被直接丢弃、ffmpeg 变孤儿继续写卡。
             self._worker = threading.Thread(target=self._run_all,
                                             args=(out, auto, enc, spec, do_index,
-                                                  dict(self.covers), todo),
+                                                  dict(self.covers), todo,
+                                                  self.spec_pair),
                                             daemon=False)
             self._worker.start()
         finally:
             if not self._worker or not self._worker.is_alive():
                 self._busy = False
 
-    def _run_all(self, out, auto, enc, spec, do_index=False, covers=None, todo=None):
+    def _run_all(self, out, auto, enc, spec, do_index=False, covers=None, todo=None,
+                 spec_pair=None):
         covers = covers or {}
         todo = list(todo or self.files)
         try:
@@ -1167,7 +1176,12 @@ class App(QWidget):
 
             tpl = None
             if do_index:
-                tpl = core.find_native_template(dest)
+                #   用户选了样本对就直接用它，别再按字典序猜 —— 卡里可能还躺着
+                #   之前导入的产物，它们同样带 inst box，猜错会让相机不认。
+                if spec_pair:
+                    tpl = core.template_from_names(dest, spec_pair[0], spec_pair[1])
+                if tpl is None:
+                    tpl = core.find_native_template(dest)
 
             ok, bad = [], []
             total = max(1, len(todo))
@@ -1198,7 +1212,7 @@ class App(QWidget):
                             src, dest, template=tpl, log=self._sig_status.emit,
                             encoder=enc_arg, progress=_cb, spec=spec,
                             cover=item_cover, cancel=self._cancel,
-                            start_number=next_start)
+                            start_number=next_start, template_names=spec_pair)
                         if res.get("inst_metas"):
                             media_metas.update(res.get("inst_metas") or {})
                         for _ie in (res.get("inst_error") or "").split("; "):

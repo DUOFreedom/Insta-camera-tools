@@ -80,3 +80,23 @@ def test_template_from_names_rejects_file_without_inst_meta(mirror, monkeypatch)
     """没有 inst box 的文件不是真机原片，不能当模板。"""
     monkeypatch.setattr(ic, "extract_inst_meta", lambda _p: b"")
     assert ic.template_from_names(mirror, REAL_VID, REAL_LRV) is None
+
+
+def test_desktop_core_also_accepts_explicit_template_names(mirror, monkeypatch):
+    """桌面端同样不能靠猜。
+
+    这条修的是另一条真实路径：桌面端把产物写到卡上同一个 DCIM/Camera01
+    之后，用户再导入第二段，`find_native_template` 就会把第一段产物当模板。
+    桌面端原本没有 template_from_names，只有安卓端有。
+    """
+    desktop_dir = os.path.abspath(os.path.join(HERE, ".."))
+    if desktop_dir not in sys.path:
+        sys.path.insert(0, desktop_dir)
+    import core
+
+    monkeypatch.setattr(core, "extract_inst_meta", lambda _p: b"\x0a\x0e" + b"0" * 14)
+    picked = core.template_from_names(mirror, REAL_VID, REAL_LRV)
+    assert picked is not None
+    main, proxy, _meta = picked
+    assert os.path.basename(main) == REAL_VID
+    assert os.path.basename(proxy) == REAL_LRV

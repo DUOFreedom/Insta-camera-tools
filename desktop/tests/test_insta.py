@@ -948,3 +948,127 @@ def test_shrink_entry_strips_extras_from_avc1(tmp_path):
     tag, children = _entry_children(tf, path)
     assert tag == b"avc1"
     assert children == [b"avcC"], f"只该留 avcC，实际 {children}"
+
+
+def _fn_ast(path, name):
+    """取单个顶层函数的 ast（剥掉 docstring），用于比对两份手工同步的实现。"""
+    import ast
+    with open(path, encoding="utf-8-sig") as f:
+        tree = ast.parse(f.read())
+    node = next(n for n in tree.body
+                if isinstance(n, ast.FunctionDef) and n.name == name)
+    for sub in ast.walk(node):
+        body = getattr(sub, "body", None)
+        if isinstance(body, list) and body and isinstance(body[0], ast.Expr) \
+                and isinstance(body[0].value, ast.Constant) \
+                and isinstance(body[0].value.value, str):
+            sub.body = body[1:]
+    return ast.dump(node)
+
+
+def test_template_from_names_does_not_drift():
+    """桌面端与安卓端的 template_from_names 必须一致。
+
+    这个函数决定「拿哪一对文件当模板」。两边逻辑一旦不同，
+    症状是「桌面端导入正常、手机端相机不认」—— 而两端的导入链路
+    都是黑盒，单测里只能靠这条守卫发现。
+    """
+    android_core = os.path.join(os.path.dirname(ROOT), "android", "app",
+                                "src", "main", "python", "insta_core.py")
+    if not os.path.isfile(android_core):
+        pytest.skip("安卓端副本不在（只检出了桌面端）")
+    desktop_core = os.path.join(ROOT, "core.py")
+    assert _fn_ast(desktop_core, "template_from_names") == \
+        _fn_ast(android_core, "template_from_names"), (
+            "template_from_names 在 desktop/core.py 与 android insta_core.py "
+            "里已漂移：改一处必须同时改另一处")
+
+
+def test_import_with_inst_accepts_template_names():
+    """两端 import_with_inst 都要能接收调用方指定的模板名。
+
+    只加了参数却忘了在函数体里用，等于没加 —— 所以顺带断言
+    参数真的被读进了 template_from_names 的调用。
+    """
+    import inspect
+    android_core = os.path.join(os.path.dirname(ROOT), "android", "app",
+                                "src", "main", "python", "insta_core.py")
+    desktop_core = os.path.join(ROOT, "core.py")
+
+    sig = inspect.signature(core.import_with_inst)
+    assert "template_names" in sig.parameters, \
+        "desktop/core.py 的 import_with_inst 缺少 template_names 参数"
+
+    for path in (desktop_core, android_core):
+        if not os.path.isfile(path):
+            continue
+        src = open(path, encoding="utf-8-sig").read()
+        assert "template_from_names(card_root, template_names[0]" in src, (
+            f"{path} 收了 template_names 却没有传给 template_from_names")
+
+
+def test_import_with_inst_actually_uses_template_names(tmp_path, monkeypatch):
+    """行为验证：给了 template_names 就必须走它，不能退回自动猜。
+
+    上一版这条只 grep 源码字符串，把「if template_names:」改成
+    「if False:」仍然全绿 —— 断言太弱。这里改成真的调一次
+    import_with_inst，看 template_from_names 有没有被调用。
+    """
+    cam = tmp_path / "DCIM" / "Camera01"
+    cam.mkdir(parents=True)
+    (cam / "VID_20240101_090000_000.mp4").write_bytes(b"\x00" * 32)
+    (cam / "LRV_20240101_090000_000.lrv").write_bytes(b"\x00" * 32)
+
+    calls = []
+
+    def fake_from_names(card_root, vid, lrv):
+        calls.append((vid, lrv))
+        return None  # 让流程停在「找不到模板」，不必真的转码
+
+    monkeypatch.setattr(core, "template_from_names", fake_from_names)
+
+    src = tmp_path / "in.mp4"
+    src.write_bytes(b"\x00" * 32)   # 只要存在即可，流程会停在找模板那一步
+
+    with pytest.raises(Exception):
+        core.import_with_inst(str(src), str(tmp_path),
+                              template_names=("VID_20240101_090000_000.mp4",
+                                              "LRV_20240101_090000_000.lrv"))
+    assert calls == [("VID_20240101_090000_000.mp4",
+                      "LRV_20240101_090000_000.lrv")],         f"template_names 没有被使用，实际调用 {calls}"
+
+
+def test_template_from_names_requires_matching_pair(tmp_path):
+    """指定的两个名字必须是同一对（VID_xxx / LRV_xxx 主干相同）。"""
+    import types
+    cam = tmp_path / "DCIM" / "Camera01"
+    cam.mkdir(parents=True)
+    for n in ("VID_20240101_090000_000.mp4", "LRV_20240101_090000_000.lrv",
+              "LRV_20230101_080000_000.lrv"):
+        (cam / n).write_bytes(b"\x00" * 16)
+    # 拼凑对：主名不同，必须拒绝
+    assert core.template_from_names(str(tmp_path),
+                                    "VID_20240101_090000_000.mp4",
+                                    "LRV_20230101_080000_000.lrv") is None
+
+
+def test_android_core_matches_desktop_on_hardened_helpers():
+    """几处「桌面端已修、安卓端忘了跟」的函数必须一致。
+
+    这四处都是真实缺陷的修复现场：
+      - save_job：安卓端静默吞 OSError，进度丢了用户不知道
+      - has_inst_box：安卓端留了读了不用且不关的句柄，卡大时累积
+      - render_cover：安卓端缺参数校验/超时/ffmpeg 判空，无 ffmpeg 时报 TypeError
+      - template_from_names：安卓端有、桌面端原本没有
+    方向永远是「桌面端改了、安卓端忘了跟」，所以比对两边实现。
+    """
+    android_core = os.path.join(os.path.dirname(ROOT), "android", "app",
+                                "src", "main", "python", "insta_core.py")
+    if not os.path.isfile(android_core):
+        pytest.skip("安卓端副本不在（只检出了桌面端）")
+    desktop_core = os.path.join(ROOT, "core.py")
+    drifted = [fn for fn in ("save_job", "has_inst_box", "render_cover",
+                             "template_from_names")
+               if _fn_ast(desktop_core, fn) != _fn_ast(android_core, fn)]
+    assert not drifted, (
+        f"这些函数在 desktop/core.py 与 android insta_core.py 之间已漂移：{drifted}")

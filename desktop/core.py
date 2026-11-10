@@ -1633,6 +1633,31 @@ def find_native_template(card_root: str) -> tuple | None:
         return main, proxy, bytes(meta)
     return None
 
+def template_from_names(card_root: str, vid_name: str, lrv_name: str) -> tuple | None:
+    """按指定文件名取模板对，不做任何猜测。
+
+    `find_native_template` 的规则是「字典序第一个带 inst meta 的 VID_」。
+    安卓端在镜像目录上跑导入，而镜像里同时有真机原片和上一轮的转码产物
+    ——后者自带 inst box，完全符合挑选条件。只要它的名字排在真机原片前面，
+    就会被当成模板，产出的东西相机不认，且不抛任何异常。
+    所以安卓侧改为把「从卡上复制过来的是哪两个文件」直接告诉核心。
+    """
+    cam = camera_dir(card_root)
+    main = os.path.join(cam, os.path.basename(vid_name))
+    proxy = os.path.join(cam, os.path.basename(lrv_name))
+    if not os.path.isfile(main) or not os.path.isfile(proxy):
+        return None
+    # VID_ 与 LRV_ 后面那段必须一致，否则是把两段不同的素材凑成一对：
+    #   分辨率/帧率/音频参数都对不上，移植出来的东西相机同样不认。
+    #   比到扩展名前为止——两者扩展名本来就不一样（.mp4 / .lrv）。
+    if os.path.splitext(vid_name)[0][4:].lower() != os.path.splitext(lrv_name)[0][4:].lower():
+        return None
+    meta = extract_inst_meta(main)
+    if not meta:
+        return None
+    return main, proxy, bytes(meta)
+
+
 def camera_dir(card_root: str) -> str:
     """视频应放置的目录：<卡根>\\DCIM\\Camera01"""
     return os.path.join(_card_root(card_root), "DCIM", "Camera01")
@@ -1930,6 +1955,8 @@ def render_cover(image_path: str, output: str,
     if cancel is None:
         # 归一化成真实 Event：下游一律直接 cancel.is_set()，不再逐处判 None。
         cancel = threading.Event()
+    if cancel.is_set():
+        raise CanceledError("已取消")
     ff = find_ffmpeg()
     if not ff:
         raise ValidationError("未找到 ffmpeg，无法渲染封面")
@@ -2156,7 +2183,8 @@ def import_with_inst(source: str, card_root: str,
                      progress=None, cancel: threading.Event | None = None,
                      spec: dict | None = None,
                      cover: str | None = None,
-                     start_number: int | None = None) -> dict:
+                     start_number: int | None = None,
+                     template_names: tuple[str, str] | None = None) -> dict:
     """【完整导入】转码 + `.inst` 移植 + 索引登记（三步全做）。
 
     相机识别的三个必要条件：
@@ -2239,6 +2267,9 @@ def import_with_inst(source: str, card_root: str,
     except OSError as e:
         raise CardError(f"无法创建相机卡目录 {cam}: {e}") from e
 
+    if template is None and template_names:
+        # 调用方指定了样本对，就不要再按字典序猜：卡里可能还躺着上一轮的产物。
+        template = template_from_names(card_root, template_names[0], template_names[1])
     if template is None:
         template = find_native_template(card_root)
     if template is None:

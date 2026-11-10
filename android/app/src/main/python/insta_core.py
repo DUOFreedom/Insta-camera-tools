@@ -1372,8 +1372,13 @@ def convert(input_path: str, output_dir: str, start_number: int | None = None,
                     # 取消不是「某一路失败」，不能交给 first_error 汇总，
                     #   否则取消会被当成转码成功返回给调用方。
                     canceled = True
-                except BaseException:
-                    pass
+                except BaseException as e:
+                    # _run_one 只在 _run_ffmpeg 外层记录 first_error；构建命令行、
+                    #   探测时长等更早的步骤抛异常时没人记，会被这里静默吞掉，
+                    #   于是 convert() 返回 (None, None) 而用户看不到任何报错。
+                    #   这里兜底记录，保证并发路径不会把失败变成"成功"。
+                    if first_error is None:
+                        first_error = e
         if first_error is not None:
             raise first_error
         if canceled:
@@ -1630,7 +1635,7 @@ def has_inst_box(path: str) -> tuple[bool, int]:
     返回 (是否存在, box 字节数)。
     """
     try:
-        data = open(path, "rb").read(64)
+        #   句柄不关会泄漏：verify_card 对每条索引条目调一次，卡大时累积。
         # 只读头部拿不到尾 box，需完整扫描；用轻量方式
         size = os.path.getsize(path)
         with open(path, "rb") as f:
@@ -1783,8 +1788,8 @@ def template_from_names(card_root: str, vid_name: str, lrv_name: str) -> tuple |
     所以安卓侧改为把「从卡上复制过来的是哪两个文件」直接告诉核心。
     """
     cam = camera_dir(card_root)
-    main = os.path.join(cam, vid_name)
-    proxy = os.path.join(cam, lrv_name)
+    main = os.path.join(cam, os.path.basename(vid_name))
+    proxy = os.path.join(cam, os.path.basename(lrv_name))
     if not os.path.isfile(main) or not os.path.isfile(proxy):
         return None
     # VID_ 与 LRV_ 后面那段必须一致，否则是把两段不同的素材凑成一对：
@@ -2097,17 +2102,49 @@ def register_to_card(card_root: str, media_paths: list[str],
 
 COVER_WIDTH, COVER_HEIGHT = 896, 512
 
-def render_cover(image_path: str, output: str) -> bytes:
+def render_cover(image_path: str, output: str,
+                 cancel: threading.Event | None = None,
+                 timeout: float = 120.0) -> bytes:
     """把任意图片渲染成相机封面用的原始帧（896x512 NV12）。
 
       同名封面图（a.mp4 → a.jpg）也走这里，不直接拿原像素。
     """
+    if not isinstance(image_path, str) or not image_path:
+        raise ValidationError("image_path 必须为非空字符串")
+    if not os.path.isfile(image_path):
+        raise FileNotFoundError(f"封面图不存在: {image_path}")
+    if not isinstance(output, str) or not output:
+        raise ValidationError("output 必须为非空字符串")
+    if cancel is not None and not isinstance(cancel, threading.Event):
+        raise ValidationError("cancel 必须为 threading.Event 或 None")
+    if cancel is None:
+        # 归一化成真实 Event：下游一律直接 cancel.is_set()，不再逐处判 None。
+        cancel = threading.Event()
+    if cancel.is_set():
+        raise CanceledError("已取消")
+    ff = find_ffmpeg()
+    if not ff:
+        #   不判 None 会把 None 塞进 argv[0]，报成 TypeError，掩盖真因。
+        raise ValidationError("未找到 ffmpeg，无法渲染封面")
+
     vf = (f"scale={COVER_WIDTH}:{COVER_HEIGHT}:force_original_aspect_ratio=decrease,"
           f"pad={COVER_WIDTH}:{COVER_HEIGHT}:(ow-iw)/2:(oh-ih)/2:black")
-    cmd = [find_ffmpeg(), "-hide_banner", "-loglevel", "error", "-y",
+    cmd = [ff, "-hide_banner", "-loglevel", "error", "-y",
            "-i", str(image_path), "-vf", vf, "-frames:v", "1",
            "-pix_fmt", "nv12", "-f", "rawvideo", str(output)]
-    subprocess.run(cmd, check=True, creationflags=_NO_WINDOW)
+    try:
+        subprocess.run(cmd, check=True, creationflags=_NO_WINDOW, timeout=timeout)
+    except subprocess.TimeoutExpired as e:
+        raise FFmpegError(
+            f"封面渲染超时（>{timeout}s）: {image_path}",
+            cmd=cmd, returncode=None, stderr="", retryable=False) from e
+    except subprocess.CalledProcessError as e:
+        err = (e.stderr.decode("utf-8", "replace")[:200]
+               if e.stderr else str(e))
+        raise FFmpegError(
+            f"封面渲染失败: {err}",
+            cmd=cmd, returncode=e.returncode, stderr=err,
+            retryable=False) from e
     data = Path(output).read_bytes()
     if len(data) != COVER_WIDTH * COVER_HEIGHT * 3 // 2:
         raise ValueError(f"封面尺寸异常: {len(data)} 字节")
@@ -2259,17 +2296,18 @@ def load_job(dest: str) -> dict | None:
 
 
 def save_job(dest: str, job: dict) -> None:
-    """原子写入，避免中途断电把进度文件写坏。"""
+    """原子写入，避免中途断电把进度文件写坏。
+
+    写入失败向上抛 OSError，由调用方决定是否中断主流程；
+    不再静默吞掉，避免断点续跑进度丢失而用户无感知。
+    """
     p = job_path(dest)
     tmp = p + ".tmp"
-    try:
-        with open(tmp, "w", encoding="utf-8") as f:
-            json.dump(job, f, ensure_ascii=False, indent=1)
-            f.flush()
-            os.fsync(f.fileno())
-        os.replace(tmp, p)
-    except OSError:
-        pass
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(job, f, ensure_ascii=False, indent=1)
+        f.flush()
+        os.fsync(f.fileno())
+    os.replace(tmp, p)
 
 
 _ES_CONTINUOUS = 0x80000000
@@ -2310,7 +2348,8 @@ def import_with_inst(source: str, card_root: str,
                      log=None, encoder: tuple[str, str, str] | None = None,
                      progress=None, cancel: threading.Event | None = None,
                      spec: dict | None = None,
-                     cover: str | None = None) -> dict:
+                     cover: str | None = None,
+                     template_names: tuple[str, str] | None = None) -> dict:
     """【完整导入】转码 + `.inst` 移植 + 索引登记（三步全做）。
 
     相机识别的三个必要条件：
@@ -2385,6 +2424,9 @@ def import_with_inst(source: str, card_root: str,
     except OSError as e:
         raise CardError(f"无法创建相机卡目录 {cam}: {e}") from e
 
+    if template is None and template_names:
+        # 调用方指定了样本对，就不要再按字典序猜：卡里可能还躺着上一轮的产物。
+        template = template_from_names(card_root, template_names[0], template_names[1])
     if template is None:
         template = find_native_template(card_root)
     if template is None:
@@ -2424,7 +2466,7 @@ def import_with_inst(source: str, card_root: str,
         thumbnail = None
         if cover:
             try:
-                thumbnail = render_cover(cover, str(thumb_path))
+                thumbnail = render_cover(cover, str(thumb_path), cancel=cancel)
                 say(f"封面: 使用自定义图片 {os.path.basename(cover)}")
             except Exception as _ce:
                 say(f"  自定义封面处理失败，改用视频取帧: {_ce}")

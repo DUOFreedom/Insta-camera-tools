@@ -25,6 +25,44 @@
 
 顺带确认了一处**不是缺陷**的：GO Ultra 的 LRV 与 VID 的 `nail` box 完全相同（688144 B = 896×512×1.5 裸 YUV420），说明两代机型共用同一张缩略图规格，`camera_udta` 里的 `nail_size != 688144` 校验对 GO Ultra 也成立。
 
+### 修复（模板误选：桌面端补齐、两端统一）
+
+`c6bbf01` 那次修的「上一轮产物被当成真机模板」只修了安卓端 —— 桌面端仍然走
+`find_native_template()` 的「字典序第一个带 inst meta 的 VID_」。桌面端把产物
+写回卡上同一个 `DCIM/Camera01` 之后，用户再导入第二段就会踩同一个坑，症状一样
+是「相机不认」且不报错。
+
+- 桌面端补 `template_from_names(card_root, vid_name, lrv_name)`，与安卓端逐行一致，
+  并有 AST 守卫测试防漂移。
+- `import_with_inst(..., template_names=)` 两端都支持：调用方指定了样本对就不再猜。
+- 桌面端 GUI 真正接上了：`_analyze_spec` 记下用户选的那一对（`sp["__pair__"]`），
+  `_run_all` 先试 `template_from_names` 再退回 `find_native_template`。原先
+  `_run_all` 无条件调 `find_native_template`，而 `import_with_inst` 里 `template`
+  优先于 `template_names` —— 用户选的样本对等于完全没生效。
+- 新增 `test_import_with_inst_actually_uses_template_names` 做**行为**验证。
+  第一版只 grep 源码字符串，把 `if template is None and template_names:` 改成
+  `if False and template_names:` 仍然全绿，等于没测；改成真调一次、断言
+  `template_from_names` 收到的参数后才拦住。
+
+### 修复（安卓端跟齐桌面端的四处硬化）
+
+审查报告指出四处「桌面端改了、安卓端忘了跟」，全部是安卓落后：
+
+- `save_job`：安卓端 `except OSError: pass` 静默吞掉写失败，断点续跑进度丢了用户
+  无感知。改成向上抛，与桌面端一致。
+- `has_inst_box`：安卓端留着 `data = open(path,"rb").read(64)` —— 读了不用且句柄
+  不关，`verify_card` 每条索引条目调一次，卡大时句柄累积。删除。
+- `render_cover`：安卓端缺全部硬化（无参数校验、无 cancel、无 timeout、
+  `find_ffmpeg()` 不判 None 直接当 argv[0]）。无 ffmpeg 时报 `TypeError` 而不是
+  「未找到 ffmpeg」；`check=True` 的 `CalledProcessError` 裸冒泡。补齐，并让桌面端
+  也加上同一处 `cancel.is_set()` 早退，两端实现逐行一致。
+- `convert` 并发驱动：安卓端 `except BaseException: pass` 会吞掉构建命令行/探测
+  时长阶段抛的异常，`convert()` 返回 `(None, None)` 而用户看不到报错 —— 即「失败
+  报成成功」。与桌面端一样兜底记 `first_error`。
+
+新增 `test_android_core_matches_desktop_on_hardened_helpers` 用 AST 比对这四个函数，
+方向明确：桌面端是基准，安卓端跟齐。
+
 ### 测试（Go Ultra 机型适配）
 
 新增 11 条，全部用合成 MP4 覆盖，不需要真机素材也能守住：
