@@ -1,4 +1,4 @@
-<div align="center">
+﻿<div align="center">
 
 <img src="assets/app.svg" width="120" alt="影石相机工具">
 
@@ -38,13 +38,13 @@
 
 ## 下载
 
-从 [**Releases**](../../releases/latest) 下载 `InstaAceImporter.exe`，双击运行，无需安装。
+从 [**Releases**](../../releases/latest) 下载 `InstaAceQml.exe`，双击运行，无需安装。
 
 ```text
-InstaAceImporter.exe   约 39 MB（单文件，免安装）
+InstaAceQml.exe   约 79 MB（单文件，免安装）
 ```
 
-> 校验方法：`Get-FileHash .\InstaAceImporter.exe -Algorithm SHA256`
+> 校验方法：`Get-FileHash .\InstaAceQml.exe -Algorithm SHA256`
 >
 > 每个 Release 页面会公布该次产物的 SHA256。从源码自行打包得到的哈希必然不同——PyInstaller 会把构建时间写进产物，同样的代码每次构建结果都不一致。
 
@@ -147,17 +147,12 @@ PyInstaller 打包的未签名程序会触发 SmartScreen，这是预期行为�
 不会覆盖已有素材。索引写入前会重读现有内容，只追加/替换自己的条目。
 </details>
 
-## 两套界面
+## 界面
 
-仓库里有**两套**桌面界面，功能等价，任选其一：
+界面层是 PySide6 + QML（`main.py` + `bridge.py` + `qml/`），与 `core.py` 及 `shared/`
+下的 `insta_index.py`、`instbox/` 分离。早期还有一套 PyQt5 经典界面，已删除。
 
-| 界面 | 技术栈 | 入口 | 构建脚本 | 产物形态 |
-|---|---|---|---|---|
-| 经典版 | PyQt5 5.15 | `gui.py` | `build.bat` / `run.bat` | 单文件 `dist\InstaAceImporter.exe` |
-| QML 版 | PySide6 6.5+ | `main.py` + `bridge.py` + `qml/` | `build_qml.bat` / `run_qml.bat` | 单文件 `dist\InstaAceQml.exe`（约 79 MB） |
-
-两套共用同一份 `core.py` 与 `shared/` 下的 `insta_index.py`、`instbox/`，只是界面层不同。
-QML 版依赖 PySide6（LGPL-3.0），经典版依赖 PyQt5（GPL-3.0），两者均列在 `requirements.txt`。
+PySide6 是 Qt 官方绑定，LGPL-3.0 授权。
 
 ## 从源码构建
 
@@ -167,16 +162,11 @@ cd Insta-camera-tools\desktop
 
 pip install -r requirements.txt
 
-# 经典版（PyQt5，单文件 exe）
-python gui.py
-python -m PyInstaller --noconfirm InstaAceImporter.spec
-
-# QML 版（PySide6，单文件 exe）
 python main.py
 python -m PyInstaller --noconfirm InstaAceQml.spec
 ```
 
-打包产物分别在 `dist\InstaAceImporter.exe` 与 `dist\InstaAceQml\`。
+打包产物是 `dist\InstaAceQml.exe`。
 
 **环境要求：** Windows 10 / 11，Python 3.10 及以上，ffmpeg 与 ffprobe 在 PATH 中或放在 `bin\`。
 
@@ -186,18 +176,16 @@ python -m PyInstaller --noconfirm InstaAceQml.spec
 Insta-camera-tools\
 ├─ desktop\                       桌面端（Windows）
 │  ├─ core.py                     核心：转码、inst 移植、索引登记、开工体检
-│  ├─ gui.py                      经典版界面（PyQt5）：拖拽、三阶段进度、任务队列
-│  ├─ main.py                     QML 版入口（PySide6），加载 qml\main.qml
-│  ├─ bridge.py                   QML 版与 core.py 之间的槽/信号桥
-│  ├─ updater.py                  QML 版更新检查（GitHub Releases）
-│  ├─ qml\                        24 个 QML 组件与视图
+│  ├─ main.py                     入口（PySide6），加载 qml\main.qml
+│  ├─ bridge.py                   界面与 core.py 之间的槽/信号桥
+│  ├─ tray.py                     系统托盘（转换中最小化继续跑）
+│  ├─ updater.py                  更新检查（GitHub Releases）
+│  ├─ qml\                        23 个 QML 组件与视图
 │  ├─ assets\                     图标资源（SVG / ICO / PNG）与内嵌字体
 │  ├─ tests\test_insta.py         离线回归测试套件
 │  ├─ tools\make_icon.py          SVG 转多尺寸 ICO 生成器
-│  ├─ build.bat / run.bat         经典版一键构建 / 一键运行
-│  ├─ build_qml.bat / run_qml.bat QML 版一键构建 / 一键运行
-│  ├─ InstaAceImporter.spec       经典版 PyInstaller 配置（onefile）
-│  ├─ InstaAceQml.spec            QML 版 PyInstaller 配置（onefile）
+│  ├─ build_qml.bat / run_qml.bat 一键构建 / 一键运行
+│  ├─ InstaAceQml.spec            PyInstaller 配置（onefile）
 │  ├─ requirements.txt            运行时依赖
 │  ├─ requirements-dev.txt        开发与测试依赖
 │  ├─ CHANGELOG.md                版本变更记录
@@ -282,9 +270,7 @@ python -m pytest -q
 | 组件 | 版本要求 | 许可证 | 用途 |
 |---|---|---|---|
 | [Python](https://www.python.org/) | 3.10+ | [PSF License](https://docs.python.org/3/license.html) | 运行环境 |
-| [PyQt5](https://riverbankcomputing.com/software/pyqt/) | ≥ 5.15 | [GPL-3.0](https://www.gnu.org/licenses/gpl-3.0.html) | 图形界面（Qt5 绑定） |
-| [Qt 5](https://www.qt.io/) | 5.15 | [LGPL-3.0](https://www.gnu.org/licenses/lgpl-3.0.html) / GPL-3.0 | PyQt5 底层框架 |
-| [PySide6](https://doc.qt.io/qtforpython/) | ≥ 6.5 | [LGPL-3.0](https://www.gnu.org/licenses/lgpl-3.0.html) | QML 版界面（Qt6 官方绑定） |
+| [PySide6](https://doc.qt.io/qtforpython/) | ≥ 6.5 | [LGPL-3.0](https://www.gnu.org/licenses/lgpl-3.0.html) | 图形界面（Qt6 官方绑定 + QML） |
 | [Qt 6](https://www.qt.io/) | 6.5+ | LGPL-3.0 / GPL-3.0 | PySide6 底层框架 |
 | [FFmpeg](https://ffmpeg.org/) | 任意近期版本 | [LGPL-2.1+](https://ffmpeg.org/legal.html) / GPL-2.0+ | 转码与封装 |
 
@@ -303,13 +289,11 @@ python -m pytest -q
 
 ### 协议兼容性说明
 
-本项目以 GPL-3.0 发布，包含两套并列的界面：经典版用 **PyQt5**（Riverbank 以 GPL-3.0 授权），QML 版用 **PySide6**（Qt 官方绑定，LGPL-3.0）。
+界面层用 **PySide6**（Qt 官方绑定，LGPL-3.0）。
 
-- PyQt5 的 GPL-3.0 与本项目协议一致，可整体以 GPL-3.0 分发。
-- PySide6 为 LGPL-3.0，作为动态链接库使用并保留其许可证声明即满足要求；本项目并未修改 Qt/PySide6 本身。
-- 两套界面**不互相依赖**：只分发其中之一时，只需保留对应那套的许可证声明。
-
-若你希望在闭源项目中复用本项目代码，请自行移除 PyQt5 部分（其 GPL-3.0 具有传染性），仅保留 PySide6 路径。
+- PySide6 以动态链接方式使用，保留其许可证声明即满足 LGPL-3.0 要求；本项目未修改 Qt/PySide6 本身。
+- 项目自身以 GPL-3.0 发布，与依赖的许可证不冲突。
+- 早期版本另有一套基于 PyQt5 的界面（PyQt5 是 GPL-3.0），已删除；当前仓库不再包含任何 PyQt5 代码或依赖。
 
 ## 致谢
 
@@ -317,13 +301,12 @@ python -m pytest -q
 
 - **[YCTS-otree](https://github.com/YCTS-otree)** —— 感谢其在影石相机文件格式逆向分析上的公开工作，为理解 `inst` box 布局与索引 protobuf 结构提供了重要参考
 - [FFmpeg](https://ffmpeg.org/) —— 转码与封装
-- [PyQt5](https://riverbankcomputing.com/software/pyqt/) —— 经典版界面框架
-- [PySide6](https://doc.qt.io/qtforpython/) / [Qt 6](https://www.qt.io/) —— QML 版界面框架
+- [PySide6](https://doc.qt.io/qtforpython/) / [Qt 6](https://www.qt.io/) —— 界面框架
 - [Insta360 官方社区](https://www.insta360.com/) —— 设备使用与格式相关的公开讨论
 
 ## 免责声明
 
-本项目为个人开发的第三方工具，与影石创新科技股份有限公司无任何关联，未获其授权或认可。Insta360、Ace Pro 是影石的商标。
+本项目为个人开发的第三方工具，与影石创新科技股份有限公司无任何关联，未获其授权或认可。Insta360、Ace Pro、GO Ultra 是影石的商标。
 
 工具通过改写文件结构与相机索引实现导入，属于对未公开格式的逆向分析。使用前请自行备份相机卡内素材。因使用本工具导致的素材损坏、相机异常或保修问题，作者不承担责任。
 

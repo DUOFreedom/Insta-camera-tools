@@ -382,7 +382,7 @@ def test_camera_udta_writes_expected_amba_fields(tmp_path):
 
 # 铁律：shared/instbox 下的模块必须能被【包导入】与【平铺导入】两种方式加载。
 #   桌面端 core._load_inst_modules() 走 `import instbox.moov_rewrap`；
-#   PyInstaller（InstaAceImporter.spec 的 pathex=['../shared/instbox']）与
+#   PyInstaller（InstaAceQml.spec 的 pathex=['../shared','../shared/instbox']）与
 #   直接跑脚本走平铺 `import moov_rewrap`。
 #   曾因 moov_rewrap 只做平铺导入（`import inst_transplant`，而该模块在
 #   shared/instbox/ 下），包导入必然 ModuleNotFoundError —— 桌面端从源码运行
@@ -1392,39 +1392,26 @@ def test_udta_with_mcrc_recomputes_for_own_mdat():
         assert mod.udta_with_mcrc(plain, mdat) == plain, f"{label} 给没有 MCRC 的 udta 加了 box"
 
 
-def test_resolve_encoder_returns_tuple_for_software():
-    """软件编码也必须返回三元组，且形参不能在下拉框里被覆盖。
+def test_encoder_label_maps_to_tuple_for_software():
+    """软件编码也必须返回三元组，而不是字符串或 None。
 
     core.convert 收到 encoder=None 会自动探测硬件编码器；只有
-    encoder[2] == "software" 的元组才会强制走软件编码。GUI 原来在「自动」
-    分支返回字符串 "software"，调用点再补一次转换 —— 两处都不该有这种
-    隐式约定。同时 _resolve_encoder 第一行把形参覆盖成下拉框的当前值，
-    等于「传什么就用什么」失效。
+    encoder[2] == "software" 的元组才会强制走软件编码。界面上选「自动」
+    「软件 (CPU)」以及任何没见过的选项都必须落到这个三元组上，否则用户的
+    显式选择会被 detect_hw_encoder() 静默推翻。
     """
-    import gui as gui_mod
+    import bridge as bridge_mod
 
-    class _Combo:
-        def __init__(self, text):
-            self._text = text
-
-        def currentText(self):
-            return self._text
-
-    class _Stub:
-        _resolve_encoder = gui_mod.App._resolve_encoder
-
-        def __init__(self, combo_text):
-            self.hw_combo = _Combo(combo_text)
-
-    # 形参优先：下拉框停在 NVIDIA，但传进来的是「自动」，必须按自动走
-    stub = _Stub("NVIDIA")
-    assert stub._resolve_encoder("自动（软件编码）") == ("", "", "software")
-    assert stub._resolve_encoder("NVIDIA（硬件编码）") == ("hevc_nvenc", "h264_nvenc", "NVIDIA")
-    assert stub._resolve_encoder("Intel（硬件编码）") == ("hevc_qsv", "h264_qsv", "Intel")
-    assert stub._resolve_encoder("AMD（硬件编码）") == ("hevc_amf", "h264_amf", "AMD")
-    # 未知选项与空串都退回软件，且类型一致（三元组）
-    assert stub._resolve_encoder("某个没见过的") == ("", "", "software")
-    assert stub._resolve_encoder("") == ("", "", "software")
+    resolve = bridge_mod.Bridge._encoder_tuple
+    assert resolve("自动") == ("", "", "software")
+    assert resolve("软件 (CPU)") == ("", "", "software")
+    assert resolve("NVIDIA") == ("hevc_nvenc", "h264_nvenc", "NVIDIA")
+    assert resolve("Intel") == ("hevc_qsv", "h264_qsv", "Intel")
+    assert resolve("AMD") == ("hevc_amf", "h264_amf", "AMD")
+    # 未知选项、空串、None 都退回软件，且类型一致（三元组）
+    assert resolve("某个没见过的") == ("", "", "software")
+    assert resolve("") == ("", "", "software")
+    assert resolve(None) == ("", "", "software")
 
 
 def test_batch_convert_rejects_non_integer_start_number(tmp_path):

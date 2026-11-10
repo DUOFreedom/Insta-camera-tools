@@ -6,8 +6,10 @@ from PySide6.QtCore import Qt, QUrl
 from PySide6.QtGui import QFontDatabase, QGuiApplication
 from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtQuickControls2 import QQuickStyle
+from PySide6.QtWidgets import QApplication
 
 from bridge import Bridge
+from tray import Tray
 from updater import Updater
 
 
@@ -29,11 +31,33 @@ def load_fonts(root: str) -> list[str]:
     return loaded
 
 
+def _show_window(engine: QQmlApplicationEngine) -> None:
+    """从托盘恢复主窗口：显示 + 置前 + 取消最小化。"""
+    roots = engine.rootObjects()
+    if not roots:
+        return
+    win = roots[0]
+    win.setProperty("visible", True)
+    win.setProperty("visibility", 2)          # Window.Windowed
+    try:
+        win.show()
+        win.raise_()
+        win.requestActivate()
+    except Exception:  # noqa: BLE001
+        pass
+
+
 def main() -> int:
     QQuickStyle.setStyle("Basic")
 
-    app = QGuiApplication(sys.argv)
+    #   QApplication 而不是 QGuiApplication：托盘图标要用 QSystemTrayIcon +
+    #   QMenu，QMenu 是 QWidget，没有 QApplication 会直接报
+    #   「QWidget: Cannot create a QWidget without QApplication」。
+    app = QApplication(sys.argv)
     app.setApplicationName("影石相机工具")
+    #   关窗由 QML 的 onClosing 决定，别让 Qt 自己把最后一个窗口关掉就退出 ——
+    #   否则「最小化到托盘继续跑」那一路刚隐藏窗口，进程就结束了。
+    app.setQuitOnLastWindowClosed(False)
 
     self_test = "--self-test" in sys.argv
     root = base_dir()
@@ -49,7 +73,12 @@ def main() -> int:
     context.setContextProperty("systemDark", app.styleHints().colorScheme() == Qt.ColorScheme.Dark)
     context.setContextProperty("selfTest", self_test)
     context.setContextProperty("loadedFonts", load_fonts(root))
-    context.setContextProperty("bridge", Bridge(engine))
+    bridge = Bridge(engine)
+    tray = Tray(os.path.join(root, "assets", "app.ico"), engine)
+    tray.showRequested.connect(lambda: _show_window(engine))
+    tray.quitRequested.connect(app.quit)
+    context.setContextProperty("bridge", bridge)
+    context.setContextProperty("tray", tray)
     context.setContextProperty("updater", Updater(engine))
     context.setContextProperty("updateDemo", os.environ.get("INSTA_UPDATE_DEMO") == "1")
 

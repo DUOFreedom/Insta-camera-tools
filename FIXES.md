@@ -4,6 +4,12 @@
 
 审查报告未随仓库分发（含设备标识与本机路径）。
 
+> **阅读提示**：本文档记录的是 2026-11-08 那次整改的当时状态。其中提到的
+> `desktop/gui.py`（PyQt5 经典界面）、`desktop/build.bat`、`desktop/run.bat`、
+> `desktop/InstaAceImporter.spec` 与 `dist/InstaAceImporter.exe` 已在后续版本删除，
+> 现在桌面端只有 QML 版（PySide6，`desktop/main.py` + `desktop/qml/`）。
+> 保留原文是为了让后来者能对照当时的判断依据。
+
 ---
 
 ## 一、验证结果（本机实测，可复现）

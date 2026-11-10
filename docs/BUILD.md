@@ -8,9 +8,9 @@
 
 - Python **3.10+**（3.11 / 3.12 / 3.13 均可；仓库不再指定某个具体小版本）
 - PyInstaller 6.x
-- PyQt5 >= 5.15（经典版）与/或 PySide6 >= 6.5（QML 版）
+- PySide6 >= 6.5
 
-两套界面的依赖都写在 `desktop/requirements.txt` 里，一次装齐即可：
+依赖都写在 `desktop/requirements.txt` 里：
 
 ```cmd
 cd desktop
@@ -21,42 +21,18 @@ pip install -r requirements.txt
 
 ```cmd
 cd desktop
-
-rem 经典版：PyQt5 单文件 exe -> dist\InstaAceImporter.exe
-build.bat
-
-rem QML 版：PySide6 单文件 exe -> dist\InstaAceQml.exe
 build_qml.bat
 ```
 
-两个脚本都只是 `python -m PyInstaller --noconfirm <spec>` 的薄封装，
+脚本只是 `python -m PyInstaller --noconfirm InstaAceQml.spec` 的薄封装，
 真正的打包参数在 spec 文件里（避免命令行漏掉 `--add-data`）。
-
-`desktop/build.bat` 内容：
-
-```bat
-@echo off
-chcp 936 >nul
-setlocal
-cd /d "%~dp0"
-python -c "import PyInstaller" 2>nul
-if errorlevel 1 (
-  echo [错误] 未安装 PyInstaller，请先执行: pip install pyinstaller
-  exit /b 1
-)
-python -m PyInstaller --noconfirm InstaAceImporter.spec
-echo EXITCODE=%ERRORLEVEL%
-endlocal
-```
-
-`build_qml.bat` 额外检查 `PySide6` 是否可导入，再调用 `InstaAceQml.spec`。
+脚本会先检查 PyInstaller 与 PySide6 是否可导入，再调用 `InstaAceQml.spec`。
 
 ### 产物
 
 | 文件 | 说明 |
 |------|------|
-| `desktop/dist/InstaAceImporter.exe` | 经典版，PyQt5，单文件，约 39 MB |
-| `desktop/dist/InstaAceQml.exe` | QML 版，PySide6，单文件（约 79 MB） |
+| `desktop/dist/InstaAceQml.exe` | PySide6，单文件（约 79 MB） |
 
 > QML 版为 onefile 单文件：首次启动需把约 79 MB 内容解压到 `%TEMP%`，
 > 冷启动约 2-5 秒，之后由系统缓存加速。若更在意启动速度，可把 spec 末尾改回
@@ -67,11 +43,10 @@ endlocal
 
 ```cmd
 cd desktop
-run.bat        rem 经典版，python gui.py
-run_qml.bat    rem QML 版，pythonw main.py
+run_qml.bat    rem pythonw main.py
 ```
 
-QML 版支持自检模式，用于 CI 或快速验证 QML 是否可加载：
+支持自检模式，用于 CI 或快速验证 QML 是否可加载：
 
 ```cmd
 python main.py --self-test
@@ -81,12 +56,10 @@ python main.py --self-test
 
 ### 打包说明
 
-- `--onefile --windowed`（经典版）：单文件、无控制台窗口
-- `hiddenimports=['inst_transplant','moov_rewrap']`：确保 shared/instbox 模块被打入 PYZ
-- `hiddenimports=['insta_index','instbox','instbox.inst_transplant','instbox.moov_rewrap']`（QML 版）：同上，另含 `insta_index`
-- `datas=[('assets','assets')]`：图标资源；QML 版另有 `('qml','qml')`
-- `pathex`：经典版为 `['../shared/instbox']`，QML 版为 `['../shared','../shared/instbox']`，
-  让 PyInstaller 能找到 `desktop/` 之外的两个共享模块
+- `--onefile --windowed`：单文件、无控制台窗口
+- `hiddenimports=['insta_index','instbox','instbox.inst_transplant','instbox.moov_rewrap']`：确保 shared 模块被打入 PYZ
+- `datas=[('qml','qml'),('assets','assets')]`：QML 与图标资源
+- `pathex=['../shared','../shared/instbox']`：让 PyInstaller 能找到 `desktop/` 之外的两个共享模块
 
 ## 二、安卓端构建
 
@@ -157,7 +130,7 @@ gradle --offline :app:testReleaseUnitTest
 |------|------|
 | `android/app/build/outputs/apk/release/app-release.apk` | 签名 APK，versionCode 14 / versionName 1.2.0，约 75.3 MB |
 
-实测产物约 75.3 MB（同一份源码不同次构建会浮动，最近一次为 75,281,949 B，原因见下）。
+实测产物约 75.3 MB（同一份源码不同次构建会浮动，最近一次为 75,279,539 B，原因见下）。
 
 **这个 APK 既不可复现哈希，也不可复现字节数。** 连编五次，字节数与 sha256 都不同。
 逐条比对两次构建，差异只有 5 个：`META-INF/CERT.RSA`、`META-INF/CERT.SF`、

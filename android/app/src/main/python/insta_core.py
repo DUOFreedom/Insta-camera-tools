@@ -480,12 +480,6 @@ def _st(s: dict, key: str, default=None):
     """安全取值，兼容缺省。"""
     return (s or {}).get(key, default)
 
-def _num(v, default=None):
-    try:
-        return int(float(v))
-    except (TypeError, ValueError):
-        return default
-
 def _fps_from_stream(s: dict) -> str:
     """从流信息里取帧率，返回【精确分数串】如 "60000/1001"。
 
@@ -802,28 +796,6 @@ def _fps_args(fps: str) -> list[str]:
     """
     num = str(fps).split("/")[0].strip() or "30000"
     return ["-r", fps, "-fps_mode", "cfr", "-movie_timescale", num]
-
-def _audio_map(index: int, track_spec: dict, src_index: int = 0) -> list[str]:
-    """返回一条音频输出流的完整参数（在流序号 a:index 上）。
-    track_spec = analyze_native() 返回的 audio_tracks 中的一项。
-    src_index  源文件里要映射的音频流下标（源不足时全部回退到 0）。
-    按样文件每轨的 codec/采样率/声道/码率/handler 复刻。
-    """
-    codec = track_spec.get("codec", "aac")
-    handler = _strip_prefix(track_spec.get("handler", "INS.AAC"))
-    sr = str(track_spec.get("sample_rate", "48000"))
-    ch = str(track_spec.get("channels", "2"))
-    br = str(track_spec.get("bit_rate", "192k"))
-    if not br.endswith("k") and br.isdigit():
-        br = br + "k"
-    return [
-        "-map", f"0:a:{src_index}",
-        f"-c:a:{index}", codec,
-        f"-ar:a:{index}", sr,
-        f"-ac:a:{index}", ch,
-        f"-b:a:{index}", br,
-        f"-metadata:s:a:{index}", f"handler_name={INS_PREFIX}{handler}",
-    ]
 
 def audio_inputs(audio_tracks, src_audio_count: int) -> list[str]:
     """源无音轨时，返回额外输入参数（在前面追加 anullsrc 静音源）。"""

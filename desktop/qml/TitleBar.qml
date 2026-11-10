@@ -6,6 +6,8 @@ Rectangle {
     property string title: ""
     property bool showThemeToggle: true
 
+    //   保留但禁用：主题切换直接改 Theme.dark 就够了，主窗口不需要再被
+    //   通知一次。信号声明保留备用，发射点停掉。
     signal themeToggleRequested()
 
     height: 40
@@ -52,7 +54,7 @@ Rectangle {
             iconName: "theme-toggle"
             onClicked: {
                 Theme.dark = !Theme.dark
-                root.themeToggleRequested()
+                // root.themeToggleRequested()  // 见上方「保留但禁用」
             }
         }
 

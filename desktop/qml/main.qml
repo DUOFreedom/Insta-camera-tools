@@ -15,6 +15,11 @@ Window {
     flags: Qt.Window | Qt.FramelessWindowHint
     color: "transparent"
 
+    onVisibleChanged: {
+        if (visible)
+            tray.hide()
+    }
+
     Component.onCompleted: {
         Theme.dark = systemDark
         if (selfTest)
@@ -29,6 +34,19 @@ Window {
         function onStateChanged() {
             if (updater.updateAvailable && !updateModal.open)
                 updateModal.open = true
+        }
+    }
+
+    //   窗口藏在托盘里跑完时，用户看不到状态栏 —— 必须主动提示一次，
+    //   否则「最小化到托盘」等于让人干等。
+    Connections {
+        target: bridge
+        function onBusyChanged() {
+            if (bridge.busy)
+                return
+            if (win.visible)
+                return
+            tray.notify("影石相机工具", bridge.status)
         }
     }
 
@@ -113,7 +131,8 @@ Window {
                                 ? "样本：" + bridge.sample
                                 : "未设置样本（回退到影石默认结构）"
                         onPickSample: sampleDialog.open()
-                        onAutoDetect: bridge.setStatusHint("请手动选择卡内的 VID_*.mp4 作为样本")
+                        //   输出目录常就是卡根或 DCIM，先按它找，找不到再扫盘符。
+                        onAutoDetect: bridge.autoDetectSample(outputView.outputDir)
                     }
 
                     InputFileView {
@@ -158,10 +177,13 @@ Window {
 
     //   转换中点 × 直接关窗的后果：进程退出 → ffmpeg 变孤儿继续往卡里写，
     //   set_awake(False) 永不执行（防休眠锁残留），卡上留半截 VID/LRV 且索引
-    //   没登记。经典版 gui.py 的 closeEvent 早就拦过这条路，QML 版此前没有。
+    //   没登记。
     onClosing: function (close) {
         if (!bridge.busy) {
             close.accepted = true
+            //   main.py 设了 setQuitOnLastWindowClosed(false)（否则「最小化
+            //   到托盘」刚藏起窗口进程就结束了），所以空闲时关窗必须显式退出。
+            Qt.quit()
             return
         }
         close.accepted = false
@@ -180,9 +202,12 @@ Window {
 
             Text {
                 width: parent.width
-                text: "当前任务尚未完成。停止转换并退出？
+                text: "当前任务尚未完成。
+
 "
-                    + "未完成的文件会留在输出目录，需要自行删除。"
+                    + "停止并退出：立刻中止，未完成的文件会留在输出目录，需要自行删除。
+"
+                    + "最小化到托盘：窗口隐藏，转换继续跑完，跑完会弹提示。"
                 wrapMode: Text.Wrap
                 color: Theme.textSecondary
                 font.family: Theme.fontFamily
@@ -210,6 +235,23 @@ Window {
                             closeModal.open = false
                             bridge.setStatusHint("后台进程尚未退出，请稍候再关闭")
                         }
+                    }
+                }
+
+                AppButton {
+                    //   托盘不可用（无桌面环境 / 某些 Linux）时不能给这个选项：
+                    //   窗口一藏，用户既看不到窗口也找不到托盘图标，等于把
+                    //   程序弄丢了。禁用并说明原因。
+                    text: tray.available ? "最小化到托盘" : "最小化到托盘（不可用）"
+                    btnHeight: 36
+                    accent: false
+                    enabled: tray.available
+                    onClicked: {
+                        closeModal.open = false
+                        win.visible = false
+                        tray.show()
+                        tray.notify("影石相机工具",
+                                    "转换在后台继续，完成后会再提示一次。")
                     }
                 }
 

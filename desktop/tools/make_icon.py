@@ -24,10 +24,10 @@ import os
 import struct
 import sys
 
-from PyQt5.QtCore import QBuffer, QByteArray, QIODevice, Qt
-from PyQt5.QtGui import QImage, QPainter
-from PyQt5.QtSvg import QSvgRenderer
-from PyQt5.QtWidgets import QApplication
+from PySide6.QtCore import QBuffer, QByteArray, QIODevice, Qt
+from PySide6.QtGui import QImage, QPainter
+from PySide6.QtSvg import QSvgRenderer
+from PySide6.QtWidgets import QApplication
 
 SIZES = [16, 24, 32, 48, 64, 128, 256]
 # ≤ 32px 用简化版（放大三角），否则环+三角在小尺寸会黏成一团

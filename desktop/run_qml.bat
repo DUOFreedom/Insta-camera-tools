@@ -1,7 +1,7 @@
 @echo off
 chcp 936 >nul
 rem 从源码直接启动 QML 版（PySide6），不带控制台窗口
-rem 与 run.bat 的区别：run.bat 启动 PyQt5 版 gui.py。
+rem 经典版（PyQt5 的 run.bat / gui.py）已删除，现在只有这一套界面。
 setlocal
 cd /d "%~dp0"
 python -c "import PySide6" 2>nul

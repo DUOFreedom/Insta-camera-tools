@@ -12,7 +12,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0--or--later-blue?style=flat-square" alt="License"></a>
   <a href="desktop/CHANGELOG.md"><img src="https://img.shields.io/badge/version-1.2.0-success?style=flat-square" alt="Version"></a>
   <a href="desktop/requirements.txt"><img src="https://img.shields.io/badge/python-3.10%2B-3776ab?style=flat-square" alt="Python"></a>
-  <a href="desktop/tests"><img src="https://img.shields.io/badge/tests-117%20passed-brightgreen?style=flat-square" alt="Tests"></a>
+  <a href="desktop/tests"><img src="https://img.shields.io/badge/tests-126%20passed-brightgreen?style=flat-square" alt="Tests"></a>
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20Android-6f42c1?style=flat-square" alt="Platform">
 </p>
 
@@ -30,32 +30,17 @@ cd Insta-camera-tools/desktop
 pip install -r requirements.txt
 ```
 
-`requirements.txt` 里是两套界面的依赖，一次装齐：`PyQt5>=5.15`（经典版）与 `PySide6>=6.5`（QML 版）。要求 Python 3.10+。
+`requirements.txt` 只装 `PySide6>=6.5`。要求 Python 3.10+。
 
-**桌面端有两套界面，共用 `desktop/core.py`，但功能不等价。**
-
-| 功能 | 经典版 | QML 版 |
-|---|---|---|
-| 封面选择 | 有 | 无 |
-| 开工前体检 `preflight` | 有 | 无 |
-| 断点续跑 `save_job` / `load_job` | 有 | 无 |
-| 卡校验 / 修复 `verify_card` | 有 | 无 |
-| 自动从存储卡分析样本 | 有 | 无 |
-| 内置更新检查 | 无 | 有 |
-
-经典版入口 `desktop/run.bat`（`python gui.py`），打包脚本 `desktop/build.bat` → `desktop/dist/InstaAceImporter.exe`（单文件，约 39 MB）。
-
-QML 版入口 `desktop/run_qml.bat`（`pythonw main.py`），打包脚本 `desktop/build_qml.bat` → `desktop/dist/InstaAceQml.exe`（单文件，约 79 MB）。
+桌面端入口 `desktop/run_qml.bat`（`pythonw main.py`），打包脚本 `desktop/build_qml.bat` → `desktop/dist/InstaAceQml.exe`（单文件，约 79 MB）。
 
 <details>
-<summary>功能差异的源码依据</summary>
+<summary>桌面端还缺什么</summary>
 
-- **封面**：`desktop/qml/OutputOptionView.qml:124` 的按钮文案是「选择封面图片」，但 `desktop/qml/OutputOptionView.qml:127` 是 `onClicked: {}` 空处理；`grep -in cover desktop/bridge.py` 零命中，`desktop/bridge.py:218` 的 `start()` 只有 `output_dir / do_index / auto_seq / encoder_label` 四个参数。经典版的完整实现在 `desktop/gui.py:562-577`（「选择封面图片」/「恢复自动」），底层是 `desktop/core.py:1875` 的 `render_cover()`（896x512 NV12）与 `desktop/core.py:1925` 的 `default_cover_for()`（默认取源视频第 10 秒）。
-- **preflight**：`desktop/core.py:1961` 定义，`desktop/gui.py:1093` 调用；`bridge.py` 与 `qml/` 零命中。
-- **断点续跑**：`desktop/core.py:2048` / `:2055` / `:2065`（`job_path` / `load_job` / `save_job`），调用点在 `desktop/gui.py:1113`、`:1164`、`:1192`、`:1243`；QML 侧零命中。
-- **卡校验**：`desktop/core.py:2594` `verify_card()`、`:2661` `repair_card()`，界面入口 `desktop/gui.py:514`（「校验索引」按钮）；QML 侧零命中。
-- **自动分析样本**：经典版 `desktop/gui.py:648` `auto_pick_spec()`（按钮「自动从存储卡分析」）；QML 版退化为 `desktop/qml/main.qml:116` 的 `bridge.setStatusHint("请手动选择卡内的 VID_*.mp4 作为样本")`。
-- **更新检查**：只有 QML 版有，`desktop/updater.py:11` `REPO = "duofreedom/Insta-camera-tools"`，经 `desktop/main.py:53` 注入 QML 上下文，`desktop/qml/main.qml:22` 调 `updater.check()`；`desktop/gui.py` 零命中。
+早期有两套并列界面（PyQt5 经典版 + QML 版）。经典版已删除，只保留 QML 版，功能上补回了下面几项，但仍有缺口：
+
+- **已补**：开工前体检 `preflight`（`desktop/bridge.py` 的 `start()` 调 `core.preflight`）、自动从存储卡分析样本（`Bridge.autoDetectSample`）。
+- **仍缺**：封面选择（`desktop/qml/OutputOptionView.qml` 的按钮是 `onClicked: {}` 空处理，`bridge.py` 里 `cover` 零命中）、断点续跑（`core.load_job` / `core.save_job` 无人调用）、卡校验（`core.verify_card` 无界面入口）。
 
 </details>
 
@@ -127,9 +112,9 @@ python desktop/core.py D:/clips D:/card/DCIM/Camera01
 
 ### 图形界面
 
-1. 双击 `desktop/dist/InstaAceImporter.exe`，或在 `desktop/` 下运行 `run.bat`。
+1. 双击 `desktop/dist/InstaAceQml.exe`，或在 `desktop/` 下运行 `run_qml.bat`。
 2. 输出目录选到卡上的 `DCIM\Camera01`。
-3. 样本选卡里任意一段相机原生录制的 `VID_*.mp4`（经典版可点「自动从存储卡分析」自动找）。
+3. 样本选卡里任意一段相机原生录制的 `VID_*.mp4`，或点「自动从存储卡分析」让它自己找。
 4. 添加视频，点「开始转换」。
 5. 拔卡插回相机，相册里应能看到这段视频。
 
@@ -236,7 +221,7 @@ pip install -r requirements-dev.txt
 python -m pytest tests/ -q
 ```
 
-预期 `117 passed, 2 skipped`。跳过的两条依赖真机索引样本（`desktop/samples/`、`android/app/src/test/resources/samples/`），样本含设备标识，按约定不入库。
+预期 `126 passed, 2 skipped`。跳过的两条依赖真机索引样本（`desktop/samples/`、`android/app/src/test/resources/samples/`），样本含设备标识，按约定不入库。
 
 改代码前请先读 [`docs/BUILD.md`](docs/BUILD.md)。两处容易踩：
 
@@ -269,14 +254,13 @@ instaace-fusion/
 │       ├── inst_transplant.py    # inst box 移植、ftyp 补丁
 │       └── moov_rewrap.py        # moov 重封装、样本重排、avc1 精简
 ├── desktop/                      # Windows 桌面端
-│   ├── core.py                   # 转码核心（GUI / QML / CLI 共用）
-│   ├── gui.py                    # 经典版界面（PyQt5）
-│   ├── main.py                   # QML 版入口（PySide6）
-│   ├── bridge.py                 # QML 版与 core.py 之间的桥
-│   ├── updater.py                # 更新检查（仅 QML 版）
+│   ├── core.py                   # 转码核心（界面 / CLI 共用）
+│   ├── main.py                   # 入口（PySide6 + QApplication）
+│   ├── bridge.py                 # 界面与 core.py 之间的桥
+│   ├── tray.py                   # 系统托盘（转换中最小化继续跑）
+│   ├── updater.py                # 更新检查
 │   ├── qml/                      # 23 个 .qml（含 main.qml）
-│   ├── build.bat                 # 经典版构建
-│   └── build_qml.bat             # QML 版构建
+│   └── build_qml.bat             # 打包脚本
 ├── android/                      # Gradle + Chaquopy
 │   ├── app/src/main/python/      # insta_core.py / android_bridge.py 等
 │   └── app/src/main/java/        # Kotlin（Compose UI + Python 引擎封装）

@@ -9,6 +9,8 @@ Item {
     property string errorText: ""
     property alias echoMode: input.echoMode
 
+    //   保留但禁用：目前只有输出目录一个输入框，回车没有额外语义
+    //   （不提交、不跳焦点）。信号声明保留备用，发射点停掉。
     signal accepted()
 
     readonly property int fieldHeight: 36
@@ -54,7 +56,7 @@ Item {
         selectionColor: Theme.accent
         selectedTextColor: "#FFFFFF"
         clip: true
-        onAccepted: root.accepted()
+        // onAccepted: root.accepted()  // 见上方「保留但禁用」
 
         Text {
             anchors.fill: parent

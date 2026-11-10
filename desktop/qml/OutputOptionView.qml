@@ -9,6 +9,9 @@ Rectangle {
     property string encoder: "自动"
 
     signal browseOutput()
+    //   保留但禁用：编码器选择目前只改 root.encoder，由 start() 一并读走，
+    //   没有谁需要单独被通知。信号留着是因为外部将来可能想监听；发射点
+    //   已停，避免一个没人处理的信号每点一次都白跑一遍绑定。
     signal encoderSelected(string value)
 
     readonly property var encoders: ["自动", "AMD", "NVIDIA", "Intel", "软件 (CPU)"]
@@ -177,7 +180,7 @@ Rectangle {
                     onClicked: {
                         root.encoder = modelData
                         encoderPopover.open = false
-                        root.encoderSelected(modelData)
+                        // root.encoderSelected(modelData)  // 见上方「保留但禁用」
                     }
                 }
             }

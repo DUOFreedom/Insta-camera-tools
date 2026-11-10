@@ -2,11 +2,33 @@
 
 ## 未发布
 
+### 变更（删除 PyQt5 经典界面，桌面端只剩 QML 版）
+
+`desktop/gui.py`（PyQt5 经典界面）、`desktop/InstaAceImporter.spec`、`desktop/build.bat`、`desktop/run.bat` 一并删除，`requirements.txt` 与 `requirements-dev.txt` 里的 `PyQt5>=5.15` 去掉。理由是维护两套界面的成本全落在「同一处缺陷修两遍、第二遍总忘」上 —— 本轮删掉的 `_resolve_encoder` 形参覆盖、`batch_convert` 静默推翻软件编码，都是先在经典版发现、再手工同步到 QML 侧的同类问题。合并成一套之后这类漂移不可能再发生。
+
+被删掉的能力在 QML 侧补齐或明确记录：
+
+- **开工前体检 `preflight`**：`core.preflight()` 新增 `template_names` 参数（先按用户选的样本对取模板，取不到再回落 `find_native_template`）；`desktop/bridge.py` 的 `start()` 在动手前调用它，`blocking` 非空就中止并显示「开始前检查未通过：…」，`warnings` 写进 import.log。
+- **自动分析样本**：新增 `Bridge.autoDetectSample(output_dir)`。先看输出目录及其父目录，再扫 D 到 I 盘的 `DCIM` / `DCIM\Camera01` / `DCIM\100MEDIA`，找到就用 `setSample()` 走正常分析。**VID 优先于 LRV** —— 按字母序 `LRV_` 排在 `VID_` 前面，直接取第一个会把代理轨当样本，而代理轨的分辨率/帧率/GOP 都与主轨不同。扩展名用新增的 `SAMPLE_EXTS`（在 `VIDEO_EXTS` 基础上加 `.lrv`/`.insv`/`.ins`）：`VIDEO_EXTS` 不含 `.lrv`，用它会让 LRV 分支永远匹配不到、VID 优先的逻辑形同虚设。
+- **转换中关窗**：新增 `desktop/tray.py`（`QSystemTrayIcon` 封装 + `showRequested`/`quitRequested`/`notify`）。`main.py` 改用 `QApplication`（`QMenu` 是 QWidget，`QGuiApplication` 下报 `QWidget: Cannot create a QWidget without QApplication`）并 `setQuitOnLastWindowClosed(False)`；`main.qml` 的 `onClosing` 在转换中弹窗给两个出路 —— 「停止并退出」（`bridge.cancel()` + `waitWorker(20000)` 成功才退出）与「最小化到托盘」（窗口隐藏、转换继续、跑完弹提示）。此前 QML 版只拦截、不给选择，直接退出会让 ffmpeg 变孤儿继续往相机卡写。
+- **仍缺**：封面选择（`OutputOptionView.qml` 的按钮还是 `onClicked: {}`，`bridge.py` 里 `cover` 零命中）、断点续跑（`core.load_job`/`save_job` 无调用方）、卡校验（`core.verify_card` 无界面入口）。这三项写进 README 的「桌面端还缺什么」，不再声称两套界面功能等价。
+
+`desktop/tools/make_icon.py` 从 PyQt5 移植到 PySide6（否则删掉 PyQt5 后这个工具直接 ImportError）。
+
+### 变更（4 个 QML signal 保留但禁用）
+
+`OutputOptionView.encoderSelected`、`Sidebar.navigate`、`TextField.accepted`、`TitleBar.themeToggleRequested` 四个 signal 声明保留，发射点注释掉并注明「保留但禁用」。它们对应的交互要么已在别处实现（编码器由 `ActionView.start` 一并传参、主题由系统跟随），要么组件当前没有被引用；留着声明是为了将来接线时不必改 `qmldir` 与文档。
+
+### 变更（删除零调用代码）
+
+删掉 7 组确认无人调用的符号：`_num`、`_audio_map`（`core.py` + `insta_core.py` 各一份）、`add_file_entry`/`add_edit_entry`/`find_entry`（`insta_index.py` 两份）、`repair_inst_metadata_layout`、`patch_media_thumbnail`（`inst_transplant.py` + `insta360_tf_import.py`）。顺带删掉 `patch_nail_thumbnail` —— 它唯一的调用方 `patch_media_thumbnail` 被删后成孤儿，且与 `camera_udta` 里直接拼 nail box 的逻辑重复。
+
+保留 `MediaError`（公开异常类型，外部 `except` 会引用）与 `_enc_dbl`（protobuf wire-type 1 原语，与 `_enc_bytes`/`_enc_uint` 成套）。`patch_inst_thumbnail` 实际在用，保留。
+
 ### 产物重建与核对（本轮）
 
-- 桌面端 `desktop/dist/InstaAceQml.exe` 78,839,044 B，`--self-test` → `QML_OK roots=1`，exit 0。解包 `PYZ.pyz` 核对：`core._build_hw_transcode_cmd` 常量含 `qsv`/`amf`，`instbox.inst_transplant.video_gop` 的 `co_names` 含 `Path` 与 `read_bytes`，`moov_rewrap` 的 `co_names` 含 `_MAX_32BIT` 与 `zlib`、函数表含 `_chunk_offsets` 与 `udta_with_mcrc` —— 四处修复都在包里。
-- 桌面端 `desktop/dist/InstaAceImporter.exe` 39,079,354 B（经典版，同一套 `shared/` 代码）。
-- 安卓 `android/app/build/outputs/apk/release/app-release.apk` 75,281,949 B；单元测试 IndexTest 7 跳过 / ConsentLogicTest 5 / ImportCardStateTest 6，失败 0。解包 `assets/chaquopy/app.imy` 核对：`insta360_tf_import.video_gop` 的 `co_names` 含 `Path`，`insta_core._build_hw_transcode_cmd` 常量含 `qsv`/`amf` 与 `-g`，`camera_moov_rewrap` 的 `co_names` 含 `_MAX_32BIT` 与 `zlib`、函数表含 `_chunk_offsets` 与 `udta_with_mcrc`、`stco_box` 常量含 `co64`、`rebuild_stbl` 的元组常量含 `(b'stco', b'co64')`。
+- 桌面端 `desktop/dist/InstaAceQml.exe` 80,479,200 B，`--self-test` → `QML_OK roots=1`，exit 0。解包 `PYZ.pyz` 核对：`tray` 在包内、`gui` 不在；`bridge.start` 的关键字常量含 `('do_index','template_names')`、`bridge._run` 含 `('template','encoder','spec','progress','cancel','log','start_number','template_names')`；`autoDetectSample` 引用 `SAMPLE_EXTS`，常量含 `DEFGHIJ`、`DCIM`、`Camera01`；`core._build_hw_transcode_cmd` 常量含 `qsv`/`amf`；`instbox.inst_transplant.video_gop` 的 `co_names` 含 `Path` 与 `read_bytes`；`moov_rewrap` 的 `co_names` 含 `_MAX_32BIT` 与 `zlib`、函数表含 `_chunk_offsets` 与 `udta_with_mcrc`。
+- 安卓 `android/app/build/outputs/apk/release/app-release.apk` 75,279,539 B；单元测试 IndexTest 7 跳过 / ConsentLogicTest 5 / ImportCardStateTest 6，失败与错误均 0。解包 `assets/chaquopy/app.imy` 核对：7 组零调用符号（`_num`/`_audio_map`/`add_file_entry`/`add_edit_entry`/`find_entry`/`repair_inst_metadata_layout`/`patch_media_thumbnail`/`patch_nail_thumbnail`）在两份 pyc 里都已不存在；`camera_moov_rewrap` 的 `co_names` 含 `_MAX_32BIT` 与 `zlib`、函数表含 `_chunk_offsets` 与 `udta_with_mcrc`、`stco_box` 常量含 `b'co64'`、`rebuild_stbl` 的元组常量含 `(b'stco', b'co64')`。
 - **APK 的字节数与 sha256 都不能当校验和**：同一份源码连编两次，签名（`META-INF/CERT.RSA`/`CERT.SF`/`MANIFEST.MF`）、`assets/chaquopy/build.json`、`assets/chaquopy/app.imy` 五项都会变。`app.imy` 里每个 pyc 只有第 8～12 字节（CPython 源文件 mtime 字段）不同，把这段清零后全部逐字节相同。要确认「装上去的就是这一轮构建的包」，解包比对 pyc 比比对哈希可靠。
 
 ### 修复（审查报告里的三处小缺陷）

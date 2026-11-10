@@ -450,32 +450,6 @@ def replace_inst_metadata(
     return bytes(out)
 
 
-def repair_inst_metadata_layout(path: Path, reference_meta: bytes) -> None:
-    """Repair stale v3 metadata size/trailer fields without touching MP4 media."""
-    media, inst_box = split_inst(path)
-    metadata = locate_metadata(path, reference_meta)
-    pos = inst_box.index(metadata)
-    payload = bytearray(inst_box[8:])
-    table_footer = len(payload) - 72 - 6
-    table_fmt, table_kind, table_size = struct.unpack_from("<BBI", payload, table_footer)
-    table_start = table_footer - table_size
-    if (table_fmt, table_kind) != (0, 0) or table_start < 0 or table_size % 10:
-        raise ValueError("invalid v3 inst offset table")
-    metadata_start = pos - 8
-    old_size = None
-    for table_pos in range(table_start, table_footer, 10):
-        kind, _fmt, size, start = struct.unpack_from("<BBII", payload, table_pos)
-        if kind == 1 and start == metadata_start:
-            old_size = size
-            struct.pack_into("<I", payload, table_pos + 2, len(metadata))
-            break
-    if old_size is None:
-        raise ValueError("v3 inst metadata is absent from offset table")
-    struct.pack_into("<I", payload, len(payload) - 40, len(payload))
-    repaired = struct.pack(">I4s", len(payload) + 8, b"inst") + payload
-    path.write_bytes(media + repaired)
-
-
 def locate_metadata(media: Path, template_metadata: bytes) -> bytes:
     _, inst = split_inst(media)
     fields = parse_message(template_metadata)
@@ -749,37 +723,6 @@ def patch_inst_thumbnail(path: Path, thumbnail: bytes) -> None:
         path.write_bytes(media + struct.pack(">I4s", len(payload) + 8, b"inst") + payload)
         return
     raise ValueError("inst contains no type-2 thumbnail")
-
-
-def patch_nail_thumbnail(path: Path, thumbnail: bytes) -> None:
-    data = bytearray(path.read_bytes())
-    moov_boxes = [box for box in mp4_boxes(data) if box[2] == b"moov"]
-    if not moov_boxes:
-        raise ValueError(f"{path} has no moov box")
-    moov = moov_boxes[0]
-    udta_boxes = [
-        box for box in child_boxes(data, moov[0] + 8, moov[0] + moov[1])
-        if box[2] == b"udta"
-    ]
-    if not udta_boxes:
-        raise ValueError(f"{path} moov has no udta box")
-    udta = udta_boxes[0]
-    nail_boxes = [
-        box for box in child_boxes(data, udta[0] + 8, udta[0] + udta[1])
-        if box[2] == b"nail"
-    ]
-    if not nail_boxes:
-        raise ValueError(f"{path} udta has no nail box")
-    nail = nail_boxes[0]
-    if nail[1] != 16 + len(thumbnail):
-        raise ValueError("unexpected nail box size")
-    data[nail[0] + 16:nail[0] + nail[1]] = thumbnail
-    path.write_bytes(data)
-
-
-def patch_media_thumbnail(path: Path, thumbnail: bytes) -> None:
-    patch_nail_thumbnail(path, thumbnail)
-    patch_inst_thumbnail(path, thumbnail)
 
 
 # Exact Ace Pro 2 AAC-LC AudioSampleEntry verified by the v17/v18 hardware

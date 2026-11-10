@@ -5,6 +5,8 @@ Item {
     property bool collapsed: false
     property int currentIndex: 0
 
+    //   保留但禁用：主界面暂无导航功能，这个组件也没被任何地方实例化
+    //   （留着备用）。信号声明保留，发射点停掉。
     signal navigate(int index)
 
     readonly property int widthExpanded: 220
@@ -56,7 +58,7 @@ Item {
                 selected: index === root.currentIndex
                 onClicked: {
                     root.currentIndex = index
-                    root.navigate(index)
+                    // root.navigate(index)  // 见上方「保留但禁用」
                 }
             }
         }

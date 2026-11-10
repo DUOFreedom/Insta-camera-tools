@@ -6,6 +6,10 @@ from PySide6.QtCore import Property, QObject, QUrl, Signal, Slot
 import core
 
 VIDEO_EXTS = (".mp4", ".mov", ".mkv", ".avi", ".ts", ".flv", ".wmv", ".m4v")
+#   自动找样本时比「可选输入」多认几种：真机原片是 VID_*.mp4 + LRV_*.lrv，
+#   有些机型还有 .insv/.ins。LRV 也在内是因为 setSample 支持从 LRV 反推 VID，
+#   卡里只剩代理轨时还能用；但 VID 优先，见 autoDetectSample。
+SAMPLE_EXTS = VIDEO_EXTS + (".lrv", ".insv", ".ins")
 
 
 class Bridge(QObject):
@@ -29,6 +33,10 @@ class Bridge(QObject):
         self._files: list[str] = []
         self._sample = ""
         self._spec = None
+        #   样本对的文件名：转码产物落在卡里之后，卡上会同时有真机原片和
+        #   上一轮的产物，两者都带 inst box。让核心按字典序猜模板会挑错，
+        #   所以把用户实际选中的这一对名字记下来，转码时按名字取模板。
+        self._spec_pair: tuple[str, str] | None = None
         self._error = ""
         self._cancel = threading.Event()
         self._worker: threading.Thread | None = None
@@ -156,10 +164,13 @@ class Bridge(QObject):
         try:
             folder = os.path.dirname(path)
             stem = os.path.splitext(os.path.basename(path))[0]
+            pair = None
             if stem.upper().startswith("LRV_"):
                 main = os.path.join(folder, stem.replace("LRV_", "VID_", 1) + ".mp4")
                 spec = core.analyze_native(main if os.path.isfile(main) else path)
                 spec["lrv_video"] = core.analyze_native(path).get("video", {})
+                if os.path.isfile(main):
+                    pair = (os.path.basename(main), os.path.basename(path))
             else:
                 spec = core.analyze_native(path)
                 lrv = os.path.join(folder, stem.replace("VID_", "LRV_", 1) + ".lrv")
@@ -168,19 +179,71 @@ class Bridge(QObject):
                         spec["lrv_video"] = core.analyze_native(lrv).get("video", {})
                     except Exception:
                         pass
+                    pair = (os.path.basename(path), os.path.basename(lrv))
         except Exception as exc:
             self._spec = None
+            self._spec_pair = None
             self._sample = ""
             self.sampleChanged.emit()
             self._set_error("样本分析失败：%s" % exc)
             return
 
         self._spec = spec
+        self._spec_pair = pair
         self._sample = path
         self.sampleChanged.emit()
         video = spec.get("video", {}) or {}
         self._set_status("样本已读取：%sx%s @%s" % (
             video.get("width", "?"), video.get("height", "?"), video.get("fps", "?")))
+
+    @Slot(str)
+    def autoDetectSample(self, output_dir: str) -> None:
+        """自动从输出目录（或常见 SD 卡 DCIM）里找一个原生录制视频当样本。
+
+        经典版界面有「自动从存储卡分析」按钮，QML 版此前只弹一句「请手动
+        选择」—— 这个退化被当成功能缺失写进了 README。现在补上：
+        先看用户选的输出目录及其父目录，再扫 D 到 I 盘的 DCIM，
+        找到第一个 VID_*/LRV_* 就交给 setSample 走正常分析流程。
+        """
+        cands: list[str] = []
+        out = (output_dir or "").strip()
+        if out and os.path.isdir(out):
+            cands.append(out)
+            cands.append(os.path.dirname(out))
+        for drive in "DEFGHIJ":
+            root = "%s:\\" % drive
+            if not os.path.isdir(root):
+                continue
+            for sub in ("DCIM", os.path.join("DCIM", "Camera01"),
+                        os.path.join("DCIM", "100MEDIA")):
+                cands.append(os.path.join(root, sub))
+
+        seen: set[str] = set()
+        for folder in cands:
+            if folder in seen or not os.path.isdir(folder):
+                continue
+            seen.add(folder)
+            try:
+                names = sorted(os.listdir(folder))
+            except OSError:
+                continue
+            #   同一对里 VID_ 是主轨、LRV_ 是代理轨。按字母序 LRV 排在前面，
+            #   直接取第一个会把代理轨当样本 —— 它的分辨率/帧率/GOP 都与主轨
+            #   不同，照它生成的规格是错的。所以 VID_ 优先，都没有才用 LRV_。
+            for prefix in ("VID", "LRV"):
+                for name in names:
+                    upper = name.upper()
+                    if not upper.startswith(prefix):
+                        continue
+                    #   upper 是大写，SAMPLE_EXTS 是小写 —— endswith 区分大小写，
+                    #   直接比会一个都匹配不上（自动分析永远报「没找到」）。
+                    if not upper.lower().endswith(SAMPLE_EXTS):
+                        continue
+                    self.setSample(os.path.join(folder, name))
+                    return
+        self._set_error(
+            "未在存储卡中自动找到原生录制视频。请确认已插入存有原生录制视频的 "
+            "SD 卡，再点「选择原生录制视频」手动指定。")
 
     @Slot("QVariantList")
     def addFiles(self, paths) -> None:
@@ -259,6 +322,22 @@ class Bridge(QObject):
             self._set_error("ffmpeg 不可用：%s" % msg)
             return
 
+        #   开工前体检：把「跑到最后才失败」的问题提前到 1 秒内。
+        #   经典版界面在 start() 里做过这一步，QML 版此前完全跳过 ——
+        #   选错目录、卡里没有真机原片、剩余空间不足，都要等转码跑完
+        #   才在状态栏冒一行字，用户以为成功了。
+        try:
+            chk = core.preflight(out, self._files, do_index=bool(do_index),
+                                 template_names=self._spec_pair)
+        except Exception as exc:  # noqa: BLE001
+            chk = {"blocking": [], "warnings": [], "preflightError": str(exc)}
+        blocking = [str(x) for x in (chk.get("blocking") or [])]
+        if blocking:
+            self._set_error("开始前检查未通过：" + "；".join(blocking))
+            return
+        for warning in (chk.get("warnings") or []):
+            core.append_log("[warn] %s" % warning)
+
         self._busy = True
         self._progress = 0.0
         self._eta = "剩余 --:--"
@@ -304,8 +383,15 @@ class Bridge(QObject):
                 self._set_status("输出目录不是相机卡结构，改为仅转码")
             template = None
             if use_inst:
+                #   用户选过样本就按名字取，别让核心按字典序猜 —— 卡里可能
+                #   躺着上一轮的产物，它们同样带 inst box，猜中产物的后果是
+                #   moov 骨架/帧率/分辨率全来自产物，相机不认且不报错。
                 try:
-                    template = core.find_native_template(out)
+                    if self._spec_pair:
+                        template = core.template_from_names(
+                            out, self._spec_pair[0], self._spec_pair[1])
+                    if template is None:
+                        template = core.find_native_template(out)
                 except Exception:
                     template = None
                 if template is None:
@@ -331,6 +417,7 @@ class Bridge(QObject):
                             spec=self._spec, progress=on_progress,
                             cancel=self._cancel, log=self._set_status,
                             start_number=next_start,
+                            template_names=self._spec_pair,
                         )
                         if not result.get("inst_ok"):
                             raise RuntimeError(result.get("inst_error") or "inst 移植失败")

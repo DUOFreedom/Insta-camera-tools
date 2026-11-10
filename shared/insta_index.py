@@ -393,23 +393,6 @@ EDIT_FLAG_UNEDITED = b"\x08\x00"
 EDIT_FLAG_EDITED = b"\x12\x00"
 
 
-def add_file_entry(fileinfo: bytes, entry: FileEntry) -> bytes:
-    """追加一条到主索引（真机行为就是 append-last）。"""
-    return fileinfo + entry.to_bytes()
-
-
-def add_edit_entry(editinfo: bytes, path: str,
-                   flag: bytes = EDIT_FLAG_UNEDITED) -> bytes:
-    return editinfo + EditEntry(path, flag).to_bytes()
-
-
-def find_entry(fileinfo: bytes, path: str) -> FileEntry | None:
-    for e in parse_fileinfo(fileinfo):
-        if e.path == path:
-            return e
-    return None
-
-
 def register_media(fileinfo: bytes, editinfo: bytes, path: str,
                    meta: MediaInfo, *, sort: bool = True) -> tuple[bytes, bytes]:
     """把一对媒体登记进两个索引（幂等：已存在则替换）。

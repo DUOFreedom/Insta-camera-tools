@@ -1,7 +1,7 @@
 @echo off
 chcp 936 >nul
 rem 打包 QML 版（PySide6 + onedir），需要预装 pyinstaller 与 PySide6
-rem 与 build.bat 的区别：build.bat 出 PyQt5 单文件 InstaAceImporter.exe，
+rem 经典版（PyQt5 的 build.bat / InstaAceImporter.exe）已删除。
 rem 本脚本出 PySide6 onedir 目录 dist\InstaAceQml\InstaAceQml.exe。
 setlocal
 cd /d "%~dp0"
