@@ -55,6 +55,11 @@ class Bridge(QObject):
         self._ffmpeg_missing = False
         self._ffmpeg_downloading = False
         self._ffmpeg_progress = 0.0
+        #   ffmpeg 是从哪儿来的：missing / env / system / portable。界面上
+        #   要告诉用户「你系统里已经有」，不然他会以为自己没装。
+        self._ffmpeg_source = "missing"
+        #   本次安装的目标范围：global（系统目录，需管理员）/ portable。
+        self._ffmpeg_scope = "portable"
         #   每个源视频一张封面图（键是 normpath）。加文件时按同名图自动配对，
         #   用户也可以手动指定；未指定时核心自己从视频第 10 秒取帧。
         self._covers: dict[str, str] = {}
@@ -111,6 +116,14 @@ class Bridge(QObject):
     @Property(float, notify=ffmpegProgressChanged)
     def ffmpegProgress(self) -> float:
         return self._ffmpeg_progress
+
+    @Property(str, notify=ffmpegMissingChanged)
+    def ffmpegSource(self) -> str:
+        return self._ffmpeg_source
+
+    @Property(str, notify=ffmpegMissingChanged)
+    def ffmpegScope(self) -> str:
+        return self._ffmpeg_scope
 
     @Property("QVariantMap", notify=coversChanged)
     def covers(self):
@@ -251,36 +264,58 @@ class Bridge(QObject):
         没有任何补救入口。"""
         ok, msg = core.ffmpeg_available()
         self._ffmpeg_missing = not ok
+        self._ffmpeg_source = core.ffmpeg_source()
         self.ffmpegMissingChanged.emit()
         if not ok:
-            self._set_status("ffmpeg 未就绪：%s。可点「下载 ffmpeg」自动安装。" % msg)
+            self._set_status(
+                "ffmpeg 未就绪：%s。可以装到系统目录（需管理员权限），"
+                "也可以只装到程序目录。" % msg)
+        elif self._ffmpeg_source == "system":
+            self._set_status("已使用系统已安装的 ffmpeg：%s" % msg)
 
     @Slot(result=str)
     def ffmpegState(self) -> str:
         ok, msg = core.ffmpeg_available()
         self._ffmpeg_missing = not ok
+        self._ffmpeg_source = core.ffmpeg_source()
         self.ffmpegMissingChanged.emit()
-        return "ok" if ok else str(msg)
+        if not ok:
+            return str(msg)
+        return "ok:%s" % self._ffmpeg_source
 
     @Slot()
     def downloadFfmpeg(self) -> None:
+        """兼容旧入口：默认装到程序目录。"""
+        self.installFfmpeg("portable")
+
+    @Slot(str)
+    def installFfmpeg(self, scope: str) -> None:
+        """下载并安装 ffmpeg。scope 为 "global"（系统目录，需管理员）或
+        "portable"（程序目录）。
+
+        下载与安装分两步：先下到临时目录，再按 scope 落盘。这样选「装到系统」
+        时 UAC 弹窗只覆盖最后那次复制，用户拒绝也不会白下 200 MB。
+        """
         if self._ffmpeg_downloading:
             return
+        target = "global" if str(scope or "").lower() == "global" else "portable"
         self._ffmpeg_downloading = True
+        self._ffmpeg_scope = target
         self._ffmpeg_progress = 0.0
         self.ffmpegMissingChanged.emit()
         self.ffmpegProgressChanged.emit()
         self._set_status("正在下载 ffmpeg，请稍候…")
-        threading.Thread(target=self._download_ffmpeg, daemon=True).start()
+        threading.Thread(target=self._download_ffmpeg, args=(target,),
+                         daemon=True).start()
 
-    def _download_ffmpeg(self) -> None:
+    def _download_ffmpeg(self, scope: str = "portable") -> None:
         def stage(frac, msg):
             self._ffmpeg_progress = max(0.0, min(1.0, float(frac or 0.0)))
             self.ffmpegProgressChanged.emit()
             self._set_status(str(msg or "下载中…"))
         try:
-            ok, msg = core.download_and_install_ffmpeg(stage)
-        except Exception as exc:
+            ok, msg = core.install_ffmpeg(scope, stage)
+        except Exception as exc:  # noqa: BLE001
             ok, msg = False, str(exc)
         self._ffmpeg_downloading = False
         self._ffmpeg_progress = 1.0 if ok else 0.0
@@ -288,6 +323,7 @@ class Bridge(QObject):
         self.ffmpegProgressChanged.emit()
         if ok:
             self._ffmpeg_missing = False
+            self._ffmpeg_source = core.ffmpeg_source()
             self.ffmpegMissingChanged.emit()
             #   刚装好 ffmpeg 时硬件探测还没跑过（启动那次因为找不到 ffmpeg
             #   直接返回「未检测到」）。不重探的话用户装了 ffmpeg 也看不到
@@ -296,7 +332,7 @@ class Bridge(QObject):
             self.detectHardware()
             self._set_status("ffmpeg 安装完成，可开始转换")
         else:
-            self._set_error("ffmpeg 下载失败：%s" % msg)
+            self._set_error("ffmpeg 安装失败：%s" % msg)
 
     @Slot()
     def clearError(self) -> None:

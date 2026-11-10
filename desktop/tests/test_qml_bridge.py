@@ -596,13 +596,65 @@ def test_ffmpeg_install_retriggers_hardware_probe(bridge, monkeypatch):
         calls.append(1)
         return ("hevc_nvenc", "h264_nvenc", "NVIDIA")
 
-    monkeypatch.setattr(bridge_mod.core, "download_and_install_ffmpeg",
-                        lambda stage: (True, "ok"))
+    monkeypatch.setattr(bridge_mod.core, "install_ffmpeg",
+                        lambda scope, stage: (True, "ok"))
     monkeypatch.setattr(bridge_mod.core, "detect_hw_encoder", fake_detect)
     monkeypatch.setattr(bridge_mod.core, "ffmpeg_available", lambda: (True, "ok"))
-    bridge._download_ffmpeg()
+    bridge._download_ffmpeg("portable")
     assert calls == [1], "装完 ffmpeg 必须重探硬件"
     assert bridge.hardwareEncoder == "NVIDIA"
+
+
+def test_install_ffmpeg_forwards_scope_to_core(bridge, monkeypatch):
+    """界面上选「装到系统」必须真的把 global 传给核心，不能悄悄改成 portable。"""
+    import bridge as bridge_mod
+    seen = []
+    monkeypatch.setattr(bridge_mod.core, "install_ffmpeg",
+                        lambda scope, stage=None: seen.append(scope) or (False, "x"))
+    monkeypatch.setattr(bridge_mod.core, "detect_hw_encoder", lambda: None)
+    bridge.installFfmpeg("global")
+    bridge._worker = None
+    for t in list(threading.enumerate()):
+        if t is not threading.current_thread() and t.name.startswith("Thread-"):
+            t.join(timeout=5)
+    assert seen == ["global"], seen
+
+
+def test_download_ffmpeg_defaults_to_portable(bridge, monkeypatch):
+    """老的「下载 ffmpeg」入口继续可用，且默认装到程序目录（不弹 UAC）。"""
+    import bridge as bridge_mod
+    seen = []
+    monkeypatch.setattr(bridge_mod.core, "install_ffmpeg",
+                        lambda scope, stage=None: seen.append(scope) or (False, "x"))
+    monkeypatch.setattr(bridge_mod.core, "detect_hw_encoder", lambda: None)
+    bridge.downloadFfmpeg()
+    for t in list(threading.enumerate()):
+        if t is not threading.current_thread() and t.name.startswith("Thread-"):
+            t.join(timeout=5)
+    assert seen == ["portable"], seen
+
+
+def test_ffmpeg_source_is_exposed_to_ui(bridge, monkeypatch):
+    """界面要能说清「这份 ffmpeg 是你系统里那个」，否则用户以为自己没装。"""
+    import bridge as bridge_mod
+    monkeypatch.setattr(bridge_mod.core, "ffmpeg_available",
+                        lambda: (True, "C:/Program Files/ffmpeg/bin/ffmpeg.exe"))
+    monkeypatch.setattr(bridge_mod.core, "ffmpeg_source", lambda: "system")
+    bridge.checkFfmpeg()
+    assert bridge.ffmpegSource == "system"
+    assert "系统已安装" in bridge.status
+
+
+def test_ffmpeg_scope_property_tracks_request(bridge, monkeypatch):
+    import bridge as bridge_mod
+    monkeypatch.setattr(bridge_mod.core, "install_ffmpeg",
+                        lambda scope, stage=None: (False, "x"))
+    monkeypatch.setattr(bridge_mod.core, "detect_hw_encoder", lambda: None)
+    bridge.installFfmpeg("global")
+    assert bridge.ffmpegScope == "global"
+    for t in list(threading.enumerate()):
+        if t is not threading.current_thread() and t.name.startswith("Thread-"):
+            t.join(timeout=5)
 
 
 def test_check_ffmpeg_surfaces_missing_state(bridge, monkeypatch):
@@ -612,7 +664,10 @@ def test_check_ffmpeg_surfaces_missing_state(bridge, monkeypatch):
                         lambda: (False, "未找到 ffmpeg/ffprobe"))
     bridge.checkFfmpeg()
     assert bridge.ffmpegMissing is True
-    assert "下载" in bridge.status
+    #   文案必须给出两个安装位置的选择，不能只说「去下载」——
+    #   用户装到系统目录和装到程序目录的后果完全不同。
+    assert "系统目录" in bridge.status
+    assert "程序目录" in bridge.status
 
 
 def test_check_ffmpeg_clears_state_when_ready(bridge, monkeypatch):
@@ -628,7 +683,8 @@ def test_main_qml_wires_ffmpeg_banner():
     """界面必须真的调用 checkFfmpeg / downloadFfmpeg，否则横幅永不出现。"""
     main = open(os.path.join(DESKTOP, "qml", "main.qml"), encoding="utf-8").read()
     assert "bridge.checkFfmpeg()" in main
-    assert "bridge.downloadFfmpeg()" in main
+    assert 'bridge.installFfmpeg("global")' in main
+    assert 'bridge.installFfmpeg("portable")' in main
     assert "bridge.ffmpegMissing" in main
 
 

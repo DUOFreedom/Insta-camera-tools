@@ -219,7 +219,7 @@ Window {
                                 width: parent.width
                                 text: bridge.ffmpegDownloading
                                     ? "正在下载 ffmpeg… " + Math.round(bridge.ffmpegProgress * 100) + "%"
-                                    : "未找到 ffmpeg。它是转码必需组件，可点右侧按钮自动下载安装。"
+                                    : "未找到 ffmpeg。它是转码必需组件，先选一个安装位置。"
                                 color: Theme.textSecondary
                                 font.family: Theme.fontFamily
                                 font.pixelSize: Theme.fontBodySize
@@ -229,11 +229,37 @@ Window {
                                 lineHeight: Theme.fontBodyLine
                             }
 
-                            AppButton {
-                                btnHeight: 32
-                                text: bridge.ffmpegDownloading ? "下载中…" : "下载 ffmpeg"
-                                enabled: !bridge.ffmpegDownloading
-                                onClicked: bridge.downloadFfmpeg()
+                            Text {
+                                width: parent.width
+                                visible: !bridge.ffmpegDownloading
+                                text: "装到系统目录：所有程序都能用，需要管理员权限；"
+                                      + "装到程序目录：只给本程序用，不需要任何权限。"
+                                color: Theme.textSecondary
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontAuxSize
+                                font.weight: Font.Normal
+                                wrapMode: Text.Wrap
+                                lineHeightMode: Text.FixedHeight
+                                lineHeight: Theme.fontAuxLine
+                            }
+
+                            Row {
+                                spacing: 8
+
+                                AppButton {
+                                    btnHeight: 32
+                                    text: bridge.ffmpegDownloading ? "下载中…" : "装到系统目录"
+                                    enabled: !bridge.ffmpegDownloading
+                                    onClicked: bridge.installFfmpeg("global")
+                                }
+
+                                AppButton {
+                                    btnHeight: 32
+                                    accent: false
+                                    text: bridge.ffmpegDownloading ? "下载中…" : "装到程序目录"
+                                    enabled: !bridge.ffmpegDownloading
+                                    onClicked: bridge.installFfmpeg("portable")
+                                }
                             }
                         }
                     }

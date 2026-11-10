@@ -12,7 +12,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0--or--later-blue?style=flat-square" alt="License"></a>
   <a href="desktop/CHANGELOG.md"><img src="https://img.shields.io/badge/version-1.2.0-success?style=flat-square" alt="Version"></a>
   <a href="desktop/requirements.txt"><img src="https://img.shields.io/badge/python-3.10%2B-3776ab?style=flat-square" alt="Python"></a>
-  <a href="desktop/tests"><img src="https://img.shields.io/badge/tests-160%20passed-brightgreen?style=flat-square" alt="Tests"></a>
+  <a href="desktop/tests"><img src="https://img.shields.io/badge/tests-178%20passed-brightgreen?style=flat-square" alt="Tests"></a>
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20Android-6f42c1?style=flat-square" alt="Platform">
 </p>
 
@@ -70,18 +70,28 @@ gradle --offline :app:assembleRelease
 
 ### 安装 ffmpeg
 
-桌面端需要带 **libx264 + libx265** 的 ffmpeg。程序按下面的顺序自己找，找到就跳过下载：
+桌面端需要带 **libx264 + libx265** 的 ffmpeg。程序按下面的顺序自己找，**先看系统里装没装，再退到程序自己的目录**：
 
 | 查找顺序 | 位置 |
 |---|---|
 | 1 | 环境变量 `FFMPEG_PATH` / `FFPROBE_PATH` |
-| 2 | exe 所在目录及其 `bin\` 子目录 |
-| 3 | `%LOCALAPPDATA%\InstaAceImporter\bin` |
-| 4 | `~\InstaAceImporter\bin` |
-| 5 | `C:\ffmpeg\bin`、`C:\Program Files\ffmpeg\bin`、`C:\Program Files (x86)\ffmpeg\bin`、`%ProgramData%\chocolatey\bin` |
-| 6 | 系统 `PATH`（`shutil.which`） |
+| 2 | 注册表 `App Paths\ffmpeg.exe`（安装器登记的位置，HKLM 优先于 HKCU） |
+| 3 | `C:\Program Files\InstaAce\bin`（本程序「装到系统目录」的目标） |
+| 4 | `C:\Program Files\ffmpeg\bin`、`C:\Program Files (x86)\ffmpeg\bin`、`C:\ffmpeg\bin`、`%ProgramData%\chocolatey\bin`、`~\scoop\shims`、`%LOCALAPPDATA%\Microsoft\WinGet\Links` |
+| 5 | 系统 `PATH`（`shutil.which`） |
+| 6 | exe 所在目录及其 `bin\` 子目录 |
+| 7 | `%LOCALAPPDATA%\InstaAceImporter\bin`、`~\InstaAceImporter\bin` |
 
-实现见 `desktop/core.py:145` 的 `_tool_dirs()` 与 `desktop/core.py:161` 的 `_find_tool()`。找到后还会实跑一次 `ffmpeg -version` 确认可用（`desktop/core.py:185`）。
+实现见 `desktop/core.py:161` 的 `_system_tool_dirs()`、`desktop/core.py:146` 的 `_portable_tool_dirs()` 与 `desktop/core.py:179` 的 `_registry_ffmpeg()`。找到后还会实跑一次 `ffmpeg -version` 确认可用。
+
+都找不到时，界面上会出现一个橙色横幅，给两个按钮：
+
+| 按钮 | 装到哪 | 需要什么 |
+|---|---|---|
+| 装到系统目录 | `C:\Program Files\InstaAce\bin`，所有程序都能用，并登记到注册表 `App Paths` | 管理员权限（弹 UAC） |
+| 装到程序目录 | exe 同目录下的 `bin\`，程序目录不可写时退回 `%LOCALAPPDATA%\InstaAceImporter\bin` | 不需要任何权限 |
+
+两个按钮都是**先下载到临时目录、再落盘**：用户拒绝 UAC 时只损失几秒，不用重下 200 MB。装完会自动重探硬件编码器，否则横幅消失了「未检测到硬件编码器」也不会更新。
 
 <details>
 <summary>手动指定 ffmpeg 路径</summary>
@@ -109,9 +119,9 @@ VID_20261109_183000_000.mp4
 LRV_20261109_183000_000.lrv
 ```
 
-时间戳优先取容器内嵌的 `creation_time`，其次取文件系统时间，都没有才用当前时间（`desktop/core.py:1320` `_source_stamp()`）。这样导入的视频在相册里按原始拍摄时间排序，而不是全挤在导入当天。
+时间戳优先取容器内嵌的 `creation_time`，其次取文件系统时间，都没有才用当前时间（`desktop/core.py:1594` `_source_stamp()`）。这样导入的视频在相册里按原始拍摄时间排序，而不是全挤在导入当天。
 
-主视频 1920x1080 / 60000/1001 fps / `libx265` + `hvc1`，代理 1280x720 / 30000/1001 fps / `libx264` + `avc1`，GOP 固定 16 帧。参数见 `desktop/core.py:67-72` 与 `desktop/core.py:952-953`。
+主视频与代理的编码格式、分辨率、帧率、GOP **全部跟随卡里的真机模板**：Ace Pro 2 是 `libx265`+`hvc1` / `libx264`+`avc1`、GOP 16，GO Ultra 两轨都是 `hvc1`、GOP 分别是 120 与 10。模板的 GOP 从 `stss` 量出来（`shared/instbox/inst_transplant.py:233` 的 `video_gop()`），写进 AMBA box 偏移 53 并同时约束 ffmpeg 的 `-g`。参数见 `desktop/core.py:67-72` 与 `desktop/core.py:1194-1200`。
 
 ### 批量转换
 
@@ -141,7 +151,7 @@ python desktop/core.py D:/clips D:/card/DCIM/Camera01
 | 输出目录 | 输入文件所在目录 | 建议指向 `DCIM\Camera01` |
 | 起始序号 | 自动接续 | 省略时扫描卡里已有文件的最大序号 |
 
-无参数运行会打印用法并以退出码 1 结束。三个参数的位置由 `desktop/core.py:2762` 起的 `__main__` 块解析。
+无参数运行会打印用法并以退出码 1 结束。三个参数的位置由 `desktop/core.py:3104` 起的 `__main__` 块解析。
 
 ### 环境变量
 
@@ -189,7 +199,7 @@ GO Ultra 的适配来自用户提供的真机素材，两代机型的差异见 [
 
 ### 报 `ValidationError: 未找到 ffmpeg，无法构建转码命令`
 
-程序没找到 ffmpeg（`desktop/core.py:800`）。按上面的查找顺序检查，最快是直接指定：
+程序没找到 ffmpeg（`desktop/core.py:1027`）。按上面的查找顺序检查，最快是直接指定：
 
 ```bash
 set FFMPEG_PATH=D:\tools\ffmpeg\bin\ffmpeg.exe
@@ -200,11 +210,11 @@ set FFPROBE_PATH=D:\tools\ffmpeg\bin\ffprobe.exe
 
 ### 报 `目标不是影石相机卡（缺少 DCIM\Camera01 结构）`
 
-索引登记前会校验目标确实是相机卡，避免在普通文件夹里误建 `DCIM` 污染数据（`desktop/core.py:1795`）。把输出目录指到卡上的 `DCIM` 或 `DCIM\Camera01` 再跑。
+索引登记前会校验目标确实是相机卡，避免在普通文件夹里误建 `DCIM` 污染数据（`desktop/core.py:2111`）。把输出目录指到卡上的 `DCIM` 或 `DCIM\Camera01` 再跑。
 
 ### 报 `卡里找不到真机原片作模板（DCIM\Camera01\VID_*.mp4 + LRV_*.lrv）`
 
-程序需要一对**相机原生录制**的 VID/LRV 当模板，它要抄模板里的 `inst` box 结构和索引条目格式（`desktop/core.py:2036`）。
+程序需要一对**相机原生录制**的 VID/LRV 当模板，它要抄模板里的 `inst` box 结构和索引条目格式（`desktop/core.py:2279`）。
 
 解决：先用相机随手录几秒，让它留在卡里，再跑转换。
 
@@ -234,7 +244,7 @@ pip install -r requirements-dev.txt
 python -m pytest tests/ -q
 ```
 
-预期 `160 passed, 2 skipped`。跳过的两条依赖真机索引样本（`desktop/samples/`、`android/app/src/test/resources/samples/`），样本含设备标识，按约定不入库。
+预期 `178 passed, 2 skipped`。跳过的两条依赖真机索引样本（`desktop/samples/`、`android/app/src/test/resources/samples/`），样本含设备标识，按约定不入库。
 
 改代码前请先读 [`docs/BUILD.md`](docs/BUILD.md)。两处容易踩：
 

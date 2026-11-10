@@ -46,6 +46,7 @@
 from __future__ import annotations
 
 import concurrent.futures
+import ctypes
 import json
 import os
 import re
@@ -142,39 +143,102 @@ def _tool_base_dir() -> str:
         return os.path.dirname(os.path.abspath(sys.executable))
     return os.path.dirname(os.path.abspath(__file__))
 
-def _tool_dirs() -> list[str]:
-    """按优先级返回查找 ffmpeg 的候选目录列表。"""
+def _portable_tool_dirs() -> list[str]:
+    """程序自带、或上次下载到本地的 ffmpeg 位置（普通用户权限就能写）。"""
     base = _tool_base_dir()
-    dirs = [base, os.path.join(base, "bin")]
+    dirs = [os.path.join(base, "bin"), base]
     local = os.environ.get("LOCALAPPDATA")
     if local:
         dirs.append(os.path.join(local, "InstaAceImporter", "bin"))
     dirs.append(os.path.join(os.path.expanduser("~"), "InstaAceImporter", "bin"))
-    # 常见第三方安装位置（用户机器上已存在 ffmpeg 时省去重新下载）
-    for c in (r"C:\ffmpeg\bin", r"C:\Program Files\ffmpeg\bin",
-              r"C:\Program Files (x86)\ffmpeg\bin",
-              os.path.join(os.environ.get("ProgramData", r"C:\ProgramData"),
-                           "chocolatey", "bin")):
-        dirs.append(c)
     return dirs
+
+def global_install_dir() -> str:
+    """系统级安装目录。往这里写需要管理员权限。"""
+    base = os.environ.get("ProgramFiles") or r"C:\Program Files"
+    return os.path.join(base, "InstaAce", "bin")
+
+def _system_tool_dirs() -> list[str]:
+    """用户自己装过的 ffmpeg，以及本工具申请管理员权限装的那一份。"""
+    dirs = [global_install_dir()]
+    for key in ("ProgramFiles", "ProgramFiles(x86)"):
+        base = os.environ.get(key)
+        if base:
+            dirs.append(os.path.join(base, "ffmpeg", "bin"))
+    dirs.append(r"C:\ffmpeg\bin")
+    data = os.environ.get("ProgramData")
+    if data:
+        dirs.append(os.path.join(data, "chocolatey", "bin"))
+    home = os.path.expanduser("~")
+    dirs.append(os.path.join(home, "scoop", "shims"))
+    local = os.environ.get("LOCALAPPDATA")
+    if local:
+        dirs.append(os.path.join(local, "Microsoft", "WinGet", "Links"))
+    return dirs
+
+def _registry_ffmpeg() -> str | None:
+    """部分安装器会把 ffmpeg.exe 登记到 App Paths，先看这里。"""
+    if os.name != "nt":
+        return None
+    try:
+        import winreg
+    except ImportError:
+        return None
+    key = r"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\ffmpeg.exe"
+    for root in (winreg.HKEY_LOCAL_MACHINE, winreg.HKEY_CURRENT_USER):
+        try:
+            with winreg.OpenKey(root, key) as k:
+                value, _ = winreg.QueryValueEx(k, "")
+        except OSError:
+            continue
+        if value and os.path.isfile(value):
+            return value
+    return None
 
 def _find_tool(name: str, env_key: str) -> str | None:
     """按优先级定位 ffmpeg / ffprobe:
-    1) 环境变量 FFMPEG_PATH / FFPROBE_PATH
-    2) 本脚本(或打包后的 exe)同目录 / bin 子目录
-    3) 用户目录下的 InstaAceImporter\\bin
-    4) 常见第三方安装位置 (C:\\ffmpeg\\bin 等)
-    5) 系统 PATH
+    1) 环境变量 FFMPEG_PATH / FFPROBE_PATH（显式指定最优先）
+    2) 系统全局安装：注册表 App Paths → 常见安装目录 → 系统 PATH
+    3) 程序运行目录及其 bin 子目录 → 用户目录下的 InstaAceImporter\\bin
+
+    先全局后本地：用户机器上已经装了 ffmpeg 就别再下一份 200 MB 的东西
+    塞在程序旁边；只有系统里确实没有，才用程序目录里那一份。
     """
     env = os.environ.get(env_key)
     if env and os.path.isfile(env):
         return env
     exe = name + ".exe" if os.name == "nt" else name
-    for d in _tool_dirs():
+    if name == "ffmpeg":
+        reg = _registry_ffmpeg()
+        if reg:
+            return reg
+    for d in _system_tool_dirs():
         p = os.path.join(d, exe)
         if os.path.isfile(p):
             return p
-    return shutil.which(name)
+    on_path = shutil.which(name)
+    if on_path:
+        return on_path
+    for d in _portable_tool_dirs():
+        p = os.path.join(d, exe)
+        if os.path.isfile(p):
+            return p
+    return None
+
+def ffmpeg_source(path: str | None = None) -> str:
+    """当前这份 ffmpeg 是哪来的: portable / env / system / missing。"""
+    p = path if path is not None else find_ffmpeg()
+    if not p:
+        return "missing"
+    parent = os.path.normcase(os.path.dirname(os.path.abspath(p)))
+    for d in _portable_tool_dirs():
+        if parent == os.path.normcase(os.path.abspath(d)):
+            return "portable"
+    env = os.environ.get("FFMPEG_PATH")
+    if env and os.path.isfile(env):
+        if os.path.normcase(os.path.abspath(env)) == os.path.normcase(os.path.abspath(p)):
+            return "env"
+    return "system"
 
 def find_ffmpeg() -> str | None:
     return _find_tool("ffmpeg", "FFMPEG_PATH")
@@ -198,7 +262,7 @@ def ffmpeg_available() -> tuple[bool, str]:
     return True, ff
 
 def ffmpeg_install_dir() -> str:
-    """返回 ffmpeg 的安装目录: 优先程序同目录/bin，不可写则退回用户目录。"""
+    """程序目录下的 ffmpeg 安装位置: 优先 exe 同目录/bin，不可写则退回用户目录。"""
     base = os.path.join(_tool_base_dir(), "bin")
     try:
         os.makedirs(base, exist_ok=True)
@@ -289,23 +353,156 @@ def _download_one(url: str, zip_path: str, progress_cb=None) -> None:
                 if progress_cb and total:
                     progress_cb(min(1.0, done / total))
 
-def download_and_install_ffmpeg(stage_cb=None):
-    """对多个下载源测速，选最快路径下载并安装 ffmpeg。
+def _staging_dir() -> str:
+    """下载中转目录。放在用户临时目录下，不需要任何权限。"""
+    d = os.path.join(tempfile.gettempdir(), "InstaAceFfmpeg")
+    os.makedirs(d, exist_ok=True)
+    return d
 
-    stage_cb(frac, message): 阶段回调。
-        frac   ∈ [0,1] 总进度；
-        message 文本提示(测速 / 下载 / 安装 / 完成 / 失败)。
+def _is_admin() -> bool:
+    if os.name != "nt":
+        return False
+    try:
+        import ctypes
+        return bool(ctypes.windll.shell32.IsUserAnAdmin())
+    except Exception:  # noqa: BLE001
+        return False
 
-    返回 (ok: bool, message: str)。ok=True 时 message 为安装目录。
+class _ShellExecInfo(ctypes.Structure):
+    _fields_ = [
+        ("cbSize", ctypes.c_ulong),
+        ("fMask", ctypes.c_ulong),
+        ("hwnd", ctypes.c_void_p),
+        ("lpVerb", ctypes.c_wchar_p),
+        ("lpFile", ctypes.c_wchar_p),
+        ("lpParameters", ctypes.c_wchar_p),
+        ("lpDirectory", ctypes.c_wchar_p),
+        ("nShow", ctypes.c_int),
+        ("hInstApp", ctypes.c_void_p),
+        ("lpIDList", ctypes.c_void_p),
+        ("lpClass", ctypes.c_wchar_p),
+        ("hkeyClass", ctypes.c_void_p),
+        ("dwHotKey", ctypes.c_ulong),
+        ("hIcon", ctypes.c_void_p),
+        ("hProcess", ctypes.c_void_p),
+    ]
+
+def _run_elevated(bat_path: str, timeout: float = 300.0) -> tuple[bool, str]:
+    """用管理员权限运行一个 .bat 并等它结束。
+
+    返回 (ok, message)。用户点了「否」时 ok=False、message 为「已取消」。
+    """
+    if os.name != "nt":
+        return False, "只有 Windows 支持提权安装"
+    #   SEE_MASK_NOCLOSEPROCESS 才能在返回后拿到进程句柄等它退出；
+    #   不加这一位 ShellExecuteEx 立刻返回，后续的复制还在跑就校验了。
+    SEE_MASK_NOCLOSEPROCESS = 0x00000040
+    SEE_MASK_NOASYNC = 0x00000100
+    info = _ShellExecInfo()
+    info.cbSize = ctypes.sizeof(_ShellExecInfo)
+    info.fMask = SEE_MASK_NOCLOSEPROCESS | SEE_MASK_NOASYNC
+    info.lpVerb = "runas"
+    info.lpFile = bat_path
+    info.lpParameters = ""
+    info.lpDirectory = os.path.dirname(bat_path)
+    info.nShow = 0                     # SW_HIDE
+    try:
+        ok = ctypes.windll.shell32.ShellExecuteExW(ctypes.byref(info))
+    except Exception as e:  # noqa: BLE001
+        return False, "无法申请管理员权限: %s" % e
+    if not ok:
+        err = ctypes.get_last_error() if hasattr(ctypes, "get_last_error") else 0
+        #   1223 = ERROR_CANCELLED，用户在 UAC 弹窗上点了「否」。
+        if err == 1223:
+            return False, "已取消（未获得管理员权限）"
+        return False, "无法申请管理员权限（错误码 %s）" % err
+    handle = info.hProcess
+    if not handle:
+        return False, "管理员进程未启动"
+    WAIT_TIMEOUT = 0x00000102
+    try:
+        rc = ctypes.windll.kernel32.WaitForSingleObject(handle, int(timeout * 1000))
+        if rc == WAIT_TIMEOUT:
+            return False, "安装超时"
+        code = ctypes.c_ulong(0)
+        ctypes.windll.kernel32.GetExitCodeProcess(handle, ctypes.byref(code))
+        if code.value != 0:
+            return False, "安装脚本返回错误码 %d" % code.value
+        return True, "ok"
+    finally:
+        try:
+            ctypes.windll.kernel32.CloseHandle(handle)
+        except Exception:  # noqa: BLE001
+            pass
+
+def _install_to(dest_dir: str, src_dir: str) -> list[str]:
+    """把下载好的 ffmpeg.exe / ffprobe.exe 复制到 dest_dir（需已有权限）。"""
+    os.makedirs(dest_dir, exist_ok=True)
+    out = []
+    for name in ("ffmpeg.exe", "ffprobe.exe"):
+        src = os.path.join(src_dir, name)
+        if not os.path.isfile(src):
+            raise FileNotFoundError("下载结果里缺少 %s" % name)
+        dst = os.path.join(dest_dir, name)
+        shutil.copy2(src, dst)
+        out.append(dst)
+    return out
+
+def install_ffmpeg_global(src_dir: str, stage_cb=None) -> tuple[bool, str]:
+    """把 src_dir 里的 ffmpeg 装到系统目录，需要管理员权限。
+
+    装完会在 HKLM 的 App Paths 里登记 ffmpeg.exe —— 这样「运行」对话框和
+    本程序的注册表探测都能找到它，不必改系统 PATH（改 PATH 有把 %SystemRoot%
+    之类展开值写坏的风险，收益也不大）。
     """
     def emit(frac, msg):
         if stage_cb:
             stage_cb(frac, msg)
 
-    dest_dir = ffmpeg_install_dir()
-    tmp_dir = tempfile.gettempdir()
+    dest = global_install_dir()
+    if _is_admin():
+        try:
+            emit(0.9, "正在安装到 %s ..." % dest)
+            _install_to(dest, src_dir)
+        except Exception as e:  # noqa: BLE001
+            return False, "复制到 %s 失败: %s" % (dest, e)
+    else:
+        emit(0.9, "正在申请管理员权限 ...")
+        stage_dir = _staging_dir()
+        os.makedirs(stage_dir, exist_ok=True)
+        bat = os.path.join(stage_dir, "install_global.bat")
+        lines = [
+            "@echo off",
+            "chcp 65001 >nul",
+            'if not exist "%s" mkdir "%s"' % (dest, dest),
+        ]
+        for name in ("ffmpeg.exe", "ffprobe.exe"):
+            lines.append('copy /y "%s" "%s\\" >nul'
+                         % (os.path.join(src_dir, name), dest))
+        lines.append(
+            'reg add "HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\App Paths\\ffmpeg.exe"'
+            ' /ve /d "%s" /f >nul' % os.path.join(dest, "ffmpeg.exe"))
+        lines.append("exit /b 0")
+        try:
+            with open(bat, "w", encoding="utf-8", newline="\r\n") as f:
+                f.write("\n".join(lines) + "\n")
+        except OSError as e:
+            return False, "无法写入安装脚本: %s" % e
+        ok, msg = _run_elevated(bat)
+        if not ok:
+            return False, msg
 
-    # 1) 对每个源测速
+    for name in ("ffmpeg.exe", "ffprobe.exe"):
+        if not os.path.isfile(os.path.join(dest, name)):
+            return False, "安装后 %s 仍不存在" % name
+    return True, dest
+
+def _download_ffmpeg_to(staging: str, stage_cb=None) -> tuple[bool, str]:
+    """对多个下载源测速，把 ffmpeg/ffprobe 下载到 staging 目录。"""
+    def emit(frac, msg):
+        if stage_cb:
+            stage_cb(frac, msg)
+
     emit(0.02, "正在为 ffmpeg 下载源测速...")
     ranked = []
     for name, spec in _FFMPEG_SOURCES.items():
@@ -321,36 +518,79 @@ def download_and_install_ffmpeg(stage_cb=None):
     for i, (name, spec, speed) in enumerate(ranked):
         if speed is None:
             continue
-        base_frac = 0.05 + (i / max(1, len(ranked))) * 0.85
+        base_frac = 0.05 + (i / max(1, len(ranked))) * 0.70
         try:
             files = spec["files"]
             emit(base_frac, f"正在从 {name} 下载 ffmpeg ...")
             if spec["kind"] == "single-exe-zip":
-                for j, (fname, url) in enumerate(files.items()):
-                    zip_path = os.path.join(tmp_dir, f"insta_{fname}.zip")
-                    _download_one(url, zip_path, lambda f: emit(base_frac, f"正在下载 ffmpeg {f*100:3.0f}% ({fname})"))
-                    emit(base_frac + 0.05, "正在安装 ffmpeg ...")
-                    _extract_bin(zip_path, dest_dir)
+                for fname, url in files.items():
+                    zip_path = os.path.join(staging, f"insta_{fname}.zip")
+                    _download_one(url, zip_path,
+                                  lambda f: emit(base_frac, f"正在下载 ffmpeg {f*100:3.0f}% ({fname})"))
+                    _extract_bin(zip_path, staging)
                     os.remove(zip_path)
             else:
-                zip_path = os.path.join(tmp_dir, "insta_ffmpeg_all.zip")
-                _download_one(files["all"], zip_path, lambda f: emit(base_frac, f"正在下载 {f*100:3.0f}%"))
-                emit(base_frac + 0.05, "正在安装 ffmpeg ...")
-                _extract_bin(zip_path, dest_dir)
+                zip_path = os.path.join(staging, "insta_ffmpeg_all.zip")
+                _download_one(files["all"], zip_path,
+                              lambda f: emit(base_frac, f"正在下载 {f*100:3.0f}%"))
+                _extract_bin(zip_path, staging)
                 os.remove(zip_path)
-
-            ok, msg = ffmpeg_available()
-            if ok:
-                emit(1.0, f"ffmpeg 安装完成 ✓ ({dest_dir})")
-                return True, dest_dir
-            last_err = f"{name} 安装后仍无法运行"
+            if (os.path.isfile(os.path.join(staging, "ffmpeg.exe"))
+                    and os.path.isfile(os.path.join(staging, "ffprobe.exe"))):
+                return True, staging
+            last_err = f"{name} 下载结果不完整"
         except Exception as e:  # noqa: BLE001
             last_err = f"{name}: {e}"
             emit(base_frac, f"{name} 下载失败，尝试下一个源 ...")
             continue
-
-    emit(1.0, f"自动下载失败: {last_err}")
     return False, last_err
+
+def install_ffmpeg(scope: str = "portable", stage_cb=None) -> tuple[bool, str]:
+    """下载并安装 ffmpeg。
+
+    scope:
+        "global"   装到系统目录（Program Files），需要管理员权限；
+        "portable" 装到程序所在目录（或用户目录，如果程序目录不可写）。
+
+    返回 (ok, message)。ok=True 时 message 为安装目录。
+    """
+    def emit(frac, msg):
+        if stage_cb:
+            stage_cb(frac, msg)
+
+    scope = "global" if str(scope or "").lower() == "global" else "portable"
+    staging = _staging_dir()
+    ok, msg = _download_ffmpeg_to(staging, stage_cb)
+    if not ok:
+        emit(1.0, f"自动下载失败: {msg}")
+        return False, msg
+
+    if scope == "global":
+        ok, msg = install_ffmpeg_global(staging, stage_cb)
+        if not ok:
+            emit(1.0, "全局安装失败: %s" % msg)
+            return False, msg
+        dest = msg
+    else:
+        dest = ffmpeg_install_dir()
+        emit(0.85, "正在安装到 %s ..." % dest)
+        try:
+            _install_to(dest, staging)
+        except Exception as e:  # noqa: BLE001
+            emit(1.0, "安装失败: %s" % e)
+            return False, "安装失败: %s" % e
+
+    emit(0.95, "正在校验 ffmpeg ...")
+    ok2, detail = ffmpeg_available()
+    if not ok2:
+        emit(1.0, "安装后仍无法运行: %s" % detail)
+        return False, "安装后仍无法运行: %s" % detail
+    emit(1.0, "ffmpeg 安装完成 ✓ (%s)" % dest)
+    return True, dest
+
+def download_and_install_ffmpeg(stage_cb=None):
+    """兼容旧调用：等价于 install_ffmpeg("portable")。"""
+    return install_ffmpeg("portable", stage_cb)
 
 _HW_ENCODERS = [
     ("hevc_amf", "h264_amf", "AMD"),

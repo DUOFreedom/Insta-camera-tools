@@ -13,6 +13,38 @@
 - **转换中关窗**：新增 `desktop/tray.py`（`QSystemTrayIcon` 封装 + `showRequested`/`quitRequested`/`notify`）。`main.py` 改用 `QApplication`（`QMenu` 是 QWidget，`QGuiApplication` 下报 `QWidget: Cannot create a QWidget without QApplication`）并 `setQuitOnLastWindowClosed(False)`；`main.qml` 的 `onClosing` 在转换中弹窗给两个出路 —— 「停止并退出」（`bridge.cancel()` + `waitWorker(20000)` 成功才退出）与「最小化到托盘」（窗口隐藏、转换继续、跑完弹提示）。此前 QML 版只拦截、不给选择，直接退出会让 ffmpeg 变孤儿继续往相机卡写。
 - 删除时仍缺的封面选择、断点续跑、卡校验，已在下一节补齐（不再有缺口）。
 
+### 变更（ffmpeg 改为「先系统后本地」，安装分全局/程序目录两种）
+
+原来的顺序是「exe 目录 → 本地目录 → 几个常见安装路径 → PATH」，等于**先找自己带的那份**。后果是用户机器上明明装了 ffmpeg（chocolatey / scoop / winget 装的），程序仍然视而不见，还额外下一份 200 MB 塞在程序目录旁边；换台机器又得重下一遍。
+
+新顺序按用户提的要求改成**先看系统装没装**（`desktop/core.py:198` 的 `_find_tool()`）：
+
+| 顺序 | 位置 |
+|---|---|
+| 1 | 环境变量 `FFMPEG_PATH` / `FFPROBE_PATH` |
+| 2 | 注册表 `App Paths\ffmpeg.exe`（安装器登记的权威位置，HKLM 优先 HKCU） |
+| 3 | `C:\Program Files\InstaAce\bin`（本程序装全局的目标） |
+| 4 | `Program Files\ffmpeg\bin`、`Program Files (x86)\ffmpeg\bin`、`C:\ffmpeg\bin`、chocolatey、scoop shims、WinGet Links |
+| 5 | 系统 `PATH` |
+| 6 | exe 所在目录及其 `bin\` |
+| 7 | `%LOCALAPPDATA%\InstaAceImporter\bin`、`~\InstaAceImporter\bin` |
+
+配套拆成三个函数：`_system_tool_dirs()`（全局）、`_portable_tool_dirs()`（程序目录）、`_registry_ffmpeg()`（注册表）。新增 `ffmpeg_source(path)` 返回 `missing` / `env` / `system` / `portable`，界面据此告诉用户「这份 ffmpeg 是你系统里那个」，否则用户会以为自己没装。
+
+下载与安装分离成两步（`desktop/core.py:548` 的 `install_ffmpeg(scope)`）：
+
+- **先下到 `%TEMP%\InstaAceFfmpeg`，再按 scope 落盘**。选「装到系统」时 UAC 弹窗只覆盖最后那次复制 —— 用户点了「否」也不会白下 200 MB 再重来。
+- `scope="global"` 走 `install_ffmpeg_global()`：已是管理员就直接复制；否则写一个 `.bat`（`mkdir` + 两条 `copy /y` + `reg add` 登记 `App Paths`）用 `ShellExecuteExW(lpVerb="runas")` 提权执行。`SEE_MASK_NOCLOSEPROCESS` 是必须的 —— 不加这一位 `ShellExecuteEx` 立刻返回，复制还在跑就去做存在性校验了，会误报失败。用户拒绝时 `ShellExecuteExW` 返回 0 且 `GetLastError() == 1223`（`ERROR_CANCELLED`），据此回「已取消（未获得管理员权限）」而不是笼统的失败。
+- 不改系统 `PATH`：改 `PATH` 有把 `%SystemRoot%` 这类展开值写坏的风险（`setx` 截断、注册表里混入未展开变量），而登记 `App Paths` 已经足够让「运行」对话框和本程序的探测找到它。
+- `scope="portable"` 走 `ffmpeg_install_dir()`（exe 同目录 `bin\`，不可写则退回 `%LOCALAPPDATA%\InstaAceImporter\bin`），全程不需要任何权限，绝不弹 UAC。
+- `download_and_install_ffmpeg()` 保留为兼容壳，等价 `install_ffmpeg("portable")`。
+
+界面（`desktop/qml/main.qml` 的橙色横幅）从单个「下载 ffmpeg」按钮改成两个：「装到系统目录」与「装到程序目录」，并补一行说明两者区别（全局所有程序能用但要管理员，程序目录只给本程序用但不需要权限）。`Bridge` 新增 `installFfmpeg(scope)` Slot 与 `ffmpegSource` / `ffmpegScope` 两个 Property；`downloadFfmpeg()` 保留，默认 `portable`。
+
+顺带删掉 `_tool_dirs()` —— 新逻辑里 `_find_tool()` 分两段走系统/本地目录，这个合并列表没有调用方了。
+
+测试：新增 `desktop/tests/test_ffmpeg_locate.py` 14 条（系统优先于本地、注册表优先于目录扫描、环境变量优先于一切、`ffmpeg_source` 四种取值、非管理员装全局要走提权且脚本里真有 `copy /y` 与 `App Paths`、已是管理员不重复弹 UAC、UAC 取消如实上报、portable 绝不提权、先下载后提权的顺序、装完仍不可用要报失败、下载失败要报失败、旧入口仍可用），`desktop/tests/test_qml_bridge.py` 新增 4 条（scope 透传、默认 portable、`ffmpegSource` 暴露给界面、`ffmpegScope` 跟随请求）。回滚验证：`_find_tool` 两段顺序对调 → `test_system_install_wins_over_portable` 红；`install_ffmpeg` 改成「global 先提权后下载」→ `test_install_downloads_before_elevating` 红；`installFfmpeg` 忽略 scope 恒用 portable → 两条红。全套 160 → 178 passed。
+
 ### 新增（QML 版补齐经典版全部功能）
 
 删掉经典版时 QML 侧缺九项，本节一并补齐，每项都有测试（`desktop/tests/test_qml_bridge.py`，全套 126 → 160 passed）。
@@ -46,7 +78,7 @@
 
 ### 产物重建与核对（本轮）
 
-- 桌面端 `desktop/dist/InstaAceQml.exe` 80,493,565 B，`--self-test` → `QML_OK roots=1`，exit 0。解包 `PYZ.pyz` 核对：`tray` 在包内、`gui` 不在；`bridge.start` 的关键字常量含 `('do_index','template_names')`、`bridge._run` 含 `('template','encoder','spec','progress','cancel','log','start_number','template_names')`；`autoDetectSample` 引用 `SAMPLE_EXTS`，常量含 `DEFGHIJ`、`DCIM`、`Camera01`；本轮补齐的 15 个函数（`addPaths`/`pickCover`/`clearCovers`/`verifyCard`/`repairCard`/`locateCard`/`removeFile`/`detectHardware`/`refreshSequence`/`checkResume`/`specSummary`/`hardwareEncoder`/`nextSequence`/`coverImage`/`clearError`）在 `bridge` 的 `co_names` 与函数定义表里全部存在，`fromLocalFile` 也在（封面预览要用 file:// URL）；`core._build_hw_transcode_cmd` 常量含 `qsv`/`amf`；`instbox.inst_transplant.video_gop` 的 `co_names` 含 `Path` 与 `read_bytes`；`moov_rewrap` 的 `co_names` 含 `_MAX_32BIT` 与 `zlib`、函数表含 `_chunk_offsets` 与 `udta_with_mcrc`。
+- 桌面端 `desktop/dist/InstaAceQml.exe` 80,501,272 B，`--self-test` → `QML_OK roots=1`，exit 0。解包 `PYZ.pyz` 核对：`tray` 在包内、`gui` 不在；`bridge.start` 的关键字常量含 `('do_index','template_names')`、`bridge._run` 含 `('template','encoder','spec','progress','cancel','log','start_number','template_names')`；`autoDetectSample` 引用 `SAMPLE_EXTS`，常量含 `DEFGHIJ`、`DCIM`、`Camera01`；本轮补齐的 15 个函数（`addPaths`/`pickCover`/`clearCovers`/`verifyCard`/`repairCard`/`locateCard`/`removeFile`/`detectHardware`/`refreshSequence`/`checkResume`/`specSummary`/`hardwareEncoder`/`nextSequence`/`coverImage`/`clearError`）在 `bridge` 的 `co_names` 与函数定义表里全部存在，`fromLocalFile` 也在（封面预览要用 file:// URL）；`core._build_hw_transcode_cmd` 常量含 `qsv`/`amf`；`instbox.inst_transplant.video_gop` 的 `co_names` 含 `Path` 与 `read_bytes`；`moov_rewrap` 的 `co_names` 含 `_MAX_32BIT` 与 `zlib`、函数表含 `_chunk_offsets` 与 `udta_with_mcrc`；本轮 ffmpeg 改造的 15 个符号（`_portable_tool_dirs`/`global_install_dir`/`_system_tool_dirs`/`_registry_ffmpeg`/`_find_tool`/`ffmpeg_source`/`_staging_dir`/`_is_admin`/`_ShellExecInfo`/`_run_elevated`/`_install_to`/`install_ffmpeg_global`/`_download_ffmpeg_to`/`install_ffmpeg`/`download_and_install_ffmpeg`）全部在 `core` 的函数表里，`ctypes` 在 `co_names` 里，删掉的 `_tool_dirs` 已不在；`bridge` 的 `installFfmpeg`/`downloadFfmpeg`/`checkFfmpeg` 与 `ffmpegSource`/`ffmpegScope` 也都打包进去了。
 - 安卓 `android/app/build/outputs/apk/release/app-release.apk` 75,279,539 B；单元测试 IndexTest 7 跳过 / ConsentLogicTest 5 / ImportCardStateTest 6，失败与错误均 0。解包 `assets/chaquopy/app.imy` 核对：7 组零调用符号（`_num`/`_audio_map`/`add_file_entry`/`add_edit_entry`/`find_entry`/`repair_inst_metadata_layout`/`patch_media_thumbnail`/`patch_nail_thumbnail`）在两份 pyc 里都已不存在；`camera_moov_rewrap` 的 `co_names` 含 `_MAX_32BIT` 与 `zlib`、函数表含 `_chunk_offsets` 与 `udta_with_mcrc`、`stco_box` 常量含 `b'co64'`、`rebuild_stbl` 的元组常量含 `(b'stco', b'co64')`。
 - **APK 的字节数与 sha256 都不能当校验和**：同一份源码连编两次，签名（`META-INF/CERT.RSA`/`CERT.SF`/`MANIFEST.MF`）、`assets/chaquopy/build.json`、`assets/chaquopy/app.imy` 五项都会变。`app.imy` 里每个 pyc 只有第 8～12 字节（CPython 源文件 mtime 字段）不同，把这段清零后全部逐字节相同。要确认「装上去的就是这一轮构建的包」，解包比对 pyc 比比对哈希可靠。
 
