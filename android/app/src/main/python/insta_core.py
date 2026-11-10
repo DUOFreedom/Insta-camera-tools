@@ -525,6 +525,18 @@ def spec_from_template(template) -> dict | None:
     except Exception:  # noqa: BLE001
         return None
 
+def _gop_of(filepath: str) -> int:
+    """量出模板的关键帧间隔；量不出来返回 0，由调用方回退到 16。
+
+    必须跟模板走：Ace Pro 2 的 LRV 是 16，GO Ultra 的 VID=120 / LRV=10。
+    """
+    try:
+        tf, _ = _load_inst_modules()
+        return int(tf.video_gop(filepath))
+    except Exception:  # noqa: BLE001
+        return 0
+
+
 def analyze_native(filepath: str) -> dict:
     """深度分析一个原生录制视频，还原其"文件结构规格"。
 
@@ -582,6 +594,7 @@ def analyze_native(filepath: str) -> dict:
             "encoder": venc,
             "profile": profile,
             "level": video.get("level"),
+            "gop": _gop_of(filepath),
             "format": _st(data.get("format", {}), "format_name", "mp4"),
         },
         "audio_tracks": audio_tracks,
@@ -847,12 +860,17 @@ def _build_transcode_cmd(src, dst, vcodec, tag, vf, enc_params,
                          video_handler, video_encoder, audio_tracks,
                          color_range, src_audio_count=0, is_lrv=False,
                          fps: str = FPS, level: int | None = None,
-                         bitrate: int | None = None, hw_decoder: str = "") -> list[str]:
+                         bitrate: int | None = None, hw_decoder: str = "",
+                         gop: int | None = None) -> list[str]:
     """软件编码命令（软件编码路径）。
 
     hw_decoder 非空时，输入侧用 MediaCodec 解码（帧为 surface），
     滤镜链最前面加 hwdownload,format=nv12 拉回系统内存。
+
+    gop 是关键帧间隔，必须与模板一致（Ace Pro 2 的 LRV=16，GO Ultra 的
+    VID=120 / LRV=10）。None 或 <=0 时退回 16。
     """
+    keyint = int(gop) if gop and int(gop) > 0 else 16
     ff = find_ffmpeg()
     if not ff:
         # 别把 None 塞进 argv——那样报出来的是「命令列表为空」，
@@ -875,15 +893,20 @@ def _build_transcode_cmd(src, dst, vcodec, tag, vf, enc_params,
         cmd += ["-c:v", "libx265", "-preset", "ultrafast",
                 "-pix_fmt", "yuv420p", "-tag:v", tag,
                 "-x265-params", enc_params or
-                "keyint=16:min-keyint=16:scenecut=0:bframes=0:range=full:info=0"]
-    else:
-        # LRV: libx264
+                f"keyint={keyint}:min-keyint={keyint}:scenecut=0:bframes=0:"
+                f"range=full:info=0"]
+    elif vcodec == "libx264":
         # 不加 -b:v 等码率参数 —— 与密集关键帧叠加会让码率失控。
         cmd += ["-c:v", "libx264", "-preset", "veryfast", "-profile:v", "high",
-                "-tag:v", tag, "-g", "16", "-keyint_min", "16", "-sc_threshold", "0",
-                "-bf", "0"]
+                "-tag:v", tag, "-g", str(keyint), "-keyint_min", str(keyint),
+                "-sc_threshold", "0", "-bf", "0"]
         if enc_params:
             cmd += ["-x264-params", enc_params]
+    else:
+        # 模板 LRV 用了别的编码器：只给通用关键帧参数，交给 ffmpeg 解释 -g。
+        cmd += ["-c:v", vcodec, "-pix_fmt", "yuv420p", "-tag:v", tag,
+                "-g", str(keyint), "-keyint_min", str(keyint),
+                "-sc_threshold", "0", "-bf", "0"]
 
     cmd += _fps_args(fps)
     cmd += _COLOR_ARGS
@@ -903,7 +926,8 @@ def _build_hw_transcode_cmd(src, dst, vcodec, tag, vf, extra_args,
                             video_handler, video_encoder, audio_tracks,
                             color_range, src_audio_count=0, is_lrv=False,
                             fps: str = FPS, level: int | None = None,
-                            bitrate: int | None = None, hw_decoder: str = "") -> list[str]:
+                            bitrate: int | None = None, hw_decoder: str = "",
+                            gop: int | None = None) -> list[str]:
     """硬件编码命令（桌面端 AMF/NVENC/QSV，或 Android MediaCodec）。
 
     真机原片关键参数：-g 16 -keyint_min 16 -sc_threshold 0 -bf 0 -extra_sei 0
@@ -916,6 +940,7 @@ def _build_hw_transcode_cmd(src, dst, vcodec, tag, vf, extra_args,
       - i-frame-interval 只能整数秒，所以 -g 16 实际会被取整为 1 秒（≈30 帧），
         拿不到相机要求的 16 帧密集关键帧 —— 这是硬编的已知取舍。
     """
+    keyint = int(gop) if gop and int(gop) > 0 else 16
     ff = find_ffmpeg()
     if not ff:
         raise ValidationError("未找到 ffmpeg，无法构建硬件转码命令")
@@ -935,7 +960,7 @@ def _build_hw_transcode_cmd(src, dst, vcodec, tag, vf, extra_args,
     cmd += extra_args
     cmd += ["-c:v", vcodec, "-tag:v", tag]
     if "nvenc" in vcodec:
-        cmd += ["-g", "16", "-keyint_min", "16", "-sc_threshold", "0",
+        cmd += ["-g", str(keyint), "-keyint_min", str(keyint), "-sc_threshold", "0",
                 "-bf", "0", "-extra_sei", "0", "-udu_sei", "0"]
         if not is_lrv:
             cmd += ["-slices", "2"]
@@ -946,8 +971,8 @@ def _build_hw_transcode_cmd(src, dst, vcodec, tag, vf, extra_args,
         #     若相机不认，请切回「自动」软件编码。
         br = bitrate or (4_000_000 if is_lrv else 20_000_000)
         cmd += ["-pix_fmt", "yuv420p", "-b:v", str(br),
-                "-bf", "0", "-g", "16",
-                "-keyint_min", "16", "-sc_threshold", "0"]
+                "-bf", "0", "-g", str(keyint),
+                "-keyint_min", str(keyint), "-sc_threshold", "0"]
         prof = "high" if "264" in vcodec else "main"
         cmd += ["-profile:v", prof]
     # 像素格式处理（目标 vf 已含 format=yuv420p,setrange=full）
@@ -1033,18 +1058,31 @@ def _build_spec_tasks(input_path, output_dir, seq, stamp, hw, spec):
         # 桌面端硬件加速路径
         hevc_enc, h264_enc, _hw_label = hw
         main_vc, main_tag = hevc_enc, "hvc1"
-        preview_vc, preview_tag = h264_enc, "avc1"
+        # LRV 的编码格式必须跟模板走：Ace Pro 2 的 LRV 是 H.264(avc1)，
+        #   而 GO Ultra 的 LRV 是 HEVC(hvc1)。写死 avc1 会让 GO Ultra 的
+        #   LRV 与 AMBA/nail 里声明的东西对不上，相机相册不显示。
+        preview_vc = lv.get("codec") or h264_enc
+        preview_tag = lv.get("codec_tag") or (
+            "hvc1" if "265" in preview_vc else "avc1")
         extra = _hw_extra_args(hevc_enc)
     else:
-        #   主视频 libx265 / 预览 libx264，与真机原片参数一致。
+        #   主视频 libx265 / 预览跟随模板（Ace Pro 2 是 libx264，GO Ultra 是 libx265）。
         main_vc, main_tag = "libx265", "hvc1"
-        preview_vc, preview_tag = "libx264", "avc1"
+        preview_vc = lv.get("codec") or "libx264"
+        preview_tag = lv.get("codec_tag") or (
+            "hvc1" if "265" in preview_vc else "avc1")
         extra = []
 
     vh = v.get("handler") or "INS.HVC"
     ve = v.get("encoder") or "HVC encoder"
-    lrv_vh = lv.get("handler") or "INS.AVC"
-    lrv_ve = lv.get("encoder") or "AVC encoder"
+    lrv_vh = lv.get("handler") or (
+        "INS.HVC" if "265" in preview_vc else "INS.AVC")
+    lrv_ve = lv.get("encoder") or (
+        "HVC encoder" if "265" in preview_vc else "AVC encoder")
+
+    # 关键帧间隔跟模板：Ace Pro 2 的 LRV=16，GO Ultra 的 VID=120 / LRV=10。
+    main_gop = int(v.get("gop") or 0)
+    lrv_gop = int(lv.get("gop") or 0)
 
     base = f"{prefix}_{stamp}_{seq:03d}"
     main_dst = os.path.join(output_dir, base + ".mp4")
@@ -1052,12 +1090,12 @@ def _build_spec_tasks(input_path, output_dir, seq, stamp, hw, spec):
 
     tasks = [
         # label, dst, vcodec, tag, w, h, fps, vh, ve, color_range, pix_fmt,
-        #        audio, profile, level
+        #        audio, profile, level, gop
         ("VID (主视频)", main_dst, main_vc, main_tag, w, h, fps, vh, ve,
-         cr, pix, audio, profile, v.get("level")),
+         cr, pix, audio, profile, v.get("level"), main_gop),
         ("LRV (低清预览)", lrv_dst, preview_vc, preview_tag, lrv_w, lrv_h,
          lrv_fps, lrv_vh, lrv_ve, lrv_cr, lrv_pix, audio, lrv_profile,
-         lv.get("level")),
+         lv.get("level"), lrv_gop),
     ]
     return tasks, extra
 
@@ -1186,12 +1224,16 @@ def convert(input_path: str, output_dir: str, start_number: int | None = None,
 
     def _run_one(idx: int, t):
         nonlocal first_error
-        (label, dst, vc, tag, w, h, fps, vh, ve, cr, pix, audio, profile, level) = t
+        (label, dst, vc, tag, w, h, fps, vh, ve, cr, pix, audio, profile, level,
+         gop) = t
         vf = _scale_pad(w, h)
         say(f"[{label}] 编码中 ({w}x{h},fps={fps})...")
         if hw:
             say(f"[硬件加速] 使用 {hw_label}")
         is_lrv = dst.lower().endswith(".lrv")
+        # GOP 必须与模板一致：相机按 AMBA[53] 声明的间隔抽帧，
+        #   与真实码流不符时不显示缩略图。0 表示模板里量不出来，退回 16。
+        keyint = int(gop) if gop and int(gop) > 0 else 16
 
         def _build_cmd(hwdec_name: str):
             """组一条转码命令。hwdec_name 非空走 MediaCodec 解码，空则软解码。"""
@@ -1199,17 +1241,19 @@ def convert(input_path: str, output_dir: str, start_number: int | None = None,
                 return _build_hw_transcode_cmd(input_path, dst, vc, tag, vf, extra,
                                                vh, ve, audio, cr, src_audio_count,
                                                is_lrv=is_lrv, fps=fps, level=level,
-                                               hw_decoder=hwdec_name)
+                                               hw_decoder=hwdec_name, gop=keyint)
             if is_lrv:
-                enc_params = "keyint=16:min-keyint=16:scenecut=0:bframes=0"
+                enc_params = (f"keyint={keyint}:min-keyint={keyint}:"
+                              f"scenecut=0:bframes=0")
                 sw_vc = vc
             else:
-                enc_params = "keyint=16:min-keyint=16:scenecut=0:bframes=0:range=full:info=0"
+                enc_params = (f"keyint={keyint}:min-keyint={keyint}:scenecut=0:"
+                              f"bframes=0:range=full:info=0")
                 sw_vc = "libx265"
             return _build_transcode_cmd(input_path, dst, sw_vc, tag, vf, enc_params,
                                         vh, ve, audio, cr, src_audio_count,
                                         is_lrv=is_lrv, fps=fps, level=level,
-                                        hw_decoder=hwdec_name)
+                                        hw_decoder=hwdec_name, gop=keyint)
 
         def _job_cb(frac, spd, eta, _i=idx, _label=label):
             if not progress:
@@ -1255,15 +1299,17 @@ def convert(input_path: str, output_dir: str, start_number: int | None = None,
                     fallback_vc = "libx265" if ("265" in str(vc) or "hevc" in str(vc)) else "libx264"
                     fallback_tag = "hvc1" if fallback_vc == "libx265" else "avc1"
                     if is_lrv:
-                        enc_params = "keyint=16:min-keyint=16:scenecut=0:bframes=0"
+                        enc_params = (f"keyint={keyint}:min-keyint={keyint}:"
+                                      f"scenecut=0:bframes=0")
                     else:
-                        enc_params = "keyint=16:min-keyint=16:scenecut=0:bframes=0:range=full:info=0"
+                        enc_params = (f"keyint={keyint}:min-keyint={keyint}:"
+                                      f"scenecut=0:bframes=0:range=full:info=0")
                     cmd_sw = _build_transcode_cmd(input_path, dst, fallback_vc,
                                                   fallback_tag, vf, enc_params,
                                                   vh, ve, audio, cr,
                                                   src_audio_count,
                                                   is_lrv=is_lrv, fps=fps,
-                                                  level=level)
+                                                  level=level, gop=keyint)
                     try:
                         _exec(cmd_sw)
                     except CanceledError:
@@ -2589,6 +2635,8 @@ def _attach_prepare_and_attach(tf, rw, gen_p, native_p, label, is_proxy,
         new_name=new_name,
         thumbnail=thumbnail,
         stats=tf.media_stats(gen_p),
+        # AMBA[53] 声明的是这条码流的真实关键帧间隔，所以量生成物而不是模板。
+        gop=tf.video_gop(gen_p),
     )
     tf.inject_udta(gen_p, udta)
     # b) 修正 ftyp（free -> wide，与相机一致）

@@ -521,6 +521,15 @@ def analyze_native(filepath: str) -> dict:
     _name_u = os.path.basename(filepath).upper()
     _role = "proxy" if (_name_u.startswith("LRV") or _name_u.endswith(".LRV")) else "main"
 
+    # 关键帧间隔必须跟着模板走：Ace Pro 2 的 LRV 是 16，GO Ultra 的 VID=120 /
+    #   LRV=10。写死 16 会让 GO Ultra 的码流与 AMBA 声明对不上，相机不认。
+    gop = 0
+    try:
+        tf, _ = _load_inst_modules()
+        gop = tf.video_gop(filepath)
+    except Exception:
+        pass
+
     return {
         "video": {
             "codec": vcodec_key,
@@ -534,6 +543,7 @@ def analyze_native(filepath: str) -> dict:
             "encoder": venc,
             "profile": profile,
             "level": video.get("level"),
+            "gop": gop,
             "format": _st(data.get("format", {}), "format_name", "mp4"),
         },
         "audio_tracks": audio_tracks,
@@ -793,11 +803,17 @@ def _build_transcode_cmd(src, dst, vcodec, tag, vf, enc_params,
                          video_handler, video_encoder, audio_tracks,
                          color_range, src_audio_count=0, is_lrv=False,
                          fps: str = FPS, level: int | None = None,
-                         bitrate: int | None = None) -> list[str]:
-    """软件编码命令。"""
+                         bitrate: int | None = None,
+                         gop: int | None = None) -> list[str]:
+    """软件编码命令。
+
+    gop 是关键帧间隔，必须与模板一致（Ace Pro 2 的 LRV=16，GO Ultra 的
+    VID=120 / LRV=10）。None 或 <=0 时退回 16（Ace Pro 2 的取值）。
+    """
     ff = find_ffmpeg()
     if not ff:
         raise ValidationError("未找到 ffmpeg，无法构建转码命令")
+    keyint = int(gop) if gop and int(gop) > 0 else 16
     extra_in = audio_inputs(audio_tracks, src_audio_count)
     cmd = [ff, "-hide_banner", "-y", "-i", src]
     if extra_in:
@@ -811,15 +827,21 @@ def _build_transcode_cmd(src, dst, vcodec, tag, vf, enc_params,
         cmd += ["-c:v", "libx265", "-preset", "ultrafast",
                 "-pix_fmt", "yuv420p", "-tag:v", tag,
                 "-x265-params", enc_params or
-                "keyint=16:min-keyint=16:scenecut=0:bframes=0:range=full:info=0"]
-    else:
-        # LRV: libx264
+                f"keyint={keyint}:min-keyint={keyint}:scenecut=0:bframes=0:"
+                f"range=full:info=0"]
+    elif vcodec == "libx264":
         # 不加 -b:v 等码率参数 —— 与密集关键帧叠加会让码率失控。
         cmd += ["-c:v", "libx264", "-preset", "veryfast", "-profile:v", "high",
-                "-tag:v", tag, "-g", "16", "-keyint_min", "16", "-sc_threshold", "0",
-                "-bf", "0"]
+                "-tag:v", tag, "-g", str(keyint), "-keyint_min", str(keyint),
+                "-sc_threshold", "0", "-bf", "0"]
         if enc_params:
             cmd += ["-x264-params", enc_params]
+    else:
+        # 模板 LRV 用了别的编码器（VP9/AV1 等）：只给通用关键帧参数，
+        #   交给 ffmpeg 自己按编码器解释 -g。
+        cmd += ["-c:v", vcodec, "-pix_fmt", "yuv420p", "-tag:v", tag,
+                "-g", str(keyint), "-keyint_min", str(keyint),
+                "-sc_threshold", "0", "-bf", "0"]
 
     cmd += _fps_args(fps)
     cmd += _COLOR_ARGS
@@ -839,12 +861,14 @@ def _build_hw_transcode_cmd(src, dst, vcodec, tag, vf, extra_args,
                             video_handler, video_encoder, audio_tracks,
                             color_range, src_audio_count=0, is_lrv=False,
                             fps: str = FPS, level: int | None = None,
-                            bitrate: int | None = None) -> list[str]:
+                            bitrate: int | None = None,
+                            gop: int | None = None) -> list[str]:
     """硬件编码命令。
 
-    实测关键参数：-g 16 -keyint_min 16 -sc_threshold 0 -bf 0 -extra_sei 0
-                  -udu_sei 0 -c:a aac 192k 48k 2ch + bt709 + 30000/1001 cfr
+    实测关键参数：-g <模板GOP> -keyint_min <模板GOP> -sc_threshold 0 -bf 0
+                  -extra_sei 0 -udu_sei 0 -c:a aac 192k 48k 2ch + bt709
     """
+    keyint = int(gop) if gop and int(gop) > 0 else 16
     extra_in = audio_inputs(audio_tracks, src_audio_count)
     ff = find_ffmpeg()
     if not ff:
@@ -859,7 +883,7 @@ def _build_hw_transcode_cmd(src, dst, vcodec, tag, vf, extra_args,
     cmd += extra_args
     cmd += ["-c:v", vcodec, "-tag:v", tag]
     if "nvenc" in vcodec:
-        cmd += ["-g", "16", "-keyint_min", "16", "-sc_threshold", "0",
+        cmd += ["-g", str(keyint), "-keyint_min", str(keyint), "-sc_threshold", "0",
                 "-bf", "0", "-extra_sei", "0", "-udu_sei", "0"]
         if not is_lrv:
             cmd += ["-slices", "2"]
@@ -946,17 +970,26 @@ def _build_spec_tasks(input_path, output_dir, seq, stamp, hw, spec):
     if hw:
         hevc_enc, h264_enc, _hw_label = hw
         main_vc, main_tag = hevc_enc, "hvc1"
-        preview_vc, preview_tag = "libx264", "avc1"
+        # LRV 的编码格式必须跟模板走：Ace Pro 2 的 LRV 是 H.264(avc1)，而
+        #   GO Ultra 的 LRV 是 HEVC(hvc1)。写死 libx264/avc1 会让 GO Ultra
+        #   的 LRV 与 AMBA/nail 里声明的东西对不上，相机相册不显示。
+        preview_vc = lv.get("codec") or "libx264"
+        preview_tag = lv.get("codec_tag") or ("hvc1" if "265" in preview_vc else "avc1")
         extra = _hw_extra_args(hevc_enc)
     else:
         main_vc, main_tag = "libx265", "hvc1"
-        preview_vc, preview_tag = "libx264", "avc1"
+        preview_vc = lv.get("codec") or "libx264"
+        preview_tag = lv.get("codec_tag") or ("hvc1" if "265" in preview_vc else "avc1")
         extra = []
 
     vh = v.get("handler") or "INS.HVC"
     ve = v.get("encoder") or "HVC encoder"
-    lrv_vh = lv.get("handler") or "INS.AVC"
-    lrv_ve = lv.get("encoder") or "AVC encoder"
+    lrv_vh = lv.get("handler") or ("INS.HVC" if "265" in preview_vc else "INS.AVC")
+    lrv_ve = lv.get("encoder") or ("HVC encoder" if "265" in preview_vc else "AVC encoder")
+
+    # 关键帧间隔跟模板：Ace Pro 2 的 LRV=16，GO Ultra 的 VID=120 / LRV=10。
+    main_gop = int(v.get("gop") or 0)
+    lrv_gop = int(lv.get("gop") or 0)
 
     base = f"{prefix}_{stamp}_{seq:03d}"
     main_dst = os.path.join(output_dir, base + ".mp4")
@@ -964,12 +997,12 @@ def _build_spec_tasks(input_path, output_dir, seq, stamp, hw, spec):
 
     tasks = [
         # label, dst, vcodec, tag, w, h, fps, vh, ve, color_range, pix_fmt,
-        #        audio, profile, level
+        #        audio, profile, level, gop
         ("VID (主视频)", main_dst, main_vc, main_tag, w, h, fps, vh, ve,
-         cr, pix, audio, profile, v.get("level")),
+         cr, pix, audio, profile, v.get("level"), main_gop),
         ("LRV (低清预览)", lrv_dst, preview_vc, preview_tag, lrv_w, lrv_h,
          lrv_fps, lrv_vh, lrv_ve, lrv_cr, lrv_pix, audio, lrv_profile,
-         lv.get("level")),
+         lv.get("level"), lrv_gop),
     ]
     return tasks, extra
 
@@ -1093,25 +1126,32 @@ def convert(input_path: str, output_dir: str, start_number: int | None = None,
 
     def _run_one(idx: int, t):
         nonlocal first_error
-        (label, dst, vc, tag, w, h, fps, vh, ve, cr, pix, audio, profile, level) = t
+        (label, dst, vc, tag, w, h, fps, vh, ve, cr, pix, audio, profile, level,
+         gop) = t
         vf = _scale_pad(w, h)
         say(f"[{label}] 编码中 ({w}x{h},fps={fps})...")
         if hw:
             say(f"[硬件加速] 使用 {hw_label}")
         is_lrv = dst.lower().endswith(".lrv")
+        # GOP 必须与模板一致：相机按 AMBA[53] 声明的间隔抽帧，
+        #   与真实码流不符时不显示缩略图。0 表示模板里量不出来，退回 16。
+        keyint = int(gop) if gop and int(gop) > 0 else 16
         if hw and not str(vc).startswith("lib"):
             cmd = _build_hw_transcode_cmd(input_path, dst, vc, tag, vf, extra,
                                           vh, ve, audio, cr, src_audio_count,
-                                          is_lrv=is_lrv, fps=fps, level=level)
+                                          is_lrv=is_lrv, fps=fps, level=level,
+                                          gop=keyint)
         else:
             if is_lrv:
-                enc_params = "keyint=16:min-keyint=16:scenecut=0:bframes=0"
+                enc_params = f"keyint={keyint}:min-keyint={keyint}:scenecut=0:bframes=0"
             else:
-                enc_params = "keyint=16:min-keyint=16:scenecut=0:bframes=0:range=full:info=0"
+                enc_params = (f"keyint={keyint}:min-keyint={keyint}:scenecut=0:"
+                              f"bframes=0:range=full:info=0")
                 vc = "libx265" if vc not in ("libx265",) else vc
             cmd = _build_transcode_cmd(input_path, dst, vc, tag, vf, enc_params,
                                        vh, ve, audio, cr, src_audio_count,
-                                       is_lrv=is_lrv, fps=fps, level=level)
+                                       is_lrv=is_lrv, fps=fps, level=level,
+                                       gop=keyint)
 
         def _job_cb(frac, spd, eta, _i=idx, _label=label):
             if not progress:
@@ -2345,10 +2385,12 @@ def _udta_stored_name(tf, native_p, is_proxy: bool) -> str:
     return os.path.basename(str(native_p))
 
 def _shrink_avc1_entry(tf, path, keep: bytes = b"avcC") -> bool:
-    """把视频采样条目 avc1 的子 box 精简为只保留 keep（相机要求）。
+    """把视频采样条目的子 box 精简为只保留 keep（相机要求）。
 
-    黄金参考（相机认的 LRV）：avc1 entry 里只有 avcC；
-    ffmpeg 产物会多带 pasp / btrt 等，相机直接拒收整条。
+    黄金参考：相机认的采样条目里只有解码配置盒 —— H.264 是 avc1/avcC，
+    HEVC 是 hvc1/hvcC。ffmpeg 产物会多带 pasp / btrt 等，相机直接拒收整条。
+    GO Ultra 的 LRV 是 hvc1，所以这里不能只看 avc1：按实际 tag 选对应的
+    配置盒，否则 GO Ultra 的 LRV 会静默跳过精简。
     修改后同步回填 stsd/stbl/minf/mdia/trak/moov 的 box 长度。
     返回是否发生了修改。
     """
@@ -2369,7 +2411,13 @@ def _shrink_avc1_entry(tf, path, keep: bytes = b"avcC") -> bool:
         stsd = tf.direct_child(snap, stbl, b"stsd")
         eoff = stsd[0] + 16
         esz = struct.unpack_from(">I", data, eoff)[0]
-        if bytes(data[eoff + 4:eoff + 8]) != b"avc1":
+        # 采样条目 tag 决定保留哪个配置盒：avc1->avcC，hvc1/hev1->hvcC。
+        tag = bytes(data[eoff + 4:eoff + 8])
+        if tag == b"avc1":
+            keep = b"avcC"
+        elif tag in (b"hvc1", b"hev1"):
+            keep = b"hvcC"
+        else:
             return False
         ch, ch_off = None, None
         for h in (86, 36, 64, 78, 20, 24, 16):
@@ -2453,6 +2501,8 @@ def _inst_attach_one(tf, rw, work, gen_p, native_p, label, is_proxy,
         new_name=new_name,
         thumbnail=thumbnail,
         stats=tf.media_stats(gen_p),
+        # AMBA[53] 声明的是这条码流的真实关键帧间隔，所以量生成物而不是模板。
+        gop=tf.video_gop(gen_p),
     )
     tf.inject_udta(gen_p, udta)
     # b) 修正 ftyp（free -> wide，与相机一致）

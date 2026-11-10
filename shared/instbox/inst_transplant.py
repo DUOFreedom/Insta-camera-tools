@@ -226,6 +226,43 @@ def extract_udta(path: Path) -> bytes:
     return data[udta_offset : udta_offset + udta_size]
 
 
+def video_gop(path: Path) -> int:
+    """读出视频轨的关键帧间隔（GOP），即 stss 里相邻 sync sample 的差。
+
+    相机把 GOP 写进 AMBA box 偏移 53，实测 Ace Pro 2 与 GO Ultra 都是
+    「stss 间隔」本身：Ace Pro 2 的 LRV 是 16，GO Ultra 的 VID=120 / LRV=10。
+    所以这个值必须从模板量，不能写死 —— 写死会让 AMBA 与实际码流对不上。
+
+    只有 1 个关键帧（全片单 GOP）时无从得知间隔，返回 0 表示「未知」，
+    由调用方决定回退值。
+    """
+    data = path.read_bytes()
+    try:
+        moov = next(box for box in mp4_boxes(data) if box[2] == b"moov")
+    except StopIteration:
+        return 0
+    for trak in (b for b in child_boxes(data, moov[0] + 8, moov[0] + moov[1]) if b[2] == b"trak"):
+        try:
+            mdia = direct_child(data, trak, b"mdia")
+            hdlr = direct_child(data, mdia, b"hdlr")
+        except ValueError:
+            continue
+        if data[hdlr[0] + 16:hdlr[0] + 20] != b"vide":
+            continue
+        try:
+            stss = direct_child(data, direct_child(data, mdia, b"minf"), b"stbl")
+            stss = direct_child(data, stss, b"stss")
+        except ValueError:
+            # 没有 stss = 每一帧都是关键帧（全 I 帧），GOP 就是 1。
+            return 1
+        count = struct.unpack_from(">I", data, stss[0] + 12)[0]
+        if count < 2:
+            return 0
+        entries = struct.unpack_from(">%dI" % min(count, 64), data, stss[0] + 16)
+        return int(entries[1] - entries[0])
+    return 0
+
+
 def media_stats(path: Path) -> dict[str, int]:
     command = [
         _tool("ffprobe"), "-v", "error", "-show_entries",
@@ -265,6 +302,7 @@ def camera_udta(
     new_name: str,
     thumbnail: bytes,
     stats: dict[str, int],
+    gop: int | None = None,
 ) -> bytes:
     udta = bytearray(extract_udta(template))
     if len(old_name) != len(new_name):
@@ -284,12 +322,19 @@ def camera_udta(
 
     amba = bytearray(udta[amba_offset : amba_offset + amba_size])
     #   防止越界写导致相机无法识别。
+    # 偏移 53 是关键帧间隔（GOP），相机按它算缩略图抽帧位置。实测真机：
+    #   Ace Pro 2 的 LRV 是 16，GO Ultra 的 VID=120 / LRV=10 —— 与 stss 里
+    #   相邻 sync sample 的差完全相等。这里写死 16 会让 GO Ultra 的码流
+    #   （GOP=120）与 AMBA 声明对不上，相机相册里表现为不显示或抽错帧。
+    if gop is None:
+        gop = video_gop(template)
+    #   防止越界写导致相机无法识别。
     _amba_fields = [
         (25, stats["video_timescale"]),
         (29, 1001),
         (41, stats["video_duration_ts"]),
         (49, stats["video_frames"]),
-        (53, 16),
+        (53, gop if gop and gop > 0 else 16),
         (67, stats["audio_rate"]),
         (71, 1024),
         (84, stats["audio_frames"] * 4),
@@ -1192,10 +1237,12 @@ def main() -> int:
         main_udta = camera_udta(
             template_main, old_name=old_main_name, new_name=main_name,
             thumbnail=thumbnail, stats=media_stats(main_base_path),
+            gop=video_gop(main_base_path),
         )
         proxy_udta = camera_udta(
             template_proxy, old_name=old_proxy_name, new_name=proxy_name,
             thumbnail=thumbnail, stats=media_stats(proxy_base_path),
+            gop=video_gop(proxy_base_path),
         )
         inject_udta(main_base_path, main_udta)
         inject_udta(proxy_base_path, proxy_udta)

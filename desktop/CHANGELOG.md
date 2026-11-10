@@ -2,6 +2,48 @@
 
 ## 未发布
 
+### 新增（Go Ultra 机型适配）
+
+用户提供了 GO Ultra 真机素材（`VID_20261104_141845_024.mp4` / `LRV_20261104_141845_024.lrv`），逆向比对后发现有四处规格是照着 Ace Pro 2 写死的，GO Ultra 上全部对不上。这不是「参数微调」，是产品在两种机型上行为不同。
+
+真机实测差异：
+
+| 项目 | Ace Pro 2 | GO Ultra |
+| --- | --- | --- |
+| VID 编码 | HEVC 1080p | HEVC 1080p @59.94 |
+| VID 关键帧间隔 | 16 | **120** |
+| LRV 编码 | **H.264 (avc1)** | **HEVC (hvc1)** |
+| LRV 关键帧间隔 | 16 | **10** |
+| AMBA[53] | 16 | 120 / 10 |
+
+四处的修法：
+
+- **AMBA[53] 写死 16 → 从产物量**。偏移 53 是关键帧间隔，相机按它算缩略图抽帧位置。实测两代机型的这个字段都精确等于 stss 里相邻 sync sample 的差（GO Ultra VID `[1,121]`→120、LRV `[1,11,21,…]`→10）。新增 `video_gop(path)` 直接读文件字节解 `moov/trak/mdia/minf/stbl/stss`，不依赖 ffprobe；`camera_udta(..., gop=)` 接受该值，`None` 时自己从模板量，量不出来（0）才退回 16。所有调用点都从**生成产物**量，因为 AMBA 声明的是这条码流的间隔，不是模板的。
+- **LRV 编码器写死 libx264/avc1 → 跟随模板**。`_build_spec_tasks` 现在读 `lrv_video.codec` 与 `codec_tag`，handler/encoder 也跟着切换。GO Ultra 的 LRV 编成 HEVC，Ace Pro 2 仍是 H.264，两者互不影响。
+- **GOP 参数写死 `-g 16 -keyint_min 16` → 跟随模板**。`analyze_native()` 新增 `gop` 字段（两端都加），`spec_from_template()` 自动带出；`_build_spec_tasks` 把 GOP 放进任务元组第 15 位；`_build_transcode_cmd` / `_build_hw_transcode_cmd` 新增 `gop` 参数，`-x265-params keyint=`、`-g`/`-keyint_min`、nvenc、mediacodec 四处全部改用模板值。任务里 GOP 为 0（老调用方/量不出）时仍退回 16。
+- **`_shrink_avc1_entry` 只认 avc1 → 按 tag 选配置盒**。这个函数负责把采样条目的多余子 box（pasp/btrt）去掉，只留解码配置盒，相机才收。原来硬编码 `if tag != b"avc1": return False`，GO Ultra 的 LRV 是 hvc1 所以永远跳过精简，而且不报任何警告。改为 avc1→保留 avcC、hvc1/hev1→保留 hvcC，其余不动。
+
+顺带确认了一处**不是缺陷**的：GO Ultra 的 LRV 与 VID 的 `nail` box 完全相同（688144 B = 896×512×1.5 裸 YUV420），说明两代机型共用同一张缩略图规格，`camera_udta` 里的 `nail_size != 688144` 校验对 GO Ultra 也成立。
+
+### 测试（Go Ultra 机型适配）
+
+新增 11 条，全部用合成 MP4 覆盖，不需要真机素材也能守住：
+
+- `test_video_gop_reads_keyframe_interval` —— 合成 stss，VID 型（[1,121]）得 120、LRV 型（[1,11,21,31]）得 10。
+- `test_video_gop_returns_zero_for_single_keyframe` —— 单关键帧无从得知间隔，返回 0 让调用方回退。
+- `test_video_gop_returns_one_without_stss` —— 无 stss = 全 I 帧，GOP 是 1。
+- `test_camera_udta_writes_real_gop_into_amba` —— 传 gop=120 必须原样写进 AMBA[53]。
+- `test_camera_udta_falls_back_to_16_when_gop_unknown` —— gop 为 0/None 时退回 16，老行为不坏。
+- `test_spec_tasks_follow_template_lrv_codec_for_go_ultra` —— GO Ultra 模板下 LRV 的 vc/tag/handler 三者一致，不留 avc1。
+- `test_spec_tasks_keep_ace_pro_2_lrv_as_h264` —— Ace Pro 2 模板下仍是 libx264/avc1。
+- `test_spec_tasks_carry_template_gop` —— VID 任务带 120、LRV 任务带 10。
+- `test_convert_passes_template_gop_into_ffmpeg_args` —— 端到端：桩掉 `_run_ffmpeg` 后检查真实命令里出现 `keyint=120` 与 `keyint=10`。
+- `test_shrink_entry_strips_extras_from_hvc1` / `test_shrink_entry_strips_extras_from_avc1` —— hvc1 精简后只留 hvcC、avc1 只留 avcC，tag 不变。
+
+五处缺陷逐一做了回滚验证（改回缺陷版本 → 对应测试变红 → 恢复后全绿），每个缺陷恰好被一条测试拦住。其中「GOP 不进命令」这一处第一版没被拦住 —— `_build_spec_tasks` 的任务元组里带着 GOP，但 `_run_one` 把 keyint 写死时，只看任务元组的测试照样通过；补了端到端那条才拦住。
+
+全套 `80 passed, 2 skipped`。
+
 ### 修复（代码审查发现的镜像污染与几处静默失败）
 
 对本轮待合并的导入操作卡与取消链路做了一次审查，发现一个会让产物「相机不认」的缺陷，以及若干「不报错但结果不对」的问题。

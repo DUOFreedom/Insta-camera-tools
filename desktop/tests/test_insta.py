@@ -683,3 +683,268 @@ def test_batch_convert_propagates_cancel_from_convert(monkeypatch):
             core.batch_convert([src], out)
     finally:
         shutil.rmtree(d, ignore_errors=True)
+
+
+# 机型适配：GOP 必须从模板量，不能写死 16。
+#   实测 Ace Pro 2 的 LRV 是 16，GO Ultra 的 VID=120 / LRV=10，都等于 stss
+#   里相邻 sync sample 的差。AMBA[53] 声明的是这条码流的真实关键帧间隔，
+#   写死会让 GO Ultra 的码流与声明对不上，相机相册里表现为不显示缩略图。
+#   这两条用合成 MP4 覆盖：没有真机素材也能守住。
+
+def _make_gop_mp4(tmp_path, keyframes: list[int], total: int = 300) -> "object":
+    """合成一个带 stss 的最小 MP4（ftyp + moov/trak/mdia/minf/stbl/stss）。"""
+    entries = b"".join(struct.pack(">I", k) for k in keyframes)
+    stss_body = struct.pack(">I4sII", 16 + len(entries), b"stss", 0, len(keyframes)) + entries
+    stbl = struct.pack(">I4s", 8 + len(stss_body), b"stbl") + stss_body
+    minf = struct.pack(">I4s", 8 + len(stbl), b"minf") + stbl
+    # hdlr 的 handler_type 在 body 偏移 8（box 起点 +16）
+    hdlr_body = b"\x00" * 8 + b"vide" + b"\x00" * 12
+    hdlr = struct.pack(">I4s", 8 + len(hdlr_body), b"hdlr") + hdlr_body
+    mdia = struct.pack(">I4s", 8 + len(hdlr) + len(minf), b"mdia") + hdlr + minf
+    trak = struct.pack(">I4s", 8 + len(mdia), b"trak") + mdia
+    moov = struct.pack(">I4s", 8 + len(trak), b"moov") + trak
+    ftyp = struct.pack(">I4s4s", 16, b"ftyp", b"isom") + b"\x00\x00\x02\x00"
+    path = tmp_path / "gop_sample.mp4"
+    path.write_bytes(ftyp + moov)
+    return path
+
+
+def test_video_gop_reads_keyframe_interval(tmp_path):
+    """video_gop 必须返回 stss 里相邻 sync sample 的差。"""
+    p = _make_gop_mp4(tmp_path, [1, 121])
+    assert tf.video_gop(p) == 120
+    p2 = tmp_path / "lrv.lrv"
+    p2.write_bytes(_make_gop_mp4(tmp_path, [1, 11, 21, 31]).read_bytes())
+    assert tf.video_gop(p2) == 10
+
+
+def test_video_gop_returns_zero_for_single_keyframe(tmp_path):
+    """只有一个关键帧时无从得知间隔，返回 0 让调用方回退。"""
+    assert tf.video_gop(_make_gop_mp4(tmp_path, [1])) == 0
+
+
+def test_video_gop_returns_one_without_stss(tmp_path):
+    """没有 stss 表示每帧都是关键帧，GOP 就是 1。"""
+    ftyp = struct.pack(">I4s4s", 16, b"ftyp", b"isom") + b"\x00\x00\x02\x00"
+    stbl = struct.pack(">I4s", 8, b"stbl")
+    minf = struct.pack(">I4s", 8 + len(stbl), b"minf") + stbl
+    hdlr_body = b"\x00" * 8 + b"vide" + b"\x00" * 12
+    hdlr = struct.pack(">I4s", 8 + len(hdlr_body), b"hdlr") + hdlr_body
+    mdia = struct.pack(">I4s", 8 + len(hdlr) + len(minf), b"mdia") + hdlr + minf
+    trak = struct.pack(">I4s", 8 + len(mdia), b"trak") + mdia
+    moov = struct.pack(">I4s", 8 + len(trak), b"moov") + trak
+    p = tmp_path / "all_i.mp4"
+    p.write_bytes(ftyp + moov)
+    assert tf.video_gop(p) == 1
+
+
+def test_camera_udta_writes_real_gop_into_amba(tmp_path):
+    """传了 gop 就必须原样写进 AMBA[53]，而不是写死 16。"""
+    template = _make_template(tmp_path)
+    udta = tf.camera_udta(
+        template, old_name="", new_name="",
+        thumbnail=b"\x00" * THUMB, stats=STATS, gop=120,
+    )
+    amba = [b for b in tf.child_boxes(bytearray(udta), 8, len(udta)) if b[2] == b"AMBA"][0]
+    assert struct.unpack_from("<I", udta, amba[0] + 53)[0] == 120
+
+
+def test_camera_udta_falls_back_to_16_when_gop_unknown(tmp_path):
+    """模板量不出 GOP（0/None）时退回 16，保持 Ace Pro 2 的老行为。"""
+    template = _make_template(tmp_path)
+    for bad in (0, None):
+        udta = tf.camera_udta(
+            template, old_name="", new_name="",
+            thumbnail=b"\x00" * THUMB, stats=STATS, gop=bad,
+        )
+        amba = [b for b in tf.child_boxes(bytearray(udta), 8, len(udta))
+                if b[2] == b"AMBA"][0]
+        assert struct.unpack_from("<I", udta, amba[0] + 53)[0] == 16
+
+
+# 机型适配：LRV 的编码格式必须跟模板走。
+#   Ace Pro 2 的 LRV 是 H.264(avc1)，GO Ultra 的 LRV 是 HEVC(hvc1)。
+#   曾把 preview_vc 写死成 libx264/avc1，导致 GO Ultra 的 LRV 采样条目
+#   与 AMBA/nail 里声明的东西自相矛盾，相机相册不显示。
+
+GO_ULTRA_SPEC = {
+    "video": {
+        "codec": "libx265", "width": 1920, "height": 1080, "fps": "60000/1001",
+        "pix_fmt": "yuv420p", "color_range": "tv", "codec_tag": "hvc1",
+        "handler": "INS.HVC", "encoder": "HVC encoder", "profile": "main",
+        "level": 120, "gop": 120,
+    },
+    "lrv_video": {
+        "codec": "libx265", "width": 1280, "height": 720, "fps": "30000/1001",
+        "pix_fmt": "yuv420p", "color_range": "tv", "codec_tag": "hvc1",
+        "handler": "INS.HVC", "encoder": "HVC encoder", "profile": "main",
+        "level": 93, "gop": 10,
+    },
+    "audio_tracks": [{"codec": "aac", "sample_rate": "48000", "channels": "2",
+                      "bit_rate": "192k", "handler": "INS.AAC"}],
+}
+
+ACE_PRO_2_SPEC = {
+    "video": {
+        "codec": "libx265", "width": 1920, "height": 1080, "fps": "30000/1001",
+        "pix_fmt": "yuv420p", "color_range": "tv", "codec_tag": "hvc1",
+        "handler": "INS.HVC", "encoder": "HVC encoder", "profile": "main",
+        "level": 120, "gop": 16,
+    },
+    "lrv_video": {
+        "codec": "libx264", "width": 1280, "height": 720, "fps": "30000/1001",
+        "pix_fmt": "yuv420p", "color_range": "tv", "codec_tag": "avc1",
+        "handler": "INS.AVC", "encoder": "AVC encoder", "profile": "high",
+        "level": None, "gop": 16,
+    },
+    "audio_tracks": [{"codec": "aac", "sample_rate": "48000", "channels": "2",
+                      "bit_rate": "192k", "handler": "INS.AAC"}],
+}
+
+
+def test_spec_tasks_follow_template_lrv_codec_for_go_ultra():
+    """GO Ultra 的 LRV 是 HEVC：vc/tag/handler 必须一致，不能留 avc1。"""
+    tasks, _ = core._build_spec_tasks("in.mp4", ".", 1, "20261104_141845",
+                                      None, GO_ULTRA_SPEC)
+    lrv = tasks[1]
+    assert lrv[2] == "libx265", f"LRV 编码器应跟随模板，实际 {lrv[2]}"
+    assert lrv[3] == "hvc1", f"LRV tag 应跟随模板，实际 {lrv[3]}"
+    assert lrv[7] == "INS.HVC", f"LRV handler 应与编码器一致，实际 {lrv[7]}"
+
+
+def test_spec_tasks_keep_ace_pro_2_lrv_as_h264():
+    """Ace Pro 2 的 LRV 是 H.264：老机型行为不能被改坏。"""
+    tasks, _ = core._build_spec_tasks("in.mp4", ".", 1, "20261104_141845",
+                                      None, ACE_PRO_2_SPEC)
+    lrv = tasks[0 + 1]
+    assert lrv[2] == "libx264"
+    assert lrv[3] == "avc1"
+    assert lrv[7] == "INS.AVC"
+
+
+def test_spec_tasks_carry_template_gop():
+    """两个任务的 GOP 必须分别来自 VID/LRV 模板，不是写死 16。"""
+    tasks, _ = core._build_spec_tasks("in.mp4", ".", 1, "20261104_141845",
+                                      None, GO_ULTRA_SPEC)
+    assert tasks[0][14] == 120, f"VID GOP 应为 120，实际 {tasks[0][14]}"
+    assert tasks[1][14] == 10, f"LRV GOP 应为 10，实际 {tasks[1][14]}"
+
+
+def test_spec_tasks_report_zero_gop_when_unknown():
+    """spec 里没有 gop（老调用方）时任务里是 0，由 _run_one 回退到 16。"""
+    spec = {k: dict(v) if isinstance(v, dict) else v
+            for k, v in GO_ULTRA_SPEC.items()}
+    spec["video"].pop("gop")
+    spec["lrv_video"].pop("gop")
+    tasks, _ = core._build_spec_tasks("in.mp4", ".", 1, "20261104_141845", None, spec)
+    assert tasks[0][14] == 0 and tasks[1][14] == 0
+
+
+def test_convert_passes_template_gop_into_ffmpeg_args(monkeypatch):
+    """端到端：convert 必须把模板 GOP 送进 ffmpeg 的 -g / keyint。
+
+    只测 _build_spec_tasks 不够 —— 任务元组里带着 GOP，但 _run_one 里
+    把 keyint 写死成 16 时，前一条测试照样通过（它只看任务元组）。
+    这条拦住"任务对了、命令没用上"的情况。
+    """
+    calls: list[list[str]] = []
+
+    def fake_run(cmd, duration, progress=None, cancel=None, procs=None, procs_lock=None):
+        calls.append(list(cmd))
+
+    monkeypatch.setattr(core, "find_ffmpeg", lambda: "ffmpeg")
+    monkeypatch.setattr(core, "_run_ffmpeg", fake_run)
+    monkeypatch.setattr(core, "probe", lambda p: {"video": {"duration": "1.0"},
+                                                  "streams": []})
+    monkeypatch.setattr(core, "next_seq", lambda d: 1)
+    monkeypatch.setattr(core, "detect_hw_encoder", lambda: None)
+    monkeypatch.setattr(core, "log_path", lambda: os.path.join(tempfile.gettempdir(), "x.log"))
+
+    d = tempfile.mkdtemp(prefix="insta_gop_")
+    try:
+        src = os.path.join(d, "in.mp4")
+        with open(src, "wb") as f:
+            f.write(b"\x00" * 128)
+        core.convert(src, d, stamp="20261104_141845", spec=GO_ULTRA_SPEC)
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
+    assert len(calls) == 2, f"应编两条（VID+LRV），实际 {len(calls)}"
+    joined = [" ".join(c) for c in calls]
+    # VID 用 libx265，GOP 体现在 -x265-params 里
+    assert any("keyint=120" in s for s in joined), \
+        f"VID 的 keyint 应为 120，实际命令：{joined}"
+    # LRV 也走 libx265（GO Ultra 模板），GOP=10
+    assert any("keyint=10" in s for s in joined), \
+        f"LRV 的 keyint 应为 10，实际命令：{joined}"
+
+
+def _make_sample_entry_mp4(tmp_path, tag: bytes, extra_children: list[bytes]) -> str:
+    """合成一个只含单条视频轨、采样条目为 tag 的最小 MP4。"""
+    def box(kind: bytes, body: bytes) -> bytes:
+        return struct.pack(">I4s", 8 + len(body), kind) + body
+
+    config = box(b"hvcC" if tag != b"avc1" else b"avcC", b"\x01" * 40)
+    entry_body = (b"\x00" * 6 + struct.pack(">H", 1) + b"\x00" * 70
+                  + config + b"".join(extra_children))
+    entry = struct.pack(">I4s", 8 + len(entry_body), tag) + entry_body
+    stsd = box(b"stsd", b"\x00" * 4 + struct.pack(">I", 1) + entry)
+    stbl = box(b"stbl", stsd)
+    minf = box(b"minf", stbl)
+    hdlr = box(b"hdlr", b"\x00" * 8 + b"vide" + b"\x00" * 12)
+    mdia = box(b"mdia", hdlr + minf)
+    trak = box(b"trak", mdia)
+    moov = box(b"moov", trak)
+    ftyp = struct.pack(">I4s4s", 16, b"ftyp", b"isom") + b"\x00\x00\x02\x00"
+    path = tmp_path / f"entry_{tag.decode()}.mp4"
+    path.write_bytes(ftyp + moov)
+    return str(path)
+
+
+def _entry_children(tf_mod, path: str) -> tuple[bytes, list[bytes]]:
+    data = open(path, "rb").read()
+    moov = next(b for b in tf_mod.mp4_boxes(data) if b[2] == b"moov")
+    for trak in [b for b in tf_mod.child_boxes(data, moov[0] + 8, moov[0] + moov[1])
+                 if b[2] == b"trak"]:
+        mdia = tf_mod.direct_child(data, trak, b"mdia")
+        hdlr = tf_mod.direct_child(data, mdia, b"hdlr")
+        if data[hdlr[0] + 16:hdlr[0] + 20] != b"vide":
+            continue
+        stsd = tf_mod.direct_child(
+            data, tf_mod.direct_child(data, tf_mod.direct_child(data, mdia, b"minf"),
+                                      b"stbl"), b"stsd")
+        eoff = stsd[0] + 16
+        esz = struct.unpack_from(">I", data, eoff)[0]
+        return (bytes(data[eoff + 4:eoff + 8]),
+                [c[2] for c in tf_mod.child_boxes(data, eoff + 86, eoff + esz)])
+    raise AssertionError("video trak not found")
+
+
+def test_shrink_entry_strips_extras_from_hvc1(tmp_path):
+    """GO Ultra 的 LRV 是 hvc1：必须保留 hvcC、去掉 pasp/btrt。
+
+    原实现只认 avc1，遇到 hvc1 直接 return False —— GO Ultra 的 LRV
+    永远不会被精简，相机拒收，且日志里连警告都没有。
+    """
+    def box(kind, body):
+        return struct.pack(">I4s", 8 + len(body), kind) + body
+    path = _make_sample_entry_mp4(
+        tmp_path, b"hvc1",
+        [box(b"pasp", struct.pack(">II", 1, 1)), box(b"btrt", b"\x00" * 12)])
+    assert core._shrink_avc1_entry(tf, path, b"avcC") is True
+    tag, children = _entry_children(tf, path)
+    assert tag == b"hvc1", "精简后 tag 不能变"
+    assert children == [b"hvcC"], f"只该留 hvcC，实际 {children}"
+
+
+def test_shrink_entry_strips_extras_from_avc1(tmp_path):
+    """Ace Pro 2 的 LRV 是 avc1：老机型行为不能坏。"""
+    def box(kind, body):
+        return struct.pack(">I4s", 8 + len(body), kind) + body
+    path = _make_sample_entry_mp4(
+        tmp_path, b"avc1",
+        [box(b"pasp", struct.pack(">II", 1, 1)), box(b"btrt", b"\x00" * 12)])
+    assert core._shrink_avc1_entry(tf, path, b"avcC") is True
+    tag, children = _entry_children(tf, path)
+    assert tag == b"avc1"
+    assert children == [b"avcC"], f"只该留 avcC，实际 {children}"
