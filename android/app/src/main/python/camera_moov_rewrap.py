@@ -404,6 +404,11 @@ def visual_entry(data: bytes):
         raise ValueError("data has no moov box")
     moov = moov_boxes[0]
     for trak in insta.child_boxes(data, moov[0] + 8, moov[0] + moov[1]):
+        #   moov 的子 box 不只是 trak（还有 mvhd/udta 等）。不过滤就会拿
+        #   mvhd 去 direct_child(mdia)，直接抛 invalid child MP4 box ——
+        #   真机 VID/LRV 的第一个子 box 都是 mvhd，所以这是必炸而不是偶发。
+        if trak[2] != b"trak":
+            continue
         mdia = insta.direct_child(data, trak, b"mdia")
         hdlr = insta.direct_child(data, mdia, b"hdlr")
         if data[hdlr[0] + 16:hdlr[0] + 20] != b"vide":
@@ -424,6 +429,11 @@ def filter_avc1_children(path: Path, keep: set[bytes], reference_meta: bytes) ->
     """
     data = path.read_bytes()
     entry, ancestors = visual_entry(data)
+    #   keep 里写的是 H.264 的配置盒名。HEVC 条目（hvc1/hev1）的配置盒叫
+    #   hvcC，照 keep 原样过滤会把 hvcC 删光，entry 只剩 86 字节空壳。
+    #   两种 entry 的固定头都是 86 字节，偏移不用改，只需要换配置盒名。
+    if entry[2] in (b"hvc1", b"hev1") and b"avcC" in keep:
+        keep = (set(keep) - {b"avcC"}) | {b"hvcC"}
     fixed = data[entry[0]:entry[0] + 86]
     children = insta.child_boxes(data, entry[0] + 86, entry[0] + entry[1])
     kept = b"".join(

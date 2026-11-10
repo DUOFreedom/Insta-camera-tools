@@ -146,8 +146,12 @@ def tailor_metadata(
     set_field(fields, 7, 0, timestamp_digits)
     set_field(fields, 9, 0, inst_payload_offset)
     set_field(fields, 10, 0, max(1, math.floor(duration)))
-    set_field(fields, 19, 2, protobuf_pair(width, height))
-    set_field(fields, 20, 0, int(fps) if fps else (30 if proxy else 60))
+    if not proxy:
+        #   代理轨不写这两个字段：实测 GO Ultra 的 LRV 里 f19/f20 与主视频
+        #   完全相同（1920x1080 / 60），只有 f26.f2 标出 proxy。照容器尺寸
+        #   硬写 1280x720/30 反而和真机对不上。跟着模板走两种机型都对。
+        set_field(fields, 19, 2, protobuf_pair(width, height))
+        set_field(fields, 20, 0, int(fps) if fps else 60)
     set_field(fields, 36, 0, epoch_ms)
 
     nested = parse_message(bytes(field_value(fields, 26)))
@@ -904,6 +908,9 @@ def video_profile(path: Path) -> dict[str, int]:
         "b_frames": int(video["has_b_frames"]),
         "bitrate": int(video["bit_rate"]),
         "level": int(video["level"]),
+        # 代理轨的编码格式由模板决定：Ace Pro 2 的 LRV 是 h264，GO Ultra
+        # 是 hevc。写死 h264 会让后者的 LRV 采样条目与 AMBA 对不上。
+        "codec": str(video.get("codec_name") or ""),
     }
 
 
@@ -1163,8 +1170,10 @@ def main() -> int:
             raise ValueError("template MP4/LRV frame counts do not match")
         target_frames: int | None = None if args.full_duration else main_profile["frames"]
     else:
-        main_profile = {"width": 1920, "height": 1080, "b_frames": 0, "bitrate": 0, "level": 0}
-        proxy_profile = {"width": 1280, "height": 720, "b_frames": 0, "bitrate": 4_000_000, "level": 0}
+        main_profile = {"width": 1920, "height": 1080, "b_frames": 0, "bitrate": 0,
+                        "level": 0, "codec": "hevc"}
+        proxy_profile = {"width": 1280, "height": 720, "b_frames": 0,
+                         "bitrate": 4_000_000, "level": 0, "codec": "h264"}
         target_frames = None
     if args.full_duration and not args.match_template:
         parser.error("--full-duration requires --match-template")
@@ -1180,6 +1189,9 @@ def main() -> int:
         proxy_profile["width"] = args.proxy_width
     if args.proxy_height is not None:
         proxy_profile["height"] = args.proxy_height
+    #   --proxy-hevc 原先只是诊断开关，不显式加就强制要求 LRV=h264。
+    #   GO Ultra 的 LRV 本身是 HEVC，跟着模板走才不会产出相机不认的条目。
+    proxy_hevc = bool(args.proxy_hevc) or proxy_profile.get("codec") == "hevc"
     camera_dir = card_root / "DCIM" / "Camera01"
     if args.insert is not None:
         insertion_when, insertion_sequence = insertion_defaults(camera_dir, args.insert)
@@ -1218,7 +1230,7 @@ def main() -> int:
             video_frames=target_frames,
             b_frames=(args.proxy_bframes if args.proxy_bframes is not None else proxy_profile["b_frames"]),
             bitrate=proxy_profile["bitrate"] or None, level=proxy_profile["level"] or None,
-            refs=args.proxy_refs, cq=args.proxy_cq, proxy_hevc=args.proxy_hevc,
+            refs=args.proxy_refs, cq=args.proxy_cq, proxy_hevc=proxy_hevc,
             use_gpu=not args.software_proxy,
         )
         thumbnail = make_thumbnail(source, thumbnail_path)
@@ -1241,7 +1253,7 @@ def main() -> int:
             height=main_profile["height"], frames=target_frames,
         )
         validate_output(
-            proxy_base_path, proxy=not args.proxy_hevc, width=proxy_profile["width"],
+            proxy_base_path, proxy=not proxy_hevc, width=proxy_profile["width"],
             height=proxy_profile["height"], frames=target_frames,
         )
 
@@ -1289,7 +1301,7 @@ def main() -> int:
         proxy_meta = rebuild_media(
             proxy_base_path, template_proxy, proxy_rewrapped, proxy_meta,
         )
-        if not args.proxy_hevc:
+        if not proxy_hevc:
             filter_avc1_children(proxy_rewrapped, {b"avcC"}, proxy_meta)
         main_meta = install_camera_mp4a(main_rewrapped, main_meta)
         proxy_meta = install_camera_mp4a(proxy_rewrapped, proxy_meta)

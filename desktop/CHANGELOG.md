@@ -83,6 +83,35 @@
 worker 非 daemon、`waitWorker` 的两态、以及一条源码守卫（`replace("file:///")`
 再出现、`onClosing` 消失都算回归）。
 
+### 修复（逆向报告指出的四处机型硬编码）
+
+拿到 GO Ultra 的完整 inst 结构分析后，又发现四处「照着 Ace Pro 2 写死」的地方。
+前三处是真机必炸，第四处是元数据与真机不一致：
+
+- **`visual_entry` 遍历 moov 子 box 时没过滤类型**。moov 的子 box 不只有 `trak`，
+  真机两个文件的第一个子 box 都是 `mvhd`，直接对它调 `direct_child(mdia)` 抛
+  `ValueError: invalid child MP4 box`。`shared/instbox/moov_rewrap.py` 与
+  `android/app/src/main/python/camera_moov_rewrap.py` 各有一份，都改。
+- **`filter_avc1_children` 硬编码 `{b"avcC"}`**。函数名里的 avc1 只是历史原因，
+  HEVC 条目（`hvc1`/`hev1`）的配置盒叫 `hvcC`，照 avcC 过滤会把 `hvcC` 删光，
+  entry 从 231 字节掉到 86 字节空壳。两种 entry 的固定头都是 86 字节，偏移不用改，
+  只需按 entry tag 换配置盒名。
+- **`--proxy-hevc` 只是诊断开关，不从模板读**。GO Ultra 的 LRV 本身是 HEVC，
+  不显式加这个开关就强制要求 LRV=h264，产出的条目相机不认。现在
+  `video_profile()` 返回里带 `codec`，`proxy_hevc` 由「显式开关 or 模板是 hevc」
+  推导，三处调用点全部改用这个局部变量。
+- **代理轨元数据过度改写**。真机 LRV 的 inst 元数据里 f19/f20/f44 与主视频
+  **完全相同**（1920x1080 / 60fps），只有 f26.f2 标出 proxy；容器层的
+  tkhd/stsd 才是 1280x720，两者不矛盾。原实现给 proxy 硬写 1280x720/30，
+  和真机对不上。现在 `tailor_metadata` 只在非 proxy 时写 f19/f20，代理轨
+  跟着模板走。
+
+新增 5 条回归测试：`test_visual_entry_skips_non_trak_children`（mvhd 在前）、
+`test_filter_avc1_children_keeps_hvcc_on_hevc`、`test_tailor_metadata_leaves_proxy_dimensions_alone`、
+`test_video_profile_carries_codec`、`test_rewrap_and_transplant_copies_do_not_drift`
+（AST 比对两份副本，这条守的是「moov_rewrap ↔ camera_moov_rewrap 曾漂移四处、
+漂了整整一个发布周期没被发现」）。全部做了回滚验证，逐个确认缺陷版本会变红。
+
 ### 测试（Go Ultra 机型适配）
 
 新增 11 条，全部用合成 MP4 覆盖，不需要真机素材也能守住：

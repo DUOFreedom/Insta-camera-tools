@@ -35,6 +35,7 @@ import struct
 import sys
 import tempfile
 import threading
+from pathlib import Path
 
 import pytest
 
@@ -1072,3 +1073,133 @@ def test_android_core_matches_desktop_on_hardened_helpers():
                if _fn_ast(desktop_core, fn) != _fn_ast(android_core, fn)]
     assert not drifted, (
         f"这些函数在 desktop/core.py 与 android insta_core.py 之间已漂移：{drifted}")
+
+
+def test_visual_entry_skips_non_trak_children(tmp_path):
+    """moov 的第一个子 box 是 mvhd 时必须跳过，不能拿它去找 mdia。
+
+    真机 VID/LRV 的 moov 布局都是 mvhd 在前、trak 在后。原实现直接对
+    moov 的每个子 box 调 direct_child(mdia)，遇到 mvhd 就抛
+    invalid child MP4 box —— 两个真机文件都必炸，不是偶发。
+    """
+    def box(kind, body):
+        return struct.pack(">I4s", 8 + len(body), kind) + body
+
+    config = box(b"hvcC", b"\x01" * 40)
+    entry_body = (b"\x00" * 6 + struct.pack(">H", 1) + b"\x00" * 70 + config)
+    entry = struct.pack(">I4s", 8 + len(entry_body), b"hvc1") + entry_body
+    stsd = box(b"stsd", b"\x00" * 4 + struct.pack(">I", 1) + entry)
+    stbl = box(b"stbl", stsd)
+    minf = box(b"minf", stbl)
+    hdlr = box(b"hdlr", b"\x00" * 8 + b"vide" + b"\x00" * 12)
+    mdia = box(b"mdia", hdlr + minf)
+    trak = box(b"trak", mdia)
+    mvhd = box(b"mvhd", b"\x00" * 100)          # 真机布局：mvhd 在 trak 之前
+    moov = box(b"moov", mvhd + trak)
+    ftyp = struct.pack(">I4s4s", 16, b"ftyp", b"isom") + b"\x00\x00\x02\x00"
+    path = tmp_path / "mvhd_first.mp4"
+    path.write_bytes(ftyp + moov)
+
+    entry_box, _ancestors = rw.visual_entry(path.read_bytes())
+    assert entry_box[2] == b"hvc1"
+
+
+def test_filter_avc1_children_keeps_hvcc_on_hevc(tmp_path):
+    """HEVC 采样条目的配置盒叫 hvcC，照 avcC 过滤会把它删光。"""
+    def box(kind, body):
+        return struct.pack(">I4s", 8 + len(body), kind) + body
+    path = _make_sample_entry_mp4(
+        tmp_path, b"hvc1",
+        [box(b"pasp", struct.pack(">II", 1, 1)), box(b"btrt", b"\x00" * 12)])
+    # filter 末尾要按 inst 元数据修正 payload 偏移，所以文件必须带 inst box。
+    meta = tf.encode_message([tf.Field(1, 2, b"0" * 14), tf.Field(9, 0, 0)])
+    with open(path, "ab") as f:
+        f.write(struct.pack(">I4s", 8 + len(meta), b"inst") + meta)
+    rw.filter_avc1_children(Path(path), {b"avcC"}, meta)
+    tag, children = _entry_children(tf, path)
+    assert tag == b"hvc1"
+    assert children == [b"hvcC"], f"hvcC 被删光了，实际 {children}"
+
+
+def test_tailor_metadata_leaves_proxy_dimensions_alone():
+    """代理轨的 f19/f20 跟着模板走，不按容器尺寸改写。
+
+    实测 GO Ultra 的 LRV 里 f19/f20 与主视频完全相同（1920x1080 / 60），
+    只有 f26.f2 标出 proxy。原实现给 proxy 硬写 1280x720/30，和真机对不上。
+    """
+    fields = [
+        tf.Field(1, 2, b"IBEEA2605QGDFE"),
+        tf.Field(2, 2, b"Insta360 GO Ultra"),
+        tf.Field(19, 2, tf.protobuf_pair(1920, 1080)),
+        tf.Field(20, 0, 60),
+        tf.Field(26, 2, tf.encode_message([tf.Field(2, 0, 0)])),
+    ]
+    template = tf.encode_message(fields)
+    out = tf.tailor_metadata(
+        template, catalog_path="/DCIM/Camera01/VID_20240101_090000_000.mp4",
+        timestamp_digits=20240101090000, epoch_ms=1704067200000,
+        inst_payload_offset=123, duration=3.8,
+        width=1280, height=720, proxy=True, fps=30,
+    )
+    got = tf.parse_message(out)
+    assert bytes(tf.field_value(got, 19)) == tf.protobuf_pair(1920, 1080)
+    assert tf.field_value(got, 20) == 60
+    nested = tf.parse_message(bytes(tf.field_value(got, 26)))
+    assert tf.field_value(nested, 2) == 1, "proxy 标记仍要写"
+
+    main = tf.tailor_metadata(
+        template, catalog_path="/DCIM/Camera01/VID_20240101_090000_000.mp4",
+        timestamp_digits=20240101090000, epoch_ms=1704067200000,
+        inst_payload_offset=123, duration=3.8,
+        width=1280, height=720, proxy=False, fps=30,
+    )
+    got_main = tf.parse_message(main)
+    assert bytes(tf.field_value(got_main, 19)) == tf.protobuf_pair(1280, 720)
+    assert tf.field_value(got_main, 20) == 30
+
+
+def test_video_profile_carries_codec(monkeypatch):
+    """video_profile 必须带出 codec：LRV 编码格式由模板决定。
+
+    Ace Pro 2 的 LRV 是 h264、GO Ultra 是 hevc。不带 codec 时下游只能
+    写死 h264，后者的 LRV 采样条目与 AMBA 就对不上。
+    """
+    fake = {
+        "streams": [{"codec_type": "video", "codec_name": "hevc", "width": 1280,
+                     "height": 720, "nb_frames": "114", "has_b_frames": 0,
+                     "bit_rate": "4000000", "level": 93}],
+        "format": {"duration": "3.804"},
+    }
+    monkeypatch.setattr(tf, "ffprobe", lambda _p: fake)
+    profile = tf.video_profile(Path("x.lrv"))
+    assert profile["codec"] == "hevc"
+    assert profile["width"] == 1280 and profile["height"] == 720
+
+
+def test_rewrap_and_transplant_copies_do_not_drift():
+    """moov_rewrap / inst_transplant 与安卓侧同名副本必须一致。
+
+    `moov_rewrap.py` ↔ `camera_moov_rewrap.py` 曾漂移四处（make_box 缺
+    largesize、缺 _chunk_offsets、samples 不认 co64、stco_box 固定 32 位），
+    因为没有任何守卫测试，漂了整整一个发布周期都没被发现。症状是
+    「大文件（>4GB 偏移）在手机上报错、桌面端正常」。
+    """
+    pairs = [
+        ("shared/instbox/moov_rewrap.py",
+         "android/app/src/main/python/camera_moov_rewrap.py",
+         ("visual_entry", "filter_avc1_children")),
+        ("shared/instbox/inst_transplant.py",
+         "android/app/src/main/python/insta360_tf_import.py",
+         ("tailor_metadata", "video_profile")),
+    ]
+    repo = os.path.dirname(SHARED)
+    drifted = []
+    for left, right, names in pairs:
+        lp = os.path.join(repo, left)
+        rp = os.path.join(repo, right)
+        if not os.path.isfile(rp):
+            continue
+        for name in names:
+            if _fn_ast(lp, name) != _fn_ast(rp, name):
+                drifted.append(f"{name}({left} vs {right})")
+    assert not drifted, f"这些函数在两份副本之间已漂移：{drifted}"
