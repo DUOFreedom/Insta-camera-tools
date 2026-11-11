@@ -79,7 +79,112 @@
           {
             "@type": "FAQPage",
             "@id": "https://duofreedom.github.io/Insta-camera-tools/faq/#faq",
-            "mainEntity": []
+            "mainEntity": [
+              {
+                "@type": "Question",
+                "name": "点开始没反应，或者报错找不到 ffmpeg",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "界面上会出现「未找到 ffmpeg」的提示条，点右侧按钮可以让程序自己下载安装（装到系统目录需要管理员确认）；也可以手动把 ffmpeg.exe 和 ffprobe.exe 放进 exe 同目录的 bin\\ 文件夹，或者装进系统 PATH。\n 注意两个文件都要，只放 ffmpeg.exe 不够——程序需要用 ffprobe.exe 读取源文件信息。"
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "视频导进去了，但相机相册里看不到",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "按顺序检查三件事：\n 编码结构是否达标——主视频必须是 HEVC hvc1、1080p、无 B 帧、关键帧间隔 16\n inst box 是否移植成功——用卡内真机原片当模板，模板片不能是别的机型录的\n 索引是否登记——见下方「技术原理」\n 三者任一缺失都会导致相册里没有这个文件。"
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "相册里能看到条目，但点了打不开",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "通常是索引字段写错，最常见两种：\n f7 时间戳不是 14 位纯数字 YYYYMMDDHHMMSS（写成 9 位带序号就会这样）\n f9 偏移不是 inst box 在文件内的真实字节偏移（写成了文件大小也会这样）"
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "相册里出现了 0KB 打不开的条目",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "索引里多登记了 .lrv 文件。规则是只登记主视频，不登记 LRV。\n 重新导入时程序会覆盖修正，不需要手动删。"
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "超过 4GB 的长视频会失败吗",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "不会。重封装对 32 位 size 与 64 位 largesize box 头、以及 stco / co64 两种分块偏移表都做了完整支持。"
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "Windows 提示「未知发布者」或杀毒软件报毒",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "PyInstaller 打包的未签名程序会触发 SmartScreen，这是预期行为。点「更多信息 → 仍要运行」即可。\n 杀软误报通常是启发式规则对 PyInstaller 启动器敏感，加白名单即可，不需要关闭实时防护。"
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "能导入到相机的哪个位置？会不会覆盖原有素材",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "写入 DCIM 目录，文件名按相机规则生成（VID_YYYYMMDD_HHMMSS_000.mp4），文件名冲突时自动递增序号。\n 不会覆盖已有素材。索引写入前会重读现有内容，只追加/替换自己的条目。"
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "安卓端提示「卡里缺一对真机模板」",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "卡里必须有一对相机自己录制的 VID_*.mp4 与 LRV_*.lrv，导入时需要拿它们当 moov 骨架与 inst box 模板。\n 用相机录一小段（几秒即可），再回来执行导入。"
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "安卓端导入很慢，或者日志里出现「回退」",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "编码器默认走软件编码（libx265 + libx264），与桌面端一致，相机识别最稳；设置页可切到「硬件」走 MediaCodec，速度更快。\n 硬编的 i-frame-interval 受系统限制只能取整数秒，拿不到相机要求的 16 帧密集关键帧，若导入后相机不显示缩略图或无法识别，请切回「自动」。\n 硬件解码与硬件编码失败时都会自动回退到软件路径，日志里会打印 [回退] 行。"
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "「自动」和机型预设有什么区别，该选哪个",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "「自动」从卡里现成的真机原片量参数，最准，能跟着固件升级走；机型预设是卡里没有原片时的兜底，参数写死在程序里。\n 判断方法：卡里还有没有相机自己录的 VID_/LRV_。有就留「自动」，没有才指定机型，选错了相机不会报错，只会不出现在相册里。"
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "会不会动到卡里的原片",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "不改原片视频本身：程序只读取原片，写出来的是新文件。会改动的是索引文件（fileinfo_list.list 与 .editinfo_list.list），这是让相册认出新条目必须做的一步。\n 所以导入前建议先备份这两个文件；不勾选「登记索引」时只在输出目录里生成文件，不碰卡。"
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "安卓端什么时候有安装包",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "暂不提供。现在只给源码，需要按构建说明自己打 APK：真机导入链路与部分机型兼容性还没验证完，用默认调试签名的包也不适合分发。\n 构建步骤见 docs/BUILD.md。"
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "支持哪些相机",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "Ace Pro 2 与 GO Ultra 是按真机原片量过参数的，包括 GOP、代理编码与音轨数。其他机型取决于 inst box 布局是否一致，没有验证过，用前先拿一个短视频试：能进相册、能播放、封面正常，再批量。\n 全景机型（X 系列）不适用：文件名规则与文件结构都不是这一套。"
+                }
+              }
+            ]
           }
         ]
       }
@@ -157,7 +262,7 @@
             <li><a class="mobile-nav__link" href="../faq/">常见问题</a></li>
             <li><a class="mobile-nav__link" href="../download/">下载</a></li>
             <li><a class="mobile-nav__link" href="../changelog/">更新日志</a></li>
-            <li><a class="mobile-nav__link" href="../license/">开源声明</a></li>
+            <li><a class="mobile-nav__link" href="../licenses/">开源声明</a></li>
           </ul>
         </nav>
       </div>
@@ -392,7 +497,7 @@
           <a class="footer__link" href="../faq/">常见问题</a>
           <a class="footer__link" href="../download/">下载</a>
           <a class="footer__link" href="../changelog/">更新日志</a>
-          <a class="footer__link" href="../license/">开源声明</a>
+          <a class="footer__link" href="../licenses/">开源声明</a>
           <a class="footer__link" href="../sitemap/">站点地图</a>
         </nav>
         <p class="footer__note">第三方工具，与影石创新科技股份有限公司无任何关联，未获其授权或认可。</p>

@@ -172,7 +172,7 @@
             <li><a class="mobile-nav__link" href="../faq/">常见问题</a></li>
             <li><a class="mobile-nav__link" href="../download/">下载</a></li>
             <li><a class="mobile-nav__link" href="../changelog/">更新日志</a></li>
-            <li><a class="mobile-nav__link" href="../license/">开源声明</a></li>
+            <li><a class="mobile-nav__link" href="../licenses/">开源声明</a></li>
           </ul>
         </nav>
       </div>
@@ -331,10 +331,7 @@
         <div class="prose">
           <p>PowerShell 里算一次哈希，与页面上给出的 SHA256 逐字符比对：</p>
         </div>
-        <div class="code code--wrap mt-16">
-          <span class="code-label">PowerShell</span>
-          <pre><code>Get-FileHash .\instatools.exe -Algorithm SHA256</code></pre>
-        </div>
+        <div class="code code--wrap mt-16"><span class="code-label">PowerShell</span><pre><code>Get-FileHash .\instatools.exe -Algorithm SHA256</code></pre></div>
         <p class="steps__note">
           注意：同一份源码连编两次，exe 的哈希也会不同（嵌入时间戳与签名信息），所以校验值只在同一次发布的文件之间通用，以 Release 页标注为准。
         </p>
@@ -348,7 +345,7 @@
             完整环境变量与离线构建命令见
             <a class="link" href="https://github.com/DUOFreedom/Insta-camera-tools/blob/main/docs/BUILD.md" target="_blank" rel="noopener noreferrer">docs/BUILD.md</a>。
           </p>
-          <p>版本演进见<a class="link" href="/changelog/">更新日志</a>，第三方依赖与许可证见<a class="link" href="/license/">开源声明</a>。</p>
+          <p>版本演进见<a class="link" href="../changelog/">更新日志</a>，第三方依赖与许可证见<a class="link" href="../licenses/">开源声明</a>。</p>
         </div>
         </div>
       </section>
@@ -383,7 +380,7 @@
           <a class="footer__link" href="../faq/">常见问题</a>
           <a class="footer__link" href="../download/">下载</a>
           <a class="footer__link" href="../changelog/">更新日志</a>
-          <a class="footer__link" href="../license/">开源声明</a>
+          <a class="footer__link" href="../licenses/">开源声明</a>
           <a class="footer__link" href="../sitemap/">站点地图</a>
         </nav>
         <p class="footer__note">第三方工具，与影石创新科技股份有限公司无任何关联，未获其授权或认可。</p>

@@ -1414,7 +1414,151 @@ pre {
   margin-top: 32px;
 }
 
-/* 18. 偏好设置 =========================================================== */
+/* 18. 多页站点公共部件 =================================================== */
+/* 首页之外每页都从 .page-head 起头：面包屑 + h1 + 导语，底部一条细线收口 */
+.page-head {
+  padding-block: 48px 24px;
+  border-bottom: 1px solid var(--md-sys-color-outline-variant);
+}
+
+.page-head__title {
+  margin-top: 8px;
+  font-size: clamp(26px, 4vw, 36px);
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+}
+
+.page-head__lead {
+  max-width: 62ch;
+  margin-top: 12px;
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: 15px;
+  line-height: 1.7;
+}
+
+.crumbs {
+  font-size: 13px;
+}
+
+.crumbs__list {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.crumbs__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.crumbs__item + .crumbs__item::before {
+  content: "/";
+  color: var(--md-sys-color-outline);
+}
+
+.crumbs__link {
+  color: var(--md-sys-color-on-surface-variant);
+  text-decoration: none;
+  transition: color var(--md-sys-motion-duration-short)
+    var(--md-sys-motion-easing-standard);
+}
+
+.crumbs__link:hover {
+  color: var(--md-sys-color-primary);
+}
+
+/* 首页导航卡：整张卡可点，末行「查看 xx」始终贴底 */
+.card--link {
+  color: inherit;
+  text-decoration: none;
+  border-color: var(--md-sys-color-outline-variant);
+}
+
+.card--link:hover {
+  background-color: var(--md-sys-color-surface-container-high);
+  border-color: var(--md-sys-color-primary);
+}
+
+.card__more {
+  margin-top: auto;
+  color: var(--md-sys-color-primary);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.card__more::after {
+  content: "→";
+  margin-left: 4px;
+}
+
+.actions--center {
+  justify-content: center;
+}
+
+.footer__nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.footer__link {
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: 13px;
+  text-decoration: none;
+  transition: color var(--md-sys-motion-duration-short)
+    var(--md-sys-motion-easing-standard);
+}
+
+.footer__link:hover {
+  color: var(--md-sys-color-primary);
+}
+
+/* 站点地图页：一条一行的链接列表，用细线分隔而不是卡片 */
+.linklist {
+  display: grid;
+  max-width: 68ch;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.linklist__item {
+  display: grid;
+  gap: 4px;
+  padding-block: 16px;
+  border-bottom: 1px solid var(--md-sys-color-outline-variant);
+}
+
+.linklist__item:first-child {
+  border-top: 1px solid var(--md-sys-color-outline-variant);
+}
+
+.linklist__desc {
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+/* 复制过来的小节标题默认居中，落进正文时要靠左 */
+.section__lead--left {
+  margin-inline: 0;
+  text-align: left;
+}
+
+.subhead--sm {
+  margin-top: 24px;
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: 14px;
+  letter-spacing: 0.02em;
+}
+
+/* 19. 偏好设置 =========================================================== */
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;

@@ -1,0 +1,2 @@
+IndexNow 索引推送用的 key（同内容见 9f7c1d2ab64e4f0c8d5b3a71e2c9408d.txt）。
+部署后用它提交站点 URL，见 tools/check_site.py 的 --ping-indexnow。
