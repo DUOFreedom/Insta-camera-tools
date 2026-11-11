@@ -28,9 +28,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.duofreedom.instaace.ui.theme.Motion
+import com.duofreedom.instatools.R
+import com.duofreedom.instatools.ui.theme.Motion
 
 /**
  * 可展开分组。
@@ -83,7 +85,9 @@ fun ExpandableSection(
             Spacer(Modifier.size(8.dp))
             Icon(
                 Icons.Rounded.ExpandMore,
-                contentDescription = if (expanded) "收起" else "展开",
+                contentDescription = stringResource(
+                    if (expanded) R.string.action_collapse else R.string.action_expand
+                ),
                 modifier = Modifier
                     .size(20.dp)
                     .rotate(arrowAngle),

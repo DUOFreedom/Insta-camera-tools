@@ -5,6 +5,7 @@ import android.net.Uri
 import android.provider.DocumentsContract
 import android.provider.OpenableColumns
 import androidx.documentfile.provider.DocumentFile
+import com.duofreedom.instatools.R
 import java.io.File
 
 /** 相机卡上导入所需的目录与文件视图。 */
@@ -192,17 +193,19 @@ class CardMirror(
             val src = File(camDir, name)
             if (!src.isFile) {
                 // 静默跳过会让用户看到「全部完成」但卡上少文件。
-                errors += "产物缺失: $name"
+                errors += ctx.getString(R.string.writeback_missing_product, name)
                 continue
             }
             if (!SafeCard.writeDocument(ctx, card.cam, name, src)) {
-                errors += "写入失败: $name"
+                errors += ctx.getString(R.string.writeback_write_failed, name)
                 continue
             }
             // 大小读不到（部分 provider 要等媒体扫描）不算失败，但读到了不一致要报。
             val onCard = SafeCard.verifySize(ctx, card.cam, name)
             if (onCard >= 0 && onCard != src.length()) {
-                errors += "大小不符: $name（本地 ${src.length()}，卡上 $onCard）"
+                errors += ctx.getString(
+                    R.string.writeback_size_mismatch, name, src.length(), onCard
+                )
             }
         }
 
@@ -211,7 +214,7 @@ class CardMirror(
             if (!src.isFile) continue
             val bytes = src.readBytes()
             if (!SafeCard.writeSmallFile(ctx, card.dcim, idx, bytes)) {
-                errors += "索引写入失败: $idx"
+                errors += ctx.getString(R.string.writeback_index_failed, idx)
             }
         }
         return errors.isEmpty() to errors.joinToString("; ")

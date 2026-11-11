@@ -84,19 +84,22 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.duofreedom.instaace.BuildConfig
-import com.duofreedom.instaace.engine.Engine
-import com.duofreedom.instaace.engine.PythonEngine
-import com.duofreedom.instaace.engine.UpdateCheckListener
-import com.duofreedom.instaace.ui.theme.Motion
+import com.duofreedom.instatools.BuildConfig
+import com.duofreedom.instatools.R
+import com.duofreedom.instatools.engine.Engine
+import com.duofreedom.instatools.engine.PythonEngine
+import com.duofreedom.instatools.engine.UpdateCheckListener
+import com.duofreedom.instatools.ui.theme.Motion
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-private val TABS = listOf("存储卡", "队列", "设置")
+/** 底部导航的标题资源，顺序与图标一一对应。 */
+private val TAB_TITLES = listOf(R.string.tab_card, R.string.tab_queue, R.string.tab_settings)
 private const val SOURCE_URL = "https://github.com/DUOFreedom/Insta-camera-tools"
 private const val PREFS_UPDATE = "update_prefs"
 private const val KEY_IGNORED_TAG = "ignored_update_tag"
@@ -106,7 +109,7 @@ fun instatoolsApp() {
     val ctx = LocalContext.current
     var docName by remember { mutableStateOf<String?>(null) }
     var docTitle by remember { mutableStateOf<String>("") }
-    val state = remember { AppState() }
+    val state = remember { AppState(ctx) }
     // AppState 内部持有 CoroutineScope，离开组合时必须取消，否则协程泄漏。
     DisposableEffect(state) {
         onDispose { state.close() }
@@ -126,7 +129,10 @@ fun instatoolsApp() {
 
     if (!consented) {
         ConsentGate(
-            onOpenFullPolicy = { docName = "privacy-policy.md"; docTitle = "使用协议与隐私政策" },
+            onOpenFullPolicy = {
+                docName = "privacy-policy.md"
+                docTitle = ctx.getString(R.string.doc_privacy_title)
+            },
             onAgree = {
                 Consent.setAgreed(ctx)
                 consented = true
@@ -190,9 +196,15 @@ fun instatoolsApp() {
         val currentUrl = updateUrl ?: ""
         AlertDialog(
             onDismissRequest = { updateTag = null },
-            title = { Text("发现新版本") },
+            title = { Text(stringResource(R.string.update_available_title)) },
             text = {
-                Text("最新版本为 $currentTag，当前版本为 ${BuildConfig.VERSION_NAME}。")
+                Text(
+                    stringResource(
+                        R.string.update_available_body,
+                        currentTag,
+                        BuildConfig.VERSION_NAME
+                    )
+                )
             },
             confirmButton = {
                 TextButton(
@@ -201,18 +213,20 @@ fun instatoolsApp() {
                         if (!opened) {
                             scope.launch {
                                 snackbar.showSnackbar(
-                                    if (currentUrl.isBlank()) "下载地址缺失，请到 GitHub Releases 页面查看"
-                                    else "没有可用的浏览器"
+                                    if (currentUrl.isBlank()) ctx.getString(R.string.update_no_url)
+                                    else ctx.getString(R.string.no_browser)
                                 )
                             }
                         }
                         updateTag = null
                     }
-                ) { Text("前往下载") }
+                ) { Text(stringResource(R.string.update_go_download)) }
             },
             dismissButton = {
                 Row {
-                    TextButton(onClick = { updateTag = null }) { Text("稍后") }
+                    TextButton(onClick = { updateTag = null }) {
+                        Text(stringResource(R.string.update_later))
+                    }
                     Spacer(Modifier.size(4.dp))
                     TextButton(
                         onClick = {
@@ -220,7 +234,7 @@ fun instatoolsApp() {
                             PythonEngine.ignoreUpdate(ctx, currentTag)
                             updateTag = null
                         }
-                    ) { Text("忽略此版本") }
+                    ) { Text(stringResource(R.string.update_ignore)) }
                 }
             }
         )
@@ -231,9 +245,12 @@ fun instatoolsApp() {
             CenterAlignedTopAppBar(
                 title = {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("影石相机工具", fontWeight = FontWeight.SemiBold)
                         Text(
-                            "影石 Ace Pro 2 · 素材导入",
+                            stringResource(R.string.app_name),
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            stringResource(R.string.app_subtitle),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -246,7 +263,7 @@ fun instatoolsApp() {
         },
         bottomBar = {
             NavigationBar {
-                TABS.forEachIndexed { i, title ->
+                TAB_TITLES.forEachIndexed { i, titleRes ->
                     NavigationBarItem(
                         selected = tab == i,
                         onClick = { tab = i },
@@ -260,7 +277,7 @@ fun instatoolsApp() {
                                 contentDescription = null
                             )
                         },
-                        label = { Text(title) }
+                        label = { Text(stringResource(titleRes)) }
                     )
                 }
             }
@@ -298,12 +315,14 @@ fun instatoolsApp() {
                     onStart = {
                         scope.launch {
                             state.startImport(ctx)
+                            // 分支只看语言无关的 StageKind，不看本地化文案：
+                            //   否则切到英文后前缀匹配全部失效。
                             snackbar.showSnackbar(
-                                when {
-                                    state.stage.startsWith("已取消") -> state.stage
-                                    state.stage.startsWith("失败") || state.stage.startsWith("部分完成") ->
-                                        state.stage
-                                    else -> "导入完成：已写回相机卡，拔卡插回相机查看"
+                                when (state.stageKind) {
+                                    StageKind.Canceled,
+                                    StageKind.Failed,
+                                    StageKind.Partial -> state.stage
+                                    else -> ctx.getString(R.string.import_done_snackbar)
                                 }
                             )
                         }
@@ -328,7 +347,9 @@ fun instatoolsApp() {
         val docText = remember(name) {
             runCatching {
                 ctx.assets.open("docs/$name").bufferedReader().use { it.readText() }
-            }.getOrElse { "无法读取文档：$name\n${it.message}" }
+            }.getOrElse {
+                ctx.getString(R.string.doc_read_failed, name, it.message ?: "")
+            }
         }
         AlertDialog(
             onDismissRequest = { docName = null },
@@ -341,7 +362,9 @@ fun instatoolsApp() {
                 )
             },
             confirmButton = {
-                TextButton(onClick = { docName = null }) { Text("关闭") }
+                TextButton(onClick = { docName = null }) {
+                    Text(stringResource(R.string.action_close))
+                }
             }
         )
     }
@@ -365,7 +388,7 @@ private fun CardScreen(state: AppState, onPick: () -> Unit, modifier: Modifier =
             ) {
                 Column(Modifier.padding(20.dp)) {
                     Text(
-                        "选择相机存储卡",
+                        stringResource(R.string.card_section_title),
                         style = MaterialTheme.typography.titleLarge,
                         color = MaterialTheme.colorScheme.onPrimaryContainer
                     )
@@ -383,7 +406,12 @@ private fun CardScreen(state: AppState, onPick: () -> Unit, modifier: Modifier =
                             modifier = Modifier.size(18.dp)
                         )
                         Spacer(Modifier.size(8.dp))
-                        Text(if (state.cardUri == null) "选择存储卡" else "重新选择")
+                        Text(
+                            stringResource(
+                                if (state.cardUri == null) R.string.pick_card
+                                else R.string.pick_card_again
+                            )
+                        )
                     }
                 }
             }
@@ -391,7 +419,7 @@ private fun CardScreen(state: AppState, onPick: () -> Unit, modifier: Modifier =
 
         item {
             Text(
-                "三层识别前置条件",
+                stringResource(R.string.preflight_title),
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(top = 8.dp)
             )
@@ -401,29 +429,37 @@ private fun CardScreen(state: AppState, onPick: () -> Unit, modifier: Modifier =
             OutlinedCard(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        StatusChip(state.dcimFound, "DCIM 结构")
+                        StatusChip(state.dcimFound, stringResource(R.string.preflight_dcim))
                         StatusChip(state.camDirFound, "Camera01")
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        StatusChip(state.indexFound, "索引文件")
-                        StatusChip(state.templatePairs > 0, "真机模板")
+                        StatusChip(state.indexFound, stringResource(R.string.preflight_index))
+                        StatusChip(
+                            state.templatePairs > 0,
+                            stringResource(R.string.preflight_template)
+                        )
                     }
                     if (state.templateName.isNotBlank()) {
                         Text(
-                            "模板：${state.templateName}",
+                            stringResource(R.string.preflight_template_name, state.templateName),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                     HorizontalDivider(Modifier.padding(vertical = 4.dp))
                     Text(
-                        "VID ${state.vidCount} 个 · LRV ${state.lrvCount} 个 · 可作模板 ${state.templatePairs} 对",
+                        stringResource(
+                            R.string.preflight_counts,
+                            state.vidCount,
+                            state.lrvCount,
+                            state.templatePairs
+                        ),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     if (state.camDirFound && state.templatePairs == 0) {
                         Text(
-                            "卡里缺一对相机原生录制的 VID_/LRV_，缺它无法生成可识别的文件。先用相机录一小段。",
+                            stringResource(R.string.preflight_need_template),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.error
                         )
@@ -432,10 +468,17 @@ private fun CardScreen(state: AppState, onPick: () -> Unit, modifier: Modifier =
                         val bad = state.indexError.isNotBlank() || state.indexEmptyMeta > 0
                         Text(
                             when {
-                                state.indexError.isNotBlank() -> "索引读取失败：${state.indexError}"
-                                state.indexEmptyMeta > 0 ->
-                                    "索引 ${state.indexCount} 条，其中 ${state.indexEmptyMeta} 条 meta 为空——相机会显示 0KB 且打不开"
-                                else -> "索引 ${state.indexCount} 条，全部带 meta"
+                                state.indexError.isNotBlank() -> stringResource(
+                                    R.string.preflight_index_error, state.indexError
+                                )
+                                state.indexEmptyMeta > 0 -> stringResource(
+                                    R.string.preflight_index_empty_meta,
+                                    state.indexCount,
+                                    state.indexEmptyMeta
+                                )
+                                else -> stringResource(
+                                    R.string.preflight_index_all_meta, state.indexCount
+                                )
                             },
                             style = MaterialTheme.typography.bodySmall,
                             color = if (bad) MaterialTheme.colorScheme.error
@@ -448,8 +491,7 @@ private fun CardScreen(state: AppState, onPick: () -> Unit, modifier: Modifier =
 
         item {
             Text(
-                "手机通过 USB-C 读卡器挂载相机卡；导入时会在这里的三层条件都满足后" +
-                    "执行：转码 → inst box 移植 → 索引登记 → 写回 DCIM\\Camera01。",
+                stringResource(R.string.card_how_it_works),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 4.dp, bottom = 16.dp)
@@ -485,20 +527,21 @@ private fun QueueScreen(
     onCancel: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val ctx = LocalContext.current
     Column(modifier.fillMaxSize().padding(horizontal = 16.dp)) {
         Row(
             Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                "待导入（${state.queue.size}）",
+                stringResource(R.string.queue_pending_count, state.queue.size),
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.weight(1f)
             )
             FilledTonalButton(onClick = onPick, enabled = !state.running) {
                 Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.size(6.dp))
-                Text("添加视频")
+                Text(stringResource(R.string.add_videos))
             }
         }
 
@@ -520,13 +563,16 @@ private fun QueueScreen(
                         headlineContent = {
                             Text(item.name, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         },
-                        supportingContent = { Text(humanSize(item.size)) },
+                        supportingContent = { Text(humanSize(ctx, item.size)) },
                         trailingContent = {
                             IconButton(
                                 onClick = { state.remove(item) },
                                 enabled = !state.running
                             ) {
-                                Icon(Icons.Rounded.DeleteOutline, contentDescription = "移除")
+                                Icon(
+                                    Icons.Rounded.DeleteOutline,
+                                    contentDescription = stringResource(R.string.action_remove)
+                                )
                             }
                         },
                         colors = ListItemDefaults.colors(
@@ -541,7 +587,10 @@ private fun QueueScreen(
         if (state.outputSummary.isNotBlank()) {
             OutlinedCard(Modifier.fillMaxWidth().padding(bottom = 12.dp)) {
                 Column(Modifier.padding(12.dp)) {
-                    Text("导入明细", style = MaterialTheme.typography.labelMedium)
+                    Text(
+                        stringResource(R.string.import_summary_title),
+                        style = MaterialTheme.typography.labelMedium
+                    )
                     Spacer(Modifier.height(4.dp))
                     Text(
                         state.outputSummary,
@@ -557,12 +606,12 @@ private fun QueueScreen(
                 running = state.running,
                 queueEmpty = state.queue.isEmpty(),
                 noCard = state.cardUri == null,
-                stage = state.stage
+                kind = state.stageKind
             ),
             stage = state.stage,
             progress = state.progress,
             logLine = state.logLine,
-            errorText = state.stage.removePrefix("失败："),
+            errorText = state.stageError,
             canceling = state.canceling,
             onStart = onStart,
             onCancel = onCancel,
@@ -586,7 +635,7 @@ private fun EmptyState(modifier: Modifier = Modifier) {
         )
         Spacer(Modifier.height(12.dp))
         Text(
-            "还没有添加视频\n支持从「文件」里多选，或从相册选",
+            stringResource(R.string.empty_queue),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -612,28 +661,38 @@ private fun SettingsScreen(
     ) {
         Card(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(16.dp)) {
-                Text("编码器", style = MaterialTheme.typography.titleSmall)
+                Text(
+                    stringResource(R.string.settings_encoder_title),
+                    style = MaterialTheme.typography.titleSmall
+                )
                 Spacer(Modifier.height(10.dp))
+                val encoders = listOf(
+                    AppState.ENCODER_AUTO to R.string.encoder_auto,
+                    AppState.ENCODER_HW to R.string.encoder_hardware
+                )
                 SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                    listOf("自动", "硬件").forEachIndexed { i, label ->
+                    encoders.forEachIndexed { i, (code, labelRes) ->
                         SegmentedButton(
-                            selected = state.encoder == label,
-                            onClick = { state.encoder = label },
-                            shape = SegmentedButtonDefaults.itemShape(index = i, count = 2),
-                            label = { Text(label) }
+                            selected = state.encoder == code,
+                            onClick = { state.encoder = code },
+                            shape = SegmentedButtonDefaults.itemShape(
+                                index = i, count = encoders.size
+                            ),
+                            label = { Text(stringResource(labelRes)) }
                         )
                     }
                 }
                 Spacer(Modifier.height(8.dp))
                 ExpandableSection(
-                    title = "两种编码器的区别",
-                    subtitle = if (state.encoder == "硬件") "当前：硬件（快，但关键帧间隔受限）"
-                    else "当前：自动（软件编码，识别最稳）"
+                    title = stringResource(R.string.settings_encoder_diff_title),
+                    subtitle = if (state.encoder == AppState.ENCODER_HW) {
+                        stringResource(R.string.settings_encoder_current_hw)
+                    } else {
+                        stringResource(R.string.settings_encoder_current_auto)
+                    }
                 ) {
                     Text(
-                        "自动 = 软件编码（libx265 + libx264，与桌面端一致，相机识别最稳）。\n" +
-                            "硬件 = MediaCodec 硬件编码，速度快很多，但关键帧间隔受系统限制只能 1 秒" +
-                            "（相机要求 16 帧），若导入后相机不显示缩略图或无法识别，请切回「自动」。",
+                        stringResource(R.string.settings_encoder_diff_body),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -643,8 +702,10 @@ private fun SettingsScreen(
 
         Card(Modifier.fillMaxWidth()) {
             ListItem(
-                headlineContent = { Text("登记相机索引") },
-                supportingContent = { Text("写入 DCIM 下的 fileinfo / editinfo，相册才会出现") },
+                headlineContent = { Text(stringResource(R.string.settings_register_index)) },
+                supportingContent = {
+                    Text(stringResource(R.string.settings_register_index_desc))
+                },
                 trailingContent = {
                     Switch(
                         checked = state.registerIndex,
@@ -664,37 +725,45 @@ private fun SettingsScreen(
                         tint = MaterialTheme.colorScheme.primary
                     )
                     Spacer(Modifier.size(8.dp))
-                    Text("关于", style = MaterialTheme.typography.titleSmall)
+                    Text(
+                        stringResource(R.string.settings_about),
+                        style = MaterialTheme.typography.titleSmall
+                    )
                 }
-                Text("版本 1.2.0", style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    stringResource(R.string.settings_version, BuildConfig.VERSION_NAME),
+                    style = MaterialTheme.typography.bodyMedium
+                )
 
                 val ctx = LocalContext.current
-                var engineLine by remember { mutableStateOf("检测中…") }
+                var engineLine by remember { mutableStateOf("…") }
                 LaunchedEffect(Unit) {
                     engineLine = withContext(Dispatchers.IO) { Engine.versionLine(ctx) }
                 }
                 Text(
-                    "ffmpeg：$engineLine",
+                    stringResource(R.string.settings_ffmpeg, engineLine),
                     style = MaterialTheme.typography.bodySmall,
                     color = if (engineLine.startsWith("ffmpeg version"))
                         MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
                 )
 
-                if (state.pythonStatus == "未检测") {
+                val py = state.pythonStatus
+                if (py == null) {
                     LaunchedEffect(Unit) { state.checkPython(ctx) }
                 }
                 Text(
-                    "导入核心：${state.pythonStatus}",
+                    stringResource(
+                        R.string.settings_import_core,
+                        py?.text ?: stringResource(R.string.status_not_checked)
+                    ),
                     style = MaterialTheme.typography.bodySmall,
-                    color = if (state.pythonStatus.startsWith("Python 核心就绪"))
+                    color = if (py?.ok == true)
                         MaterialTheme.colorScheme.primary
                     else MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
                 Text(
-                    "已内置：选卡扫描与索引体检、aarch64 ffmpeg 7.1、" +
-                        "内嵌 CPython 运行桌面端已验证的导入核心" +
-                        "（转码 → inst box 移植 → 索引登记 → 写回相机卡）。",
+                    stringResource(R.string.settings_built_in),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -702,12 +771,15 @@ private fun SettingsScreen(
 
                 // 开发者与源码入口
                 Text(
-                    "开发者",
+                    stringResource(R.string.settings_developer),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(Modifier.height(4.dp))
-                Text("B站 @铎DUOFreedom", style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    stringResource(R.string.settings_developer_bili),
+                    style = MaterialTheme.typography.bodyMedium
+                )
                 Spacer(Modifier.height(2.dp))
                 Text(
                     "GitHub  ·  DUOFreedom",
@@ -716,7 +788,7 @@ private fun SettingsScreen(
                 )
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    "源代码",
+                    stringResource(R.string.settings_source_code),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -726,13 +798,17 @@ private fun SettingsScreen(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.clickable {
-                        if (!openUrl(ctx, SOURCE_URL)) onMessage("没有可用的浏览器")
+                        if (!openUrl(ctx, SOURCE_URL)) {
+                            onMessage(ctx.getString(R.string.no_browser))
+                        }
                     }
                 )
                 Spacer(Modifier.height(6.dp))
                 OutlinedButton(
                     onClick = {
-                        if (!openUrl(ctx, SOURCE_URL)) onMessage("没有可用的浏览器")
+                        if (!openUrl(ctx, SOURCE_URL)) {
+                            onMessage(ctx.getString(R.string.no_browser))
+                        }
                     },
                     modifier = Modifier.fillMaxWidth()
                 ) {
@@ -742,11 +818,11 @@ private fun SettingsScreen(
                         modifier = Modifier.size(16.dp)
                     )
                     Spacer(Modifier.size(6.dp))
-                    Text("在浏览器中打开源代码仓库")
+                    Text(stringResource(R.string.settings_open_repo))
                 }
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    "GPL-3.0 · 与桌面端同源",
+                    stringResource(R.string.settings_license),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -757,18 +833,36 @@ private fun SettingsScreen(
                     Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    FilledTonalButton(onClick = { onOpenDoc("privacy-policy.md", "使用协议与隐私政策") }) {
-                        Text("使用协议与隐私", style = MaterialTheme.typography.labelMedium)
+                    FilledTonalButton(
+                        onClick = {
+                            onOpenDoc(
+                                "privacy-policy.md",
+                                ctx.getString(R.string.doc_privacy_title)
+                            )
+                        }
+                    ) {
+                        Text(
+                            stringResource(R.string.settings_open_privacy),
+                            style = MaterialTheme.typography.labelMedium
+                        )
                     }
-                    FilledTonalButton(onClick = { onOpenDoc("open-source-notices.md", "开源合规声明") }) {
-                        Text("开源合规声明", style = MaterialTheme.typography.labelMedium)
+                    FilledTonalButton(
+                        onClick = {
+                            onOpenDoc(
+                                "open-source-notices.md",
+                                ctx.getString(R.string.doc_notices_title)
+                            )
+                        }
+                    ) {
+                        Text(
+                            stringResource(R.string.settings_open_notices),
+                            style = MaterialTheme.typography.labelMedium
+                        )
                     }
                 }
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "权限：无危险权限。仅申请 INTERNET 用于启动时检查新版本" +
-                        "（单次 GET，不下载、不上传、无遥测）；" +
-                        "存储访问通过系统目录选择器按需授权，随时可撤销。",
+                    stringResource(R.string.settings_permissions),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -778,8 +872,8 @@ private fun SettingsScreen(
 }
 
 
-private fun humanSize(bytes: Long): String = when {
-    bytes <= 0 -> "大小未知"
+private fun humanSize(ctx: Context, bytes: Long): String = when {
+    bytes <= 0 -> ctx.getString(R.string.size_unknown_full)
     bytes >= 1L shl 30 -> String.format("%.2f GB", bytes / 1073741824.0)
     bytes >= 1L shl 20 -> String.format("%.1f MB", bytes / 1048576.0)
     bytes >= 1L shl 10 -> String.format("%.0f KB", bytes / 1024.0)

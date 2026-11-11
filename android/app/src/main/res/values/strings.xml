@@ -1,16 +1,160 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+    English is the default resource set (res/values/).
+    Chinese lives in res/values-zh/ — Android picks it automatically when the
+    system language is Chinese; any other language falls back to this file.
+    Product name: always lowercase `instatools` / 中文 `影石相机工具`.
+-->
 <resources>
-    <string name="app_name">影石相机工具</string>
-    <string name="app_subtitle">影石 Ace Pro 2 · 素材导入</string>
-    <string name="tab_card">存储卡</string>
-    <string name="tab_queue">队列</string>
-    <string name="tab_settings">设置</string>
-    <string name="pick_card">选择存储卡</string>
-    <string name="pick_card_again">重新选择</string>
-    <string name="add_videos">添加视频</string>
-    <string name="start_import">开始导入</string>
-    <string name="importing">导入中…</string>
-    <string name="need_card">请先选择存储卡</string>
-    <string name="preflight_title">三层识别前置条件</string>
-    <string name="empty_queue">还没有添加视频\n支持从「文件」里多选，或从相册选</string>
+    <!-- 应用名与副标题 -->
+    <string name="app_name">instatools</string>
+    <string name="app_subtitle">Insta360 Ace Pro 2 · Media Import</string>
+
+    <!-- 底部导航 -->
+    <string name="tab_card">Storage card</string>
+    <string name="tab_queue">Queue</string>
+    <string name="tab_settings">Settings</string>
+
+    <!-- 存储卡页 -->
+    <string name="card_section_title">Choose the camera storage card</string>
+    <string name="pick_card">Choose storage card</string>
+    <string name="pick_card_again">Change</string>
+    <string name="preflight_title">Three-layer recognition checks</string>
+    <string name="preflight_dcim">DCIM layout</string>
+    <string name="preflight_index">Index file</string>
+    <string name="preflight_template">Camera template</string>
+    <string name="preflight_template_name">Template: %1$s</string>
+    <string name="preflight_counts">VID %1$d · LRV %2$d · %3$d usable template pairs</string>
+    <string name="preflight_need_template">This card has no camera-recorded VID_/LRV_ pair. Without one, no file can be generated that the camera accepts — record a short clip with the camera first.</string>
+    <string name="preflight_index_error">Failed to read the index: %1$s</string>
+    <string name="preflight_index_empty_meta">%1$d index entries, %2$d with empty meta — the camera shows them as 0 KB and cannot open them</string>
+    <string name="preflight_index_all_meta">%1$d index entries, all with meta</string>
+    <string name="card_how_it_works">Mount the camera card through a USB-C card reader. When all three checks above pass, importing runs: transcode → inst box transplant → index registration → write back to DCIM\\Camera01.</string>
+    <string name="card_none_selected">No storage card selected</string>
+    <string name="label_storage_card">Storage card</string>
+    <string name="card_read_failed">Read failed: %1$s</string>
+
+    <!-- 队列页 -->
+    <string name="queue_pending_count">To import (%1$d)</string>
+    <string name="add_videos">Add videos</string>
+    <string name="start_import">Start import</string>
+    <string name="importing">Importing…</string>
+    <string name="need_card">Choose a storage card first</string>
+    <string name="empty_queue">No videos yet\nPick several from “Files”, or choose them from the gallery</string>
+    <string name="action_remove">Remove</string>
+    <string name="import_summary_title">Import details</string>
+    <string name="size_unknown_full">Unknown size</string>
+    <string name="size_unknown">unknown</string>
+    <string name="file_fallback_video_name">Video</string>
+
+    <!-- 导入操作卡 -->
+    <string name="action_add_first">Add videos first</string>
+    <string name="action_retry_import">Retry import</string>
+    <string name="action_cancel_import">Cancel import</string>
+    <string name="action_canceling">Canceling…</string>
+    <string name="import_failed_see_log">Import failed — see the log below</string>
+
+    <!-- 导入阶段状态（StageKind 的显示文案） -->
+    <string name="status_idle">Ready</string>
+    <string name="status_detecting">Checking…</string>
+    <string name="status_not_checked">Not checked</string>
+    <string name="status_preparing">Preparing…</string>
+    <string name="status_preparing_mirror">Preparing card mirror (template + index)…</string>
+    <string name="status_item_read">Item %1$d/%2$d: reading source</string>
+    <string name="status_item_stage">Item %1$d/%2$d · %3$s</string>
+    <string name="stage_label_transcode">Transcode</string>
+    <string name="status_cancel_failed">Cancel failed — try again</string>
+    <string name="status_queue_empty">Queue is empty</string>
+    <string name="status_no_card">Choose the camera storage card first</string>
+    <string name="status_engine_unavailable">Engine unavailable: no executable libffmpeg.so found</string>
+    <string name="status_canceled_writeback">Canceled — writing back the finished items…</string>
+    <string name="status_writeback">Writing back to the camera card…</string>
+    <string name="status_canceled">Canceled</string>
+    <string name="status_canceled_partial">Canceled (%1$d finished items written back to the card)</string>
+    <string name="status_all_done">All done</string>
+    <string name="status_partial">Partially done (see details below)</string>
+    <string name="status_failed">Failed: %1$s</string>
+    <string name="result_inst_ok">inst transplanted · index registered</string>
+    <string name="summary_writeback_failed">Write-back failed: %1$s</string>
+    <string name="summary_canceled_nothing">Canceled — nothing needed writing back</string>
+    <string name="summary_written">Written back to the camera card (%1$d files + index)</string>
+    <string name="import_done_snackbar">Import complete: written back to the card — unplug it and put it back in the camera</string>
+
+    <!-- 导入错误 -->
+    <string name="error_cache_space">Not enough cache space: source %1$s, available %2$s</string>
+    <string name="error_cannot_read">Cannot read: %1$s</string>
+    <string name="error_no_cancel_event">Cannot create the cancel event: Python core is not ready</string>
+    <string name="error_card_incomplete">Incomplete card layout: DCIM/Camera01 plus a camera-recorded VID_/LRV_ pair are required</string>
+    <string name="error_mirror_failed">Card mirror build failed: could not copy the template or the index</string>
+    <string name="index_read_failed_short">Failed to read the index</string>
+
+    <!-- 写回相机卡（SafeCard.writeBack 的错误明细） -->
+    <string name="writeback_missing_product">Missing output: %1$s</string>
+    <string name="writeback_write_failed">Write failed: %1$s</string>
+    <string name="writeback_size_mismatch">Size mismatch: %1$s (local %2$d, on card %3$d)</string>
+    <string name="writeback_index_failed">Index write failed: %1$s</string>
+
+    <!-- 更新提示 -->
+    <string name="update_available_title">New version available</string>
+    <string name="update_available_body">Latest version is %1$s, you are on %2$s.</string>
+    <string name="update_go_download">Download</string>
+    <string name="update_later">Later</string>
+    <string name="update_ignore">Skip this version</string>
+    <string name="update_no_url">No download URL — check the GitHub Releases page</string>
+    <string name="no_browser">No browser available</string>
+
+    <!-- 文档弹窗 -->
+    <string name="doc_privacy_title">Terms &amp; Privacy Policy</string>
+    <string name="doc_notices_title">Open Source Notices</string>
+    <string name="doc_read_failed">Cannot read the document: %1$s\n%2$s</string>
+    <string name="action_close">Close</string>
+    <string name="action_back">Back</string>
+    <string name="action_expand">Expand</string>
+    <string name="action_collapse">Collapse</string>
+
+    <!-- 首次启动协议 -->
+    <string name="consent_read_failed">Cannot read the full policy: %1$s</string>
+    <string name="consent_summary">All transcoding and index handling happen locally on your phone. Nothing is collected and nothing is uploaded.</string>
+    <string name="consent_points">Before you start, please read and accept the Terms &amp; Privacy Policy. Highlights:\n· No dangerous permissions are requested\n· The only network use is one version check at launch (no download, no upload)\n· Storage access is granted by you in the system folder picker and can be revoked at any time\n· Import rewrites the index file on the camera card; back up DCIM before importing\n· Make sure you have the legal right to the videos you import</string>
+    <string name="consent_checkbox">I have read and accept the Terms &amp; Privacy Policy</string>
+    <string name="consent_view_full">View the full policy</string>
+    <string name="consent_agree_continue">Agree and continue</string>
+    <string name="consent_decline">Decline and exit</string>
+
+    <!-- 设置页 -->
+    <string name="settings_encoder_title">Encoder</string>
+    <string name="encoder_auto">Auto</string>
+    <string name="encoder_hardware">Hardware</string>
+    <string name="settings_encoder_diff_title">How the two encoders differ</string>
+    <string name="settings_encoder_current_hw">Current: Hardware (fast, limited keyframe interval)</string>
+    <string name="settings_encoder_current_auto">Current: Auto (software encoding, most reliable recognition)</string>
+    <string name="settings_encoder_diff_body">Auto = software encoding (libx265 + libx264, same as the desktop app; the camera recognizes it most reliably).\nHardware = MediaCodec hardware encoding. Much faster, but the system limits the keyframe interval to 1 second (the camera wants 16 frames); if the camera shows no thumbnails or does not recognize the import, switch back to Auto.</string>
+    <string name="settings_register_index">Register camera index</string>
+    <string name="settings_register_index_desc">Writes fileinfo / editinfo under DCIM so the clips show up in the album</string>
+    <string name="settings_about">About</string>
+    <string name="settings_version">Version %1$s</string>
+    <string name="settings_ffmpeg">ffmpeg: %1$s</string>
+    <string name="settings_import_core">Import core: %1$s</string>
+    <string name="settings_built_in">Built in: card scan and index inspection, aarch64 ffmpeg 7.1, and an embedded CPython running the desktop-tested import core (transcode → inst box transplant → index registration → write back to the camera card).</string>
+    <string name="settings_developer">Developer</string>
+    <string name="settings_developer_bili">Bilibili @铎DUOFreedom</string>
+    <string name="settings_source_code">Source code</string>
+    <string name="settings_open_repo">Open the source repository in a browser</string>
+    <string name="settings_license">GPL-3.0 · Same codebase as the desktop app</string>
+    <string name="settings_open_privacy">Terms &amp; privacy</string>
+    <string name="settings_open_notices">Open source notices</string>
+    <string name="settings_permissions">Permissions: no dangerous permissions. INTERNET is used only for the one version check at launch (a single GET, no download, no upload, no telemetry). Storage access is granted on demand through the system folder picker and can be revoked at any time.</string>
+
+    <!-- ffmpeg 引擎 -->
+    <string name="engine_missing">Engine missing: %1$s</string>
+    <string name="engine_no_output">no output</string>
+    <string name="engine_start_failed">Failed to start: %1$s</string>
+
+    <!-- 内嵌 CPython -->
+    <string name="python_core_unavailable">Python core unavailable: %1$s</string>
+    <string name="python_core_ready">Python core ready (%1$s)</string>
+    <string name="python_core_error">Python core error: %1$s</string>
+    <string name="python_self_check_failed">Python self-check failed: %1$s</string>
+    <string name="python_core_init_failed">Python core initialization failed: %1$s</string>
+    <string name="python_no_result">Python returned no result</string>
 </resources>

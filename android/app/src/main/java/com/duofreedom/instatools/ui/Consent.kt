@@ -31,9 +31,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.duofreedom.instatools.R
 import java.io.File
 
 /**
@@ -42,12 +44,12 @@ import java.io.File
  * why: 首次启动必须强制用户阅读并同意《使用协议与隐私政策》才能使用，
  *   这是合规要求，也是自我保护（避免用户误以为「装上就能随便改卡」）。
  *
- * 存储位置：应用私有目录 `files/instaace_consent.json`（用户卸载即清除）。
+ * 存储位置：应用私有目录 `files/instatools_consent.json`（用户卸载即清除）。
  * 记录了同意的协议版本号：协议内容变更后需要重新征求同意。
  */
 object Consent {
 
-    private const val FILE = "instaace_consent.json"
+    private const val FILE = "instatools_consent.json"
     private const val KEY_AGREED = "agreed"
     private const val KEY_VERSION = "policy_version"
 
@@ -105,7 +107,7 @@ fun ConsentGate(
         runCatching {
             ctx.assets.open("docs/privacy-policy.md")
                 .bufferedReader().use { it.readText() }
-        }.getOrElse { "无法读取协议全文：${it.message}" }
+        }.getOrElse { ctx.getString(R.string.consent_read_failed, it.message ?: "") }
     }
 
     AlertDialog(
@@ -119,25 +121,21 @@ fun ConsentGate(
                     modifier = Modifier.size(22.dp)
                 )
                 Spacer(Modifier.size(8.dp))
-                Text("使用协议与隐私政策", fontWeight = FontWeight.SemiBold)
+                Text(
+                    stringResource(R.string.doc_privacy_title),
+                    fontWeight = FontWeight.SemiBold
+                )
             }
         },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState())) {
                 Text(
-                    "本应用的转码与索引处理全部在你的手机上本地完成，" +
-                        "不收集、不上传任何数据。",
+                    stringResource(R.string.consent_summary),
                     style = MaterialTheme.typography.bodyMedium
                 )
                 Spacer(Modifier.height(10.dp))
                 Text(
-                    "开始使用前，请阅读并同意《使用协议与隐私政策》。" +
-                        "要点：\n" +
-                        "· 不申请任何危险权限\n" +
-                        "· 唯一的联网行为是启动时查一次新版本（不下载、不上传）\n" +
-                        "· 存储访问需你在系统目录选择器中亲自授权，随时可撤销\n" +
-                        "· 导入会改写相机卡的索引文件，导入前建议备份 DCIM 目录\n" +
-                        "· 请确保你对导入的视频内容拥有合法权利",
+                    stringResource(R.string.consent_points),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -149,7 +147,7 @@ fun ConsentGate(
                     Checkbox(checked = checked, onCheckedChange = { checked = it })
                     Spacer(Modifier.size(4.dp))
                     Text(
-                        "我已阅读并同意《使用协议与隐私政策》",
+                        stringResource(R.string.consent_checkbox),
                         style = MaterialTheme.typography.bodyMedium
                     )
                 }
@@ -161,7 +159,10 @@ fun ConsentGate(
                         modifier = Modifier.size(16.dp)
                     )
                     Spacer(Modifier.size(6.dp))
-                    Text("查看完整协议原文", style = MaterialTheme.typography.labelLarge)
+                    Text(
+                        stringResource(R.string.consent_view_full),
+                        style = MaterialTheme.typography.labelLarge
+                    )
                 }
             }
         },
@@ -172,11 +173,13 @@ fun ConsentGate(
             ) {
                 Icon(Icons.Rounded.Check, contentDescription = null, modifier = Modifier.size(16.dp))
                 Spacer(Modifier.size(4.dp))
-                Text("同意并继续")
+                Text(stringResource(R.string.consent_agree_continue))
             }
         },
         dismissButton = {
-            TextButton(onClick = { onDecline() }) { Text("不同意，退出") }
+            TextButton(onClick = { onDecline() }) {
+                Text(stringResource(R.string.consent_decline))
+            }
         }
     )
 
@@ -184,7 +187,7 @@ fun ConsentGate(
     if (showFull) {
         AlertDialog(
             onDismissRequest = { showFull = false },
-            title = { Text("使用协议与隐私政策") },
+            title = { Text(stringResource(R.string.doc_privacy_title)) },
             text = {
                 Text(
                     policyText,
@@ -195,7 +198,9 @@ fun ConsentGate(
                 )
             },
             confirmButton = {
-                TextButton(onClick = { showFull = false }) { Text("返回") }
+                TextButton(onClick = { showFull = false }) {
+                    Text(stringResource(R.string.action_back))
+                }
             }
         )
     }

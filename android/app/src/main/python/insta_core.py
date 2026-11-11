@@ -37,6 +37,8 @@ from pathlib import Path
 import zipfile
 from datetime import datetime, timedelta
 
+import i18n
+
 __version__ = "1.2.0"
 
 # 以下仅为【无真机模板时】的兜底值。
@@ -374,11 +376,11 @@ def check_encoding_capability() -> tuple[bool, str]:
     """校验软件编码能力（libx265 + libx264）。供自检/设置页展示。"""
     encs = available_encoders()
     if not encs:
-        return False, "无法读取 ffmpeg 编码器列表"
+        return False, i18n.t("无法读取 ffmpeg 编码器列表")
     missing = [n for n in ("libx265", "libx264") if n not in encs]
     if missing:
-        return False, "ffmpeg 缺少编码器: " + ", ".join(missing)
-    return True, "libx265 + libx264 就绪"
+        return False, i18n.t("ffmpeg 缺少编码器: %s") % ", ".join(missing)
+    return True, i18n.t("libx265 + libx264 就绪")
 
 
 def available_decoders() -> set[str]:
@@ -760,7 +762,7 @@ def _run_ffmpeg(cmd: list[str], duration: float, progress=None, cancel=None,
     if not cmd or not isinstance(cmd, list) or not cmd[0]:
         raise ValidationError("_run_ffmpeg 要求非空的命令列表")
     if not os.path.isfile(cmd[0]) and not shutil.which(cmd[0]):
-        raise ValidationError(f"ffmpeg 可执行文件不存在: {cmd[0]}")
+        raise ValidationError(i18n.t("ffmpeg 可执行文件不存在: %s") % cmd[0])
     if duration < 0:
         raise ValidationError("duration 不得为负数")
     if cancel is not None and not isinstance(cancel, threading.Event):
@@ -770,7 +772,7 @@ def _run_ffmpeg(cmd: list[str], duration: float, progress=None, cancel=None,
         cancel = threading.Event()
 
     if cancel.is_set():
-        raise CanceledError("已取消")
+        raise CanceledError(i18n.t("已取消"))
     full = cmd + ["-progress", "pipe:1", "-nostats"]
     proc = subprocess.Popen(full, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                             creationflags=_NO_WINDOW, text=True,
@@ -846,7 +848,7 @@ def _run_ffmpeg(cmd: list[str], duration: float, progress=None, cancel=None,
     if err_thread.is_alive():
         err_thread.join()
     if canceled:
-        raise CanceledError("已取消")
+        raise CanceledError(i18n.t("已取消"))
     if proc.returncode != 0:
         err = "".join(stderr_chunks)[-800:]
         raise FFmpegError(
@@ -931,7 +933,7 @@ def _build_transcode_cmd(src, dst, vcodec, tag, vf, enc_params,
     if not ff:
         # 别把 None 塞进 argv——那样报出来的是「命令列表为空」，
         #   真正的原因（ffmpeg 没解出来/路径失效）会被完全掩盖。
-        raise ValidationError("未找到 ffmpeg，无法构建转码命令")
+        raise ValidationError(i18n.t("未找到 ffmpeg，无法构建转码命令"))
     extra_in = audio_inputs(audio_tracks, src_audio_count)
     if hw_decoder:
         cmd = [ff, "-hide_banner", "-y", "-c:v", hw_decoder, "-i", src]
@@ -999,7 +1001,7 @@ def _build_hw_transcode_cmd(src, dst, vcodec, tag, vf, extra_args,
     keyint = int(gop) if gop and int(gop) > 0 else 16
     ff = find_ffmpeg()
     if not ff:
-        raise ValidationError("未找到 ffmpeg，无法构建硬件转码命令")
+        raise ValidationError(i18n.t("未找到 ffmpeg，无法构建硬件转码命令"))
     extra_in = audio_inputs(audio_tracks, src_audio_count)
     if hw_decoder:
         cmd = [ff, "-hide_banner", "-y", "-c:v", hw_decoder, "-i", src]
@@ -1237,7 +1239,7 @@ def convert(input_path: str, output_dir: str, start_number: int | None = None,
         cancel = threading.Event()
 
     if cancel.is_set():
-        raise CanceledError("已取消")
+        raise CanceledError(i18n.t("已取消"))
 
     if encoder is None:
         encoder = detect_hw_encoder()
@@ -1331,7 +1333,7 @@ def convert(input_path: str, output_dir: str, start_number: int | None = None,
                 return
             with lock:
                 cur = state["done"] + weights[_i] * min(1.0, max(0.0, float(frac or 0)))
-            progress(min(1.0, cur), _label, spd, eta)
+            progress(min(1.0, cur), i18n.t(_label), spd, eta)
 
         def _fail(e):
             nonlocal first_error
@@ -1422,12 +1424,12 @@ def convert(input_path: str, output_dir: str, start_number: int | None = None,
             say(f"[回退] {hwdec} 硬件解码失败（{e}），本次改用软件解码重试")
             _run_transcode(lambda: _build_cmd(""))
         if cancel is not None and cancel.is_set():
-            raise CanceledError("已取消")
+            raise CanceledError(i18n.t("已取消"))
         with lock:
             state["done"] = min(1.0, state["done"] + weights[idx])
             overall = state["done"]
         if progress:
-            progress(overall, label, 0.0, 0)
+            progress(overall, i18n.t(label), 0.0, 0)
         return dst
 
     if workers > 1 and n > 1:
@@ -1453,7 +1455,7 @@ def convert(input_path: str, output_dir: str, start_number: int | None = None,
         if first_error is not None:
             raise first_error
         if canceled:
-            raise CanceledError("已取消")
+            raise CanceledError(i18n.t("已取消"))
     else:
         for idx, t in enumerate(tasks):
             results[idx] = _run_one(idx, t)
@@ -1562,7 +1564,7 @@ def batch_convert(file_list: list[str], output_dir: str,
         cancel = threading.Event()
 
     if cancel.is_set():
-        raise CanceledError("已取消")
+        raise CanceledError(i18n.t("已取消"))
 
     if start_number is None:
         base_seq = next_seq(output_dir)
@@ -1594,7 +1596,7 @@ def batch_convert(file_list: list[str], output_dir: str,
     used_names = set()
     for i, src in enumerate(file_list):
         if cancel is not None and cancel.is_set():
-            raise CanceledError("已取消")
+            raise CanceledError(i18n.t("已取消"))
         if use_card:
             stamp = (card_when + timedelta(seconds=i)).strftime("%Y%m%d_%H%M%S")
         else:
@@ -2135,11 +2137,11 @@ def register_to_card(card_root: str, media_paths: list[str],
         (log or print)(m)
 
     if require_card and not is_camera_card(card_root):
-        raise RuntimeError(
+        raise RuntimeError(i18n.t(
             f"目标不是影石相机卡（缺少 DCIM\\Camera01 结构）：\n"
             f"  {_card_root(card_root)}\n"
             "为避免在普通文件夹里误建 DCIM 目录、污染数据，已中止索引写入。\n"
-            "请把输出目录指向存储卡的 DCIM 或 DCIM\\Camera01。")
+            "请把输出目录指向存储卡的 DCIM 或 DCIM\\Camera01。"))
 
     fi_path, ei_path = card_index_paths(card_root)
     os.makedirs(os.path.dirname(fi_path), exist_ok=True)
@@ -2226,7 +2228,7 @@ def render_cover(image_path: str, output: str,
         # 归一化成真实 Event：下游一律直接 cancel.is_set()，不再逐处判 None。
         cancel = threading.Event()
     if cancel.is_set():
-        raise CanceledError("已取消")
+        raise CanceledError(i18n.t("已取消"))
     ff = find_ffmpeg()
     if not ff:
         #   不判 None 会把 None 塞进 argv[0]，报成 TypeError，掩盖真因。
@@ -2521,7 +2523,7 @@ def import_with_inst(source: str, card_root: str,
         raise ValidationError("cover 必须为字符串或 None")
 
     if cancel.is_set():
-        raise CanceledError("已取消")
+        raise CanceledError(i18n.t("已取消"))
 
     card_root = _card_root(card_root)
     cam = camera_dir(card_root)
@@ -2536,10 +2538,10 @@ def import_with_inst(source: str, card_root: str,
     if template is None:
         template = find_native_template(card_root)
     if template is None:
-        raise CardError(
+        raise CardError(i18n.t(
             "卡里找不到真机原片作模板。\n"
             "`.inst` 移植必须有一个真机视频提供 moov 骨架与 inst box。\n"
-            "请先在 DCIM\\Camera01 放一对相机原生 VID_*.mp4 + LRV_*.lrv。")
+            "请先在 DCIM\\Camera01 放一对相机原生 VID_*.mp4 + LRV_*.lrv。"))
 
     tpl_main, tpl_proxy, ref_meta = template
     say(f"模板: {os.path.basename(tpl_main)}")
@@ -2556,7 +2558,7 @@ def import_with_inst(source: str, card_root: str,
     tf, rw = _load_inst_modules()
 
     say("步骤 1/3 转码...")
-    p_transcode = _stage_cb(progress, 0.0, 0.70, "转码")
+    p_transcode = _stage_cb(progress, 0.0, 0.70, i18n.t("转码"))
     main_path, proxy_path = convert(source, cam, encoder=encoder,
                                     spec=spec, log=None, progress=p_transcode,
                                     cancel=cancel, model_override=model_override)
@@ -2582,16 +2584,16 @@ def import_with_inst(source: str, card_root: str,
             except Exception as _te:
                 say(f"  缩略图生成失败（不致命）: {_te}")
                 thumbnail = None
-        p_inst = _stage_cb(progress, 0.70, 0.94, "移植 inst box")
+        p_inst = _stage_cb(progress, 0.70, 0.94, i18n.t("移植 inst box"))
         if p_inst:
             p_inst(0.0, "", 0.0, 0)
         pairs = ((main_path, tpl_main, "VID", False),
                  (proxy_path, tpl_proxy, "LRV", True))
         for _k, (gen, native, label, is_proxy) in enumerate(pairs):
             if cancel.is_set():
-                raise CanceledError("已取消")
+                raise CanceledError(i18n.t("已取消"))
             if gen is None or not os.path.isfile(gen):
-                inst_errs.append(f"{label}: 转码产物不存在")
+                inst_errs.append(i18n.t("%s: 转码产物不存在") % label)
                 if p_inst:
                     p_inst((_k + 1) / len(pairs), "", 0.0, 0)
                 continue
@@ -2606,7 +2608,7 @@ def import_with_inst(source: str, card_root: str,
                     f" → /DCIM/Camera01/{gen_p.name}")
             except Exception as e:
                 import traceback as _tb
-                msg = f"{type(e).__name__}: {e}"
+                msg = f"{type(e).__name__}: {i18n.t(str(e))}"
                 inst_errs.append(f"{label}: {msg}")
                 say(f"  {label}: inst 移植失败（{msg}）")
                 say("  " + _tb.format_exc().replace("\n", "\n  ")[:900])
@@ -2614,7 +2616,7 @@ def import_with_inst(source: str, card_root: str,
                 p_inst((_k + 1) / len(pairs), "", 0.0, 0)
 
         say("步骤 3/3 登记索引...")
-        p_index = _stage_cb(progress, 0.94, 1.0, "登记索引")
+        p_index = _stage_cb(progress, 0.94, 1.0, i18n.t("登记索引"))
         if p_index:
             p_index(0.1, "", 0.0, 0)
         media, media_metas = [], []
@@ -2639,7 +2641,7 @@ def import_with_inst(source: str, card_root: str,
                                               metas=media_metas)
             except Exception as e:
                 import traceback as _tb2
-                index_error = f"{type(e).__name__}: {e}"
+                index_error = f"{type(e).__name__}: {i18n.t(str(e))}"
                 say(f"索引登记失败（inst 已移植，文件本身可用）: {index_error}")
                 say("  " + _tb2.format_exc().replace("\n", "\n  ")[:700])
         if p_index:

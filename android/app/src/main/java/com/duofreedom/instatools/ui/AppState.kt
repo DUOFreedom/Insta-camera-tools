@@ -19,12 +19,14 @@ import kotlinx.coroutines.withContext
 import androidx.compose.runtime.setValue
 import androidx.documentfile.provider.DocumentFile
 import com.chaquo.python.PyObject
-import com.duofreedom.instaace.engine.ImportCallback
-import com.duofreedom.instaace.engine.Index
-import com.duofreedom.instaace.engine.Engine
-import com.duofreedom.instaace.engine.PythonEngine
-import com.duofreedom.instaace.engine.CardMirror
-import com.duofreedom.instaace.engine.SafeCard
+import com.duofreedom.instatools.R
+import com.duofreedom.instatools.engine.CoreStatus
+import com.duofreedom.instatools.engine.ImportCallback
+import com.duofreedom.instatools.engine.Index
+import com.duofreedom.instatools.engine.Engine
+import com.duofreedom.instatools.engine.PythonEngine
+import com.duofreedom.instatools.engine.CardMirror
+import com.duofreedom.instatools.engine.SafeCard
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -47,15 +49,62 @@ data class ImportResult(
 )
 
 /**
+ * 导入阶段的语义分类。
+ *
+ * why 单独存在：界面需要按「成功 / 失败 / 已取消」做分支（卡片配色、
+ *   Snackbar 文案、错误区是否出现）。一旦直接对本地化后的文案做前缀判断，
+ *   切到英文就会命中不了——语言一变，分支就坏。因此文案只负责显示，
+ *   判断一律看这个语言无关的枚举。
+ */
+enum class StageKind {
+    /** 空闲：还没开始，或上一次导入已被清空。 */
+    Idle,
+
+    /** 导入进行中。 */
+    Running,
+
+    /** 已请求取消，正在等 Python 侧收尾。 */
+    Canceling,
+
+    /** 已取消。 */
+    Canceled,
+
+    /** 全部完成。 */
+    Done,
+
+    /** 部分完成（有失败条目）。 */
+    Partial,
+
+    /** 失败。 */
+    Failed
+}
+
+/**
  * 界面状态、存储卡扫描与完整导入调度。
  *
  * 导入流程（与桌面端一致，只是把 CPU 侧交给内嵌的 CPython）：
  *   选定卡 → 建卡镜像（模板对 + 索引）→ 逐条：拷贝源文件 → 转码 → inst 移植 → 登记索引
  *   → 把新增媒体与更新后的索引写回卡 → 重新扫描确认。
+ *
+ * 文案：所有用户可见文字都从资源取（跟随系统语言），所以必须持有 Context。
+ *   这里存的是 applicationContext：AppState 的生命周期由 Composable 的
+ *   `remember` + `DisposableEffect` 管理，用应用级 Context 可以避免误持有
+ *   Activity 造成泄漏，getString 的结果完全一样。
  */
-class AppState {
+class AppState(context: Context) {
+
+    private val app: Context = context.applicationContext
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+
+    /** 取一条本地化文案。占位符顺序与数量在 values/ 与 values-zh/ 中必须一致。 */
+    private fun s(id: Int, vararg args: Any): String = app.getString(id, *args)
+
+    companion object {
+        /** 编码器选项的稳定标识：与显示文案解耦，切换语言不会改变判断结果。 */
+        const val ENCODER_AUTO = "auto"
+        const val ENCODER_HW = "hardware"
+    }
 
     /** 释放内部协程作用域。调用后不应再使用本实例。 */
     fun close() {
@@ -64,7 +113,7 @@ class AppState {
 
     var cardUri by mutableStateOf<Uri?>(null)
         private set
-    var cardLabel by mutableStateOf("未选择存储卡")
+    var cardLabel by mutableStateOf(app.getString(R.string.card_none_selected))
     var scanning by mutableStateOf(false)
         private set
 
@@ -92,11 +141,32 @@ class AppState {
 
     val queue = mutableStateListOf<QueueItem>()
 
-    var encoder by mutableStateOf("自动")
+    /** 编码器选择，取值 [ENCODER_AUTO] 或 [ENCODER_HW]。 */
+    var encoder by mutableStateOf(ENCODER_AUTO)
     var registerIndex by mutableStateOf(true)
 
     var progress by mutableStateOf(0f)
-    var stage by mutableStateOf("待开始")
+
+    /** 阶段文案（已按当前语言本地化，只用于显示）。 */
+    var stage by mutableStateOf(app.getString(R.string.status_idle))
+        private set
+
+    /** [stage] 的语义分类：界面分支只看它，不看文案。 */
+    var stageKind by mutableStateOf(StageKind.Idle)
+        private set
+
+    /** 失败详情（不含「失败：」前缀），失败态卡片展示用。 */
+    var stageError by mutableStateOf("")
+        private set
+
+    /**
+     * 同时更新阶段文案与语义分类，避免两者写漏一个。
+     */
+    private fun setStage(kind: StageKind, text: String, error: String = "") {
+        stageKind = kind
+        stage = text
+        stageError = error
+    }
 
     var running by mutableStateOf(false)
         private set
@@ -127,7 +197,7 @@ class AppState {
         //   足够——队列循环每条开始前都查它，第一条都还没派发就直接收尾。
         cancelRequested = true
         canceling = true
-        stage = "正在取消…"
+        setStage(StageKind.Canceling, s(R.string.action_canceling))
         val ev = cancelEvent ?: return
         scope.launch(Dispatchers.IO) {
             if (!PythonEngine.cancelEventSet(ev)) {
@@ -136,7 +206,7 @@ class AppState {
                 withContext(Dispatchers.Main) {
                     canceling = false
                     cancelRequested = false
-                    stage = "取消失败：请重试"
+                    setStage(StageKind.Running, s(R.string.status_cancel_failed))
                 }
             }
         }
@@ -145,11 +215,12 @@ class AppState {
     var outputSummary by mutableStateOf("")
     val results = mutableStateListOf<ImportResult>()
 
-    var pythonStatus by mutableStateOf("未检测")
+    /** Python 核心自检结果；null 表示尚未检测。 */
+    var pythonStatus by mutableStateOf<CoreStatus?>(null)
         private set
 
     fun checkPython(ctx: Context) {
-        pythonStatus = "检测中…"
+        pythonStatus = CoreStatus(ok = false, text = s(R.string.status_detecting))
         scope.launch {
             val status = withContext(Dispatchers.IO) { PythonEngine.status(ctx) }
             pythonStatus = status
@@ -199,7 +270,7 @@ class AppState {
     )
 
     private fun readCard(ctx: Context, tree: Uri): CardScan {
-        var label = tree.lastPathSegment ?: "存储卡"
+        var label = tree.lastPathSegment ?: s(R.string.label_storage_card)
         var dcim = false
         var camOk = false
         var vids = 0
@@ -237,13 +308,13 @@ class AppState {
                         emptyMeta = entries.count { it.meta.isEmpty() }
                     }
                 } catch (e: Exception) {
-                    indexError = e.message ?: "索引读取失败"
+                    indexError = e.message ?: s(R.string.index_read_failed_short)
                 }
             }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            label = "读取失败：${e.message}"
+            label = s(R.string.card_read_failed, e.message ?: "")
         }
         return CardScan(
             label = label,
@@ -262,7 +333,7 @@ class AppState {
     fun addVideos(ctx: Context, uris: List<Uri>) {
         uris.forEach { uri ->
             if (queue.any { it.uri == uri }) return@forEach
-            var name = uri.lastPathSegment ?: "视频"
+            var name = uri.lastPathSegment ?: s(R.string.file_fallback_video_name)
             var size = 0L
             try {
                 ctx.contentResolver.query(
@@ -291,7 +362,7 @@ class AppState {
     fun clearQueue() {
         queue.clear()
         progress = 0f
-        stage = "待开始"
+        setStage(StageKind.Idle, s(R.string.status_idle))
         outputSummary = ""
         results.clear()
     }
@@ -310,16 +381,16 @@ class AppState {
     suspend fun startImport(ctx: Context) {
         if (running) return
         if (queue.isEmpty()) {
-            stage = "队列为空"
+            setStage(StageKind.Idle, s(R.string.status_queue_empty))
             return
         }
         val tree = cardUri
         if (tree == null) {
-            stage = "请先选择相机存储卡"
+            setStage(StageKind.Idle, s(R.string.status_no_card))
             return
         }
         if (!Engine.available(ctx)) {
-            stage = "引擎不可用：找不到可执行的 libffmpeg.so"
+            setStage(StageKind.Idle, s(R.string.status_engine_unavailable))
             logLine = Engine.versionLine(ctx)
             return
         }
@@ -327,7 +398,7 @@ class AppState {
         running = true
         canceling = false
         cancelRequested = false
-        stage = "准备中…"
+        setStage(StageKind.Running, s(R.string.status_preparing))
         progress = 0f
         results.clear()
         outputSummary = ""
@@ -341,20 +412,20 @@ class AppState {
             // 取消事件必须早于任何耗时操作创建，否则用户在「准备卡镜像」
             //   阶段点取消会没有东西可置位，按钮看起来失灵。
             val ev = withContext(Dispatchers.IO) { PythonEngine.newCancelEvent(ctx) }
-            if (ev == null) throw RuntimeException("无法创建取消事件：Python 核心未就绪")
+            if (ev == null) throw RuntimeException(s(R.string.error_no_cancel_event))
             cancelEvent = ev
 
             val card = withContext(Dispatchers.IO) {
                 SafeCard.open(ctx, tree)
-            } ?: throw RuntimeException("卡结构不完整：需要 DCIM/Camera01 与一对真机 VID_/LRV_ 原片")
+            } ?: throw RuntimeException(s(R.string.error_card_incomplete))
 
             val pyStatus = withContext(Dispatchers.IO) { PythonEngine.status(ctx) }
-            if (!pyStatus.startsWith("Python 核心就绪")) throw RuntimeException(pyStatus)
+            if (!pyStatus.ok) throw RuntimeException(pyStatus.text)
 
-            stage = "准备卡镜像（模板 + 索引）…"
+            setStage(StageKind.Running, s(R.string.status_preparing_mirror))
             val mirror = CardMirror(ctx, card, jobDir)
             val mirrorOk = withContext(Dispatchers.IO) { mirror.build() }
-            if (!mirrorOk) throw RuntimeException("卡镜像构建失败：模板或索引拷贝不出来")
+            if (!mirrorOk) throw RuntimeException(s(R.string.error_mirror_failed))
 
             val items = queue.toList()
             for (i in items.indices) {
@@ -364,7 +435,10 @@ class AppState {
                 if (cancelRequested) break
 
                 val base = i.toFloat() / items.size
-                stage = "第 ${i + 1}/${items.size} 条：读取源文件"
+                setStage(
+                    StageKind.Running,
+                    s(R.string.status_item_read, i + 1, items.size)
+                )
                 progress = base
 
                 val safeName = item.name.replace(Regex("[^A-Za-z0-9._-]"), "_")
@@ -372,7 +446,11 @@ class AppState {
                 val staged = File(stageDir, "${i}_$safeName")
                 if (item.size > 0 && item.size * 3 > stageDir.usableSpace) {
                     throw RuntimeException(
-                        "缓存空间不足：源 ${human(item.size)}，可用 ${human(stageDir.usableSpace)}"
+                        s(
+                            R.string.error_cache_space,
+                            human(item.size),
+                            human(stageDir.usableSpace)
+                        )
                     )
                 }
                 val copied = withContext(Dispatchers.IO) {
@@ -381,10 +459,10 @@ class AppState {
                         true
                     } ?: false
                 }
-                if (!copied) throw RuntimeException("无法读取：${item.name}")
+                if (!copied) throw RuntimeException(s(R.string.error_cannot_read, item.name))
 
                 cb.fraction = 0f
-                cb.label = "转码"
+                cb.label = s(R.string.stage_label_transcode)
                 // 进度轮询跑在 IO 协程里，每次写状态都切回主线程。
                 val tick = scope.launch(Dispatchers.IO) {
                     while (isActive) {
@@ -396,7 +474,10 @@ class AppState {
                             //   否则点完取消 250ms 后又变回「第 1/2 条 · 转码」，
                             //   看起来像按钮没生效。
                             if (lbl.isNotBlank() && !canceling) {
-                                stage = "第 ${i + 1}/${items.size} 条 · $lbl"
+                                setStage(
+                                    StageKind.Running,
+                                    s(R.string.status_item_stage, i + 1, items.size, lbl)
+                                )
                             }
                         }
                         delay(250)
@@ -408,7 +489,7 @@ class AppState {
                     withContext(Dispatchers.IO) {
                         PythonEngine.runImport(
                             ctx, staged, mirror.root, cb,
-                            preferHardware = (encoder == "硬件"),
+                            preferHardware = (encoder == ENCODER_HW),
                             cancel = cancelEvent,
                             // 明确告诉核心用哪一对文件当模板。镜像目录里除了
                             //   刚拷进来的真机原片，还可能躺着上一轮的产物，
@@ -444,7 +525,8 @@ class AppState {
                                 json.optString("inst_error").takeIf { it.isNotBlank() },
                                 json.optString("index_error").takeIf { it.isNotBlank() }
                             )
-                            if (errs.isEmpty()) "inst 已移植 · 索引已登记" else errs.joinToString(" / ")
+                            if (errs.isEmpty()) s(R.string.result_inst_ok)
+                            else errs.joinToString(" / ")
                         } else json.optString("error")
                     )
                 )
@@ -461,7 +543,11 @@ class AppState {
             val (writeOk, writeErr) = if (media.isEmpty()) {
                 true to ""
             } else {
-                stage = if (canceled) "已取消，写回已完成的部分…" else "写回相机卡…"
+                setStage(
+                    StageKind.Running,
+                    if (canceled) s(R.string.status_canceled_writeback)
+                    else s(R.string.status_writeback)
+                )
                 withContext(Dispatchers.IO) { mirror.writeBack(media) }
             }
 
@@ -469,22 +555,29 @@ class AppState {
                 val mark = if (it.ok) "✓" else "✗"
                 "$mark ${it.main.ifBlank { it.name }}  ${it.detail}"
             } + when {
-                !writeOk -> "\n写回失败：$writeErr"
-                media.isEmpty() -> if (canceled) "\n已取消，没有需要写回的条目" else ""
-                else -> "\n已写回相机卡（${media.size} 个文件 + 索引）"
+                !writeOk -> "\n" + s(R.string.summary_writeback_failed, writeErr)
+                media.isEmpty() ->
+                    if (canceled) "\n" + s(R.string.summary_canceled_nothing) else ""
+                else -> "\n" + s(R.string.summary_written, media.size)
             }
 
-            stage = when {
-                canceled && media.isEmpty() -> "已取消"
-                canceled -> "已取消（已完成的 ${results.count { it.ok }} 条已写回卡）"
-                results.all { it.ok } && writeOk -> "全部完成"
-                else -> "部分完成（见下方明细）"
+            when {
+                canceled && media.isEmpty() ->
+                    setStage(StageKind.Canceled, s(R.string.status_canceled))
+                canceled -> setStage(
+                    StageKind.Canceled,
+                    s(R.string.status_canceled_partial, results.count { it.ok })
+                )
+                results.all { it.ok } && writeOk ->
+                    setStage(StageKind.Done, s(R.string.status_all_done))
+                else -> setStage(StageKind.Partial, s(R.string.status_partial))
             }
             if (!canceled) progress = 1f
 
             scanCard(ctx, tree)
         } catch (t: Throwable) {
-            stage = "失败：${t.message?.lineSequence()?.firstOrNull() ?: t.javaClass.simpleName}"
+            val detail = t.message?.lineSequence()?.firstOrNull() ?: t.javaClass.simpleName
+            setStage(StageKind.Failed, s(R.string.status_failed, detail), detail)
             logLine = t.message ?: t.toString()
         } finally {
             ticker?.cancel()
@@ -497,7 +590,7 @@ class AppState {
     }
 
     private fun human(bytes: Long): String = when {
-        bytes <= 0 -> "未知"
+        bytes <= 0 -> s(R.string.size_unknown)
         bytes >= 1L shl 30 -> "%.2f GB".format(bytes / 1073741824.0)
         bytes >= 1L shl 20 -> "%.1f MB".format(bytes / 1048576.0)
         bytes >= 1L shl 10 -> "%.0f KB".format(bytes / 1024.0)

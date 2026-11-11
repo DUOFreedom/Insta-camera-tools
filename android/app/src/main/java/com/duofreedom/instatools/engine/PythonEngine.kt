@@ -2,6 +2,7 @@ package com.duofreedom.instatools.engine
 
 import android.content.Context
 import com.chaquo.python.PyObject
+import com.duofreedom.instatools.R
 import com.chaquo.python.Python
 import com.chaquo.python.android.AndroidPlatform
 import org.json.JSONObject
@@ -27,6 +28,14 @@ class ImportCallback {
 }
 
 /**
+ * Python 核心自检结果。
+ *
+ * why 拆成 ok + text：界面既要按成败配色/分支，又要把说明文字展示给用户。
+ *   如果把两者混在一个字符串里，只能靠文案前缀判断成败——一翻译就失效。
+ */
+data class CoreStatus(val ok: Boolean, val text: String)
+
+/**
  * 更新检查回调接口。
  */
 interface UpdateCheckListener {
@@ -45,6 +54,16 @@ object PythonEngine {
     @Volatile private var initError: String = ""
     @Volatile var coreVersion: String = ""
 
+    /**
+     * 交给 Python 侧的语言标签（"zh" / "en"）。
+     *
+     * why 读资源配置而不是 `Locale.getDefault()`：Android 13+ 的「按应用语言」
+     *   只改 Activity 的 resources 配置，进程默认 locale 仍是系统值；用户把本
+     *   应用单独设成英文时，只有这里能拿到他实际看到的语言。
+     */
+    fun langTag(ctx: Context): String =
+        if (ctx.resources.configuration.locales[0].language == "zh") "zh" else "en"
+
     private fun requireInit(ctx: Context): Boolean {
         if (initialized) return true
         if (initError.isNotBlank()) return false
@@ -58,6 +77,10 @@ object PythonEngine {
             val cache = File(ctx.cacheDir, "python").apply { mkdirs() }
             coreVersion = bridge.callAttr("init", ffmpeg, ffprobe, cache.absolutePath)
                 ?.toString().orEmpty()
+            // Python 侧文案（进度标签/自检说明/失败原因）按这里的语言出。
+            //   进度回调 label、self_check 说明都是 Python 产出的字符串，
+            //   不跟着 Kotlin 的资源走，必须显式告诉它。
+            bridge.callAttr("set_lang", langTag(ctx))
             initialized = true
             true
         } catch (t: Throwable) {
@@ -66,17 +89,32 @@ object PythonEngine {
         }
     }
 
-    fun status(ctx: Context): String {
-        if (!requireInit(ctx)) return "Python 核心不可用：$initError"
+    fun status(ctx: Context): CoreStatus {
+        if (!requireInit(ctx)) {
+            return CoreStatus(
+                ok = false,
+                text = ctx.getString(R.string.python_core_unavailable, initError)
+            )
+        }
         // 把真实异常暴露出来：真机上只显示「不可用」没法定位
         return try {
             val bridge = Python.getInstance().getModule("android_bridge")
+            // 自检说明由 Python 拼接（含编码器名与版本号），语言要现取现传：
+            //   进程存活着的时候用户可能切过语言，init 时设的那次已经过期了。
+            bridge.callAttr("set_lang", langTag(ctx))
             val arr = bridge.callAttr("self_check")?.asList()
             val ok = arr?.getOrNull(0)?.toBoolean() ?: false
             val msg = arr?.getOrNull(1)?.toString().orEmpty()
-            if (ok) "Python 核心就绪（$msg）" else "Python 核心异常：$msg"
+            if (ok) CoreStatus(true, ctx.getString(R.string.python_core_ready, msg))
+            else CoreStatus(false, ctx.getString(R.string.python_core_error, msg))
         } catch (t: Throwable) {
-            "Python 自检失败：${t.javaClass.simpleName}: ${t.message}"
+            CoreStatus(
+                ok = false,
+                text = ctx.getString(
+                    R.string.python_self_check_failed,
+                    "${t.javaClass.simpleName}: ${t.message}"
+                )
+            )
         }
     }
 
@@ -110,7 +148,7 @@ object PythonEngine {
         templateNames: Pair<String, String>? = null
     ): JSONObject {
         if (!requireInit(ctx)) {
-            throw RuntimeException("Python 核心初始化失败：$initError")
+            throw RuntimeException(ctx.getString(R.string.python_core_init_failed, initError))
         }
         val bridge = Python.getInstance().getModule("android_bridge")
         val raw = bridge.callAttr(
@@ -123,8 +161,9 @@ object PythonEngine {
             cancel,               // cancel（threading.Event 或 None）
             // Chaquopy 把 Kotlin 数组转成 Python list；Python 侧按二元序列解包，
             //   不要求是 tuple。
-            templateNames?.let { arrayOf(it.first, it.second) }  // template_names
-        )?.toString() ?: throw RuntimeException("Python 未返回结果")
+            templateNames?.let { arrayOf(it.first, it.second) },  // template_names
+            langTag(ctx)                                         // lang
+        )?.toString() ?: throw RuntimeException(ctx.getString(R.string.python_no_result))
         return JSONObject(raw)
     }
 

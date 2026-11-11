@@ -41,9 +41,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.duofreedom.instatools.R
 import com.duofreedom.instatools.ui.theme.instatoolsTheme
 import kotlinx.coroutines.delay
 
@@ -51,7 +53,7 @@ import kotlinx.coroutines.delay
  * 导入操作卡：把「队列为空 / 未选卡 / 可开始 / 导入中 / 失败」五种数据状态
  * 收进一张卡片，外加按下反馈构成第六态。
  *
- * 与 [com.duofreedom.instaace.ui.theme.Motion] 的关系：项目主题用 Expressive
+ * 与 [com.duofreedom.instatools.ui.theme.Motion] 的关系：项目主题用 Expressive
  * 阻尼 0.8 / 刚度 380（位移）与 1.0 / 1600（效果）；本组件按设计稿要求改为
  * 0.75 / 400 与 1.0 / 500 —— 位移回弹更明显一点，效果更快收尾。差异只在本
  * 组件内，不动全局令牌。
@@ -79,18 +81,42 @@ enum class ImportCardState {
  * 抽成纯函数是为了能在没有真机/模拟器的环境下用 JUnit 覆盖五个分支 ——
  * 渲染测试跑不了，但这套优先级规则（导入中压过一切，失败只在上一条结果
  * 里读）是可以断言的。
+ *
+ * 判断依据是语言无关的 [StageKind]：文案本身会被翻译，拿它做前缀匹配
+ * 一换语言就失效。
+ */
+fun cardStateFor(
+    running: Boolean,
+    queueEmpty: Boolean,
+    noCard: Boolean,
+    kind: StageKind
+): ImportCardState = when {
+    running -> ImportCardState.Loading
+    queueEmpty -> ImportCardState.Empty
+    noCard -> ImportCardState.Disabled
+    kind == StageKind.Failed -> ImportCardState.Error
+    else -> ImportCardState.Ready
+}
+
+/**
+ * 文本前缀版本：保留给既有单元测试（ImportCardStateTest）与历史调用方。
+ * 新代码请传 [StageKind]，不要依赖会被翻译的文案。
  */
 fun cardStateFor(
     running: Boolean,
     queueEmpty: Boolean,
     noCard: Boolean,
     stage: String
-): ImportCardState = when {
-    running -> ImportCardState.Loading
-    queueEmpty -> ImportCardState.Empty
-    noCard -> ImportCardState.Disabled
-    stage.startsWith("失败") -> ImportCardState.Error
-    else -> ImportCardState.Ready
+): ImportCardState = cardStateFor(running, queueEmpty, noCard, stageKindOf(stage))
+
+/** 从历史文案前缀反推阶段分类（兼容中英文两种历史文案）。 */
+private fun stageKindOf(stage: String): StageKind = when {
+    stage.startsWith("失败") || stage.startsWith("failed", ignoreCase = true) ->
+        StageKind.Failed
+    stage.startsWith("已取消") || stage.startsWith("canceled", ignoreCase = true) ->
+        StageKind.Canceled
+    stage.isBlank() -> StageKind.Idle
+    else -> StageKind.Running
 }
 
 private object Space {
@@ -188,7 +214,7 @@ fun ImportActionCard(
                     )
                     Spacer(Modifier.size(Space.s1))
                     Text(
-                        errorText.ifBlank { "导入失败，详情见下方日志" },
+                        errorText.ifBlank { stringResource(R.string.import_failed_see_log) },
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onErrorContainer
                     )
@@ -253,7 +279,12 @@ private fun PrimaryAction(
         ) {
             Icon(Icons.Rounded.Close, contentDescription = null, modifier = Modifier.size(Space.s2))
             Spacer(Modifier.size(Space.s1))
-            Text(if (canceling) "正在取消…" else "取消导入")
+            Text(
+                stringResource(
+                    if (canceling) R.string.action_canceling
+                    else R.string.action_cancel_import
+                )
+            )
         }
     } else {
         Button(
@@ -276,12 +307,14 @@ private fun PrimaryAction(
             )
             Spacer(Modifier.size(Space.s1))
             Text(
-                when (state) {
-                    ImportCardState.Empty -> "先添加视频"
-                    ImportCardState.Disabled -> "请先选择存储卡"
-                    ImportCardState.Error -> "重新导入"
-                    else -> "开始导入"
-                }
+                stringResource(
+                    when (state) {
+                        ImportCardState.Empty -> R.string.action_add_first
+                        ImportCardState.Disabled -> R.string.need_card
+                        ImportCardState.Error -> R.string.action_retry_import
+                        else -> R.string.start_import
+                    }
+                )
             )
         }
     }

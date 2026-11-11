@@ -23,10 +23,17 @@ import threading
 import traceback
 import urllib.request
 
+import i18n
+
 _core = None
 _tf = None
 _rw = None
 _log_file = None
+
+
+def set_lang(value):
+    """Kotlin 调用：显式指定界面语言（"zh"/"en"），其它值复位为自动探测。"""
+    i18n.set_lang(value)
 
 
 def new_cancel_event():
@@ -72,7 +79,7 @@ def init(ffmpeg_path, ffprobe_path, cache_dir):
     try:
         _tf, _rw = insta_core._load_inst_modules()
     except Exception as e:
-        raise RuntimeError("inst 模块加载失败: %s: %s" % (type(e).__name__, e))
+        raise RuntimeError(i18n.t("inst 模块加载失败: %s") % ("%s: %s" % (type(e).__name__, e)))
     return "insta_core %s" % getattr(insta_core, "__version__", "?")
 
 
@@ -107,7 +114,7 @@ def _safe_log(cb, text):
 
 
 def run_import(source, card_root, callback=None, cover=None, prefer_hardware=False,
-               cancel=None, template_names=None):
+               cancel=None, template_names=None, lang=None):
     """在镜像卡目录上执行完整导入，返回 JSON 字符串。
 
     source            已暂存到本地的源视频
@@ -121,10 +128,15 @@ def run_import(source, card_root, callback=None, cover=None, prefer_hardware=Fal
                       传了就不再让核心自己猜 —— 镜像目录里上一轮的产物同样带
                       inst box，猜错的后果是相机不认且不报错。
 
+    lang              可选 "zh"/"en"：界面语言，决定进度标签与失败原因的语种。
+                      不传则沿用上次 set_lang() 的值（Kotlin 侧 init 后已设过）。
+
     返回 JSON：成功 {"ok": True, main, proxy, inst_ok, inst_error, index_error, registered}；
               取消 {"ok": False, canceled": True, error}；
               失败 {"ok": False, error, trace}。
     """
+    i18n.set_lang(lang)
+
     def log(msg):
         _safe_log(callback, msg)
 
@@ -145,7 +157,7 @@ def run_import(source, card_root, callback=None, cover=None, prefer_hardware=Fal
                 return json.dumps({
                     "ok": False,
                     "canceled": False,
-                    "error": "模板对不可用：%s / %s" % (vid_name, lrv_name),
+                    "error": i18n.t("模板对不可用：%s / %s") % (vid_name, lrv_name),
                 }, ensure_ascii=False)
             log("模板（指定）: %s" % vid_name)
         res = _core.import_with_inst(
@@ -173,14 +185,14 @@ def run_import(source, card_root, callback=None, cover=None, prefer_hardware=Fal
             return json.dumps({
                 "ok": False,
                 "canceled": True,
-                "error": "%s: %s" % (type(e).__name__, e),
+                "error": "%s: %s" % (type(e).__name__, i18n.t(str(e))),
             }, ensure_ascii=False)
         tb = traceback.format_exc()
         log("导入失败：%s: %s" % (type(e).__name__, e))
         return json.dumps({
             "ok": False,
             "canceled": False,
-            "error": "%s: %s" % (type(e).__name__, e),
+            "error": "%s: %s" % (type(e).__name__, i18n.t(str(e))),
             "trace": tb[-3000:],
         }, ensure_ascii=False)
 
@@ -201,17 +213,17 @@ def self_check():
         ff = os.environ.get("FFMPEG_PATH", "")
         fp = os.environ.get("FFPROBE_PATH", "")
         if not os.path.isfile(ff):
-            return False, "ffmpeg 不存在: %s" % ff
+            return False, i18n.t("ffmpeg 不存在: %s") % ff
         if not os.path.isfile(fp):
-            return False, "ffprobe 不存在: %s" % fp
+            return False, i18n.t("ffprobe 不存在: %s") % fp
         if _core is None:
-            return False, "核心模块未初始化"
+            return False, i18n.t("核心模块未初始化")
         ok, msg = _core.check_encoding_capability()
         if not ok:
-            return False, "%s（%s）" % (msg, getattr(_core, "__version__", "?"))
+            return False, i18n.t("%s（%s）") % (i18n.t(str(msg)), getattr(_core, "__version__", "?"))
         return True, "OK %s / %s" % (getattr(_core, "__version__", "?"), msg)
     except Exception as e:  # noqa: BLE001
-        return False, "%s: %s" % (type(e).__name__, e)
+        return False, "%s: %s" % (type(e).__name__, i18n.t(str(e)))
 
 
 # ============== 启动更新检查（与桌面端 updater.py 对齐） ==============

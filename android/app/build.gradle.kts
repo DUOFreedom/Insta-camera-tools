@@ -27,7 +27,6 @@ android {
         versionCode = 14
         versionName = "1.2.0"
         resourceConfigurations += listOf("zh", "en")
-        manifestPlaceholders["appLabel"] = "instatools"
 
         // 双 ABI：同时支持 64 位与 32 位 ARM。
         //   只带 arm64-v8a 时，32 位设备会 INSTALL_FAILED_NO_MATCHING_ABIS，

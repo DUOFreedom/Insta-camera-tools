@@ -1,6 +1,7 @@
 package com.duofreedom.instatools.engine
 
 import android.content.Context
+import com.duofreedom.instatools.R
 import java.io.File
 
 /**
@@ -22,7 +23,7 @@ object Engine {
     /** 跑一次 `-version`，返回首行；失败返回错误描述。 */
     fun versionLine(ctx: Context): String {
         val bin = ffmpeg(ctx)
-        if (!bin.exists()) return "引擎缺失：${bin.name}"
+        if (!bin.exists()) return ctx.getString(R.string.engine_missing, bin.name)
         return try {
             val p = ProcessBuilder(bin.absolutePath, "-version")
                 .redirectErrorStream(true)
@@ -30,9 +31,13 @@ object Engine {
             val out = p.inputStream.bufferedReader().readText()
             p.waitFor()
             out.lineSequence().firstOrNull { it.startsWith("ffmpeg version") }
-                ?: out.lineSequence().firstOrNull().orEmpty().ifBlank { "无输出" }
+                ?: out.lineSequence().firstOrNull().orEmpty()
+                    .ifBlank { ctx.getString(R.string.engine_no_output) }
         } catch (e: Exception) {
-            "启动失败：${e.javaClass.simpleName} ${e.message ?: ""}"
+            ctx.getString(
+                R.string.engine_start_failed,
+                "${e.javaClass.simpleName} ${e.message ?: ""}"
+            )
         }
     }
 }
