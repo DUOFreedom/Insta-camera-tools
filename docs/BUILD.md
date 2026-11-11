@@ -130,7 +130,7 @@ gradle --offline :app:testReleaseUnitTest
 |------|------|
 | `android/app/build/outputs/apk/release/app-release.apk` | 签名 APK，versionCode 14 / versionName 1.2.0，约 75.3 MB |
 
-实测产物约 75.3 MB（同一份源码不同次构建会浮动，最近一次为 75,279,539 B，原因见下）。
+实测产物约 75.3 MB（同一份源码不同次构建会浮动，最近一次为 75,311,427 B，原因见下）。
 
 **这个 APK 既不可复现哈希，也不可复现字节数。** 连编五次，字节数与 sha256 都不同。
 逐条比对两次构建，差异只有 5 个：`META-INF/CERT.RSA`、`META-INF/CERT.SF`、

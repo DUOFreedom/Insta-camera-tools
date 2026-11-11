@@ -11,7 +11,7 @@ Window {
     minimumWidth: 720
     minimumHeight: 480
     visible: !selfTest
-    title: "影石相机工具"
+    title: bridge.appName
     flags: Qt.Window | Qt.FramelessWindowHint
     color: "transparent"
 
@@ -78,21 +78,21 @@ Window {
                 return
             if (win.visible)
                 return
-            tray.notify("影石相机工具", bridge.status)
+            tray.notify(bridge.appName, bridge.status)
         }
     }
 
     FileDialog {
         id: sampleDialog
-        title: "选择原生录制视频"
-        nameFilters: ["视频文件 (*.mp4 *.mov *.lrv *.insv *.ins)"]
+        title: bridge.tr("选择原生录制视频")
+        nameFilters: [bridge.tr("视频文件 (*.mp4 *.mov *.lrv *.insv *.ins)")]
         onAccepted: bridge.setSample(bridge.localPath(selectedFile))
     }
 
     FileDialog {
         id: videoDialog
-        title: "选择视频"
-        nameFilters: ["视频文件 (*.mp4 *.mov *.mkv *.avi *.ts *.flv *.wmv *.m4v)"]
+        title: bridge.tr("选择视频")
+        nameFilters: [bridge.tr("视频文件 (*.mp4 *.mov *.mkv *.avi *.ts *.flv *.wmv *.m4v)")]
         fileMode: FileDialog.OpenFiles
         onAccepted: {
             var paths = []
@@ -104,13 +104,13 @@ Window {
 
     FolderDialog {
         id: folderDialog
-        title: "选择包含视频的文件夹"
+        title: bridge.tr("选择包含视频的文件夹")
         onAccepted: bridge.addFolder(bridge.localPath(selectedFolder))
     }
 
     FolderDialog {
         id: outputDialog
-        title: "选择输出目录"
+        title: bridge.tr("选择输出目录")
         onAccepted: {
             outputView.outputDir = bridge.localPath(selectedFolder)
             bridge.checkResume(outputView.outputDir)
@@ -119,8 +119,8 @@ Window {
 
     FileDialog {
         id: coverDialog
-        title: "选择封面图片"
-        nameFilters: ["图片 (*.png *.jpg *.jpeg *.bmp *.webp)"]
+        title: bridge.tr("选择封面图片")
+        nameFilters: [bridge.tr("图片 (*.png *.jpg *.jpeg *.bmp *.webp)")]
         onAccepted: bridge.pickCover(bridge.localPath(selectedFile))
     }
 
@@ -170,7 +170,7 @@ Window {
             TitleBar {
                 width: parent.width
                 targetWindow: win
-                title: "影石相机工具"
+                title: bridge.appName
             }
 
             ScrollView {
@@ -189,7 +189,7 @@ Window {
 
                     Text {
                         width: parent.width
-                        text: "影石相机工具"
+                        text: bridge.appName
                         color: Theme.textPrimary
                         font.family: Theme.fontDisplayFamily
                         font.pixelSize: Theme.fontDisplaySize
@@ -218,8 +218,8 @@ Window {
                             Text {
                                 width: parent.width
                                 text: bridge.ffmpegDownloading
-                                    ? "正在下载 ffmpeg… " + Math.round(bridge.ffmpegProgress * 100) + "%"
-                                    : "未找到 ffmpeg。它是转码必需组件，先选一个安装位置。"
+                                    ? bridge.tr("正在下载 ffmpeg… ") + Math.round(bridge.ffmpegProgress * 100) + "%"
+                                    : bridge.tr("未找到 ffmpeg。它是转码必需组件，先选一个安装位置。")
                                 color: Theme.textSecondary
                                 font.family: Theme.fontFamily
                                 font.pixelSize: Theme.fontBodySize
@@ -232,8 +232,8 @@ Window {
                             Text {
                                 width: parent.width
                                 visible: !bridge.ffmpegDownloading
-                                text: "装到系统目录：所有程序都能用，需要管理员权限；"
-                                      + "装到程序目录：只给本程序用，不需要任何权限。"
+                                text: bridge.tr("装到系统目录：所有程序都能用，需要管理员权限；"
+                                      + "装到程序目录：只给本程序用，不需要任何权限。")
                                 color: Theme.textSecondary
                                 font.family: Theme.fontFamily
                                 font.pixelSize: Theme.fontAuxSize
@@ -248,7 +248,7 @@ Window {
 
                                 AppButton {
                                     btnHeight: 32
-                                    text: bridge.ffmpegDownloading ? "下载中…" : "装到系统目录"
+                                    text: bridge.ffmpegDownloading ? bridge.tr("下载中…") : bridge.tr("装到系统目录")
                                     enabled: !bridge.ffmpegDownloading
                                     onClicked: bridge.installFfmpeg("global")
                                 }
@@ -256,7 +256,7 @@ Window {
                                 AppButton {
                                     btnHeight: 32
                                     accent: false
-                                    text: bridge.ffmpegDownloading ? "下载中…" : "装到程序目录"
+                                    text: bridge.ffmpegDownloading ? bridge.tr("下载中…") : bridge.tr("装到程序目录")
                                     enabled: !bridge.ffmpegDownloading
                                     onClicked: bridge.installFfmpeg("portable")
                                 }
@@ -267,8 +267,8 @@ Window {
                     CameraSampleView {
                         width: parent.width
                         status: bridge.sample !== ""
-                                ? "样本：" + bridge.sample
-                                : "未设置样本（回退到影石默认结构）"
+                                ? bridge.tr("样本：") + bridge.sample
+                                : bridge.tr("未设置样本（回退到影石默认结构）")
                         summary: bridge.specSummary
                         onPickSample: sampleDialog.open()
                         //   输出目录常就是卡根或 DCIM，先按它找，找不到再扫盘符。
@@ -292,11 +292,11 @@ Window {
                         id: outputView
                         width: parent.width
                         hardwareHint: bridge.hardwareEncoder === ""
-                            ? "正在检测硬件编码器…"
-                            : (bridge.hardwareEncoder === "未检测到"
-                                ? "未检测到可用硬件编码器，将使用软件编码"
-                                : "已检测到 " + bridge.hardwareEncoder
-                                  + "，可选它加快约 1.5～2 倍（默认仍用软件，与相机已验证的路径一致）")
+                            ? bridge.tr("正在检测硬件编码器…")
+                            : (bridge.hardwareEncoder === bridge.tr("未检测到")
+                                ? bridge.tr("未检测到可用硬件编码器，将使用软件编码")
+                                : bridge.tr("已检测到 ") + bridge.hardwareEncoder
+                                  + bridge.tr("，可选它加快约 1.5～2 倍（默认仍用软件，与相机已验证的路径一致）"))
                         sequenceHint: bridge.nextSequence
                         coverSummary: bridge.coverSummary
                         coverImage: bridge.coverImage
@@ -340,7 +340,7 @@ Window {
                             AppButton {
                                 width: 120
                                 btnHeight: 32
-                                text: bridge.resumeOnly ? "只跑未完成" : "全部重跑"
+                                text: bridge.resumeOnly ? bridge.tr("只跑未完成") : bridge.tr("全部重跑")
                                 onClicked: bridge.setResumeOnly(!bridge.resumeOnly)
                             }
                         }
@@ -376,7 +376,7 @@ Window {
 
                             AppButton {
                                 btnHeight: 32
-                                text: "清理异常条目"
+                                text: bridge.tr("清理异常条目")
                                 visible: bridge.verifyHasBad
                                 onClicked: bridge.repairCard(outputView.outputDir)
                             }
@@ -431,7 +431,7 @@ Window {
     Modal {
         id: closeModal
         anchors.fill: parent
-        title: "正在转换"
+        title: bridge.tr("正在转换")
         dismissOnBackdrop: false
 
         Column {
@@ -440,9 +440,9 @@ Window {
 
             Text {
                 width: parent.width
-                text: "当前任务尚未完成。\n\n"
+                text: bridge.tr("当前任务尚未完成。\n\n"
                     + "停止并退出：立刻中止，未完成的文件会留在输出目录，需要自行删除。\n"
-                    + "最小化到托盘：窗口隐藏，转换继续跑完，跑完会弹提示。"
+                    + "最小化到托盘：窗口隐藏，转换继续跑完，跑完会弹提示。")
                 wrapMode: Text.Wrap
                 color: Theme.textSecondary
                 font.family: Theme.fontFamily
@@ -458,7 +458,7 @@ Window {
                 layoutDirection: Qt.RightToLeft
 
                 AppButton {
-                    text: "停止并退出"
+                    text: bridge.tr("停止并退出")
                     btnHeight: 36
                     onClicked: {
                         bridge.cancel()
@@ -468,7 +468,7 @@ Window {
                             Qt.quit()
                         } else {
                             closeModal.open = false
-                            bridge.setStatusHint("后台进程尚未退出，请稍候再关闭")
+                            bridge.setStatusHint(bridge.tr("后台进程尚未退出，请稍候再关闭"))
                         }
                     }
                 }
@@ -477,7 +477,7 @@ Window {
                     //   托盘不可用（无桌面环境 / 某些 Linux）时不能给这个选项：
                     //   窗口一藏，用户既看不到窗口也找不到托盘图标，等于把
                     //   程序弄丢了。禁用并说明原因。
-                    text: tray.available ? "最小化到托盘" : "最小化到托盘（不可用）"
+                    text: tray.available ? bridge.tr("最小化到托盘") : bridge.tr("最小化到托盘（不可用）")
                     btnHeight: 36
                     accent: false
                     enabled: tray.available
@@ -485,13 +485,13 @@ Window {
                         closeModal.open = false
                         win.visible = false
                         tray.show()
-                        tray.notify("影石相机工具",
-                                    "转换在后台继续，完成后会再提示一次。")
+                        tray.notify(bridge.appName,
+                                    bridge.tr("转换在后台继续，完成后会再提示一次。"))
                     }
                 }
 
                 AppButton {
-                    text: "继续转换"
+                    text: bridge.tr("继续转换")
                     btnHeight: 36
                     accent: false
                     onClicked: closeModal.open = false
@@ -503,7 +503,7 @@ Window {
     Modal {
         id: updateModal
         anchors.fill: parent
-        title: "发现新版本"
+        title: bridge.tr("发现新版本")
         dismissOnBackdrop: false
 
         Column {
@@ -512,9 +512,10 @@ Window {
 
             Text {
                 width: parent.width
-                text: "当前版本 " + updater.currentVersion
-                    + "，最新版本 " + (updater.latestTag !== "" ? updater.latestTag
-                        : (updateDemo ? "v1.2.0" : "未知")) + "。"
+                text: bridge.tr("当前版本 %1，最新版本 %2。")
+                    .arg(updater.currentVersion)
+                    .arg(updater.latestTag !== "" ? updater.latestTag
+                        : (updateDemo ? "v1.2.0" : bridge.tr("未知")))
                 wrapMode: Text.Wrap
                 color: Theme.textSecondary
                 font.family: Theme.fontFamily
@@ -530,7 +531,7 @@ Window {
                 layoutDirection: Qt.RightToLeft
 
                 AppButton {
-                    text: "前往下载"
+                    text: bridge.tr("前往下载")
                     btnHeight: 36
                     onClicked: {
                         Qt.openUrlExternally(updater.releaseUrl)
@@ -539,14 +540,14 @@ Window {
                 }
 
                 AppButton {
-                    text: "稍后"
+                    text: bridge.tr("稍后")
                     btnHeight: 36
                     accent: false
                     onClicked: updateModal.open = false
                 }
 
                 AppButton {
-                    text: "关闭"
+                    text: bridge.tr("关闭")
                     btnHeight: 36
                     accent: false
                     onClicked: {

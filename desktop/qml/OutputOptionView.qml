@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Layouts
 import QtQuick.Window
 
 Rectangle {
@@ -6,7 +7,7 @@ Rectangle {
     property string outputDir: ""
     property bool registerIndex: true
     property bool autoSequence: true
-    property string encoder: "自动"
+    property string encoder: "auto"
     property string hardwareHint: ""
     property string sequenceHint: ""
     property string coverSummary: ""
@@ -21,9 +22,26 @@ Rectangle {
     signal encoderSelected(string value)
     signal modelOverrideSelected(string value)
 
-    readonly property var encoders: ["自动", "AMD", "NVIDIA", "Intel", "软件 (CPU)"]
+    readonly property var encoderValues: ["auto", "AMD", "NVIDIA", "Intel", "software"]
+    readonly property var encoderLabels: [bridge.tr("自动"), "AMD", "NVIDIA", "Intel",
+                                          bridge.tr("软件 (CPU)")]
+    readonly property string encoderLabel: encoderLabels[Math.max(0, encoderValues.indexOf(encoder))]
     readonly property var models: ["auto", "ace_pro_2", "go_ultra"]
-    readonly property var modelLabels: ["自动（从卡里原片量出）", "Ace Pro 2", "GO Ultra"]
+    readonly property var modelLabels: [bridge.tr("自动（从卡里原片量出）"), "Ace Pro 2", "GO Ultra"]
+
+    // 标签列宽度按实际语言量：中文「机型」两个字 32 就够，英文 "Output folder" 要 90 多。
+    // 写死 64 在英文界面会把标签挤到右边一列的文字上。
+    readonly property int labelWidth: Math.ceil(Math.max(
+        labelMetrics.advanceWidth(bridge.tr("机型")),
+        labelMetrics.advanceWidth(bridge.tr("输出目录")),
+        labelMetrics.advanceWidth(bridge.tr("编码器")),
+        labelMetrics.advanceWidth(bridge.tr("视频封面")))) + 4
+
+    FontMetrics {
+        id: labelMetrics
+        font.family: Theme.fontFamily
+        font.pixelSize: Theme.fontBodySize
+    }
 
     radius: 12
     color: Theme.card
@@ -39,7 +57,7 @@ Rectangle {
 
         Text {
             width: parent.width
-            text: "输出与选项"
+            text: bridge.tr("输出与选项")
             color: Theme.textPrimary
             font.family: Theme.fontFamily
             font.pixelSize: Theme.fontTitleSize
@@ -48,14 +66,15 @@ Rectangle {
             lineHeight: Theme.fontTitleLine
         }
 
-        Row {
+        RowLayout {
             width: parent.width
             spacing: 8
 
             Text {
-                anchors.verticalCenter: parent.verticalCenter
-                width: 64
-                text: "机型"
+                Layout.alignment: Qt.AlignVCenter
+                Layout.preferredWidth: root.labelWidth
+                Layout.maximumWidth: root.labelWidth
+                text: bridge.tr("机型")
                 color: Theme.textPrimary
                 font.family: Theme.fontFamily
                 font.pixelSize: Theme.fontBodySize
@@ -64,7 +83,7 @@ Rectangle {
 
             AppButton {
                 id: modelTrigger
-                width: 160
+                Layout.preferredWidth: Math.max(160, implicitWidth)
                 text: root.modelLabels[root.models.indexOf(root.modelOverride)]
                 btnHeight: 36
                 accent: false
@@ -72,9 +91,9 @@ Rectangle {
             }
 
             Text {
-                anchors.verticalCenter: parent.verticalCenter
-                width: parent.width - 64 - 8 - 160 - 8
-                text: "选机型后按预设参数生成；选「自动」时若有原片仍优先用原片"
+                Layout.alignment: Qt.AlignVCenter
+                Layout.fillWidth: true
+                text: bridge.tr("选机型后按预设参数生成；选「自动」时若有原片仍优先用原片")
                 color: Theme.textSecondary
                 font.family: Theme.fontFamily
                 font.pixelSize: Theme.fontAuxSize
@@ -85,14 +104,15 @@ Rectangle {
             }
         }
 
-        Row {
+        RowLayout {
             width: parent.width
             spacing: 8
 
             Text {
-                anchors.verticalCenter: parent.verticalCenter
-                width: 64
-                text: "输出目录"
+                Layout.alignment: Qt.AlignVCenter
+                Layout.preferredWidth: root.labelWidth
+                Layout.maximumWidth: root.labelWidth
+                text: bridge.tr("输出目录")
                 color: Theme.textPrimary
                 font.family: Theme.fontFamily
                 font.pixelSize: Theme.fontBodySize
@@ -100,42 +120,42 @@ Rectangle {
             }
 
             TextField {
-                width: parent.width - 64 - 8 - 64 - 8 - 96 - 16
+                Layout.fillWidth: true
                 text: root.outputDir
-                placeholder: "建议存储卡 DCIM\\Camera01"
+                placeholder: bridge.tr("建议存储卡 DCIM\\Camera01")
                 onTextChanged: root.outputDir = text
             }
 
             AppButton {
-                text: "浏览"
+                text: bridge.tr("浏览")
                 btnHeight: 36
                 accent: true
                 onClicked: root.browseOutput()
             }
 
             AppButton {
-                text: "定位 SD 卡"
+                text: bridge.tr("定位 SD 卡")
                 btnHeight: 36
                 accent: false
                 onClicked: root.locateCard()
             }
         }
 
-        Row {
+        RowLayout {
             width: parent.width
             spacing: 8
 
             AppButton {
-                text: "校验索引"
+                text: bridge.tr("校验索引")
                 btnHeight: 32
                 accent: false
                 onClicked: root.verifyCard()
             }
 
             Text {
-                anchors.verticalCenter: parent.verticalCenter
-                width: parent.width - 88 - 8
-                text: "检查卡内索引与文件是否一致。相册里有条目却打不开，通常是索引登记了坏条目。"
+                Layout.alignment: Qt.AlignVCenter
+                Layout.fillWidth: true
+                text: bridge.tr("检查卡内索引与文件是否一致。相册里有条目却打不开，通常是索引登记了坏条目。")
                 color: Theme.textSecondary
                 font.family: Theme.fontFamily
                 font.pixelSize: Theme.fontBodySize
@@ -144,31 +164,32 @@ Rectangle {
             }
         }
 
-        Row {
+        RowLayout {
             width: parent.width
             spacing: 16
 
             Switch {
-                label: "登记相机索引"
+                label: bridge.tr("登记相机索引")
                 checked: root.registerIndex
                 onToggled: root.registerIndex = checked
             }
 
             Switch {
-                label: "自动接续序号"
+                label: bridge.tr("自动接续序号")
                 checked: root.autoSequence
                 onToggled: root.autoSequence = checked
             }
         }
 
-        Row {
+        RowLayout {
             width: parent.width
             spacing: 8
 
             Text {
-                anchors.verticalCenter: parent.verticalCenter
-                width: 64
-                text: "编码器"
+                Layout.alignment: Qt.AlignVCenter
+                Layout.preferredWidth: root.labelWidth
+                Layout.maximumWidth: root.labelWidth
+                text: bridge.tr("编码器")
                 color: Theme.textPrimary
                 font.family: Theme.fontFamily
                 font.pixelSize: Theme.fontBodySize
@@ -177,16 +198,16 @@ Rectangle {
 
             AppButton {
                 id: encoderTrigger
-                width: 160
-                text: root.encoder
+                Layout.preferredWidth: Math.max(160, implicitWidth)
+                text: root.encoderLabel
                 btnHeight: 36
                 accent: false
                 onClicked: encoderPopover.open = !encoderPopover.open
             }
 
             Text {
-                anchors.verticalCenter: parent.verticalCenter
-                width: parent.width - 64 - 8 - 160 - 8
+                Layout.alignment: Qt.AlignVCenter
+                Layout.fillWidth: true
                 text: root.hardwareHint
                 color: Theme.textSecondary
                 font.family: Theme.fontFamily
@@ -211,14 +232,15 @@ Rectangle {
             elide: Text.ElideRight
         }
 
-        Row {
+        RowLayout {
             width: parent.width
             spacing: 8
 
             Text {
-                anchors.verticalCenter: parent.verticalCenter
-                width: 64
-                text: "视频封面"
+                Layout.alignment: Qt.AlignVCenter
+                Layout.preferredWidth: root.labelWidth
+                Layout.maximumWidth: root.labelWidth
+                text: bridge.tr("视频封面")
                 color: Theme.textPrimary
                 font.family: Theme.fontFamily
                 font.pixelSize: Theme.fontBodySize
@@ -226,14 +248,14 @@ Rectangle {
             }
 
             AppButton {
-                text: "选择封面图片"
+                text: bridge.tr("选择封面图片")
                 btnHeight: 36
                 accent: false
                 onClicked: root.pickCover()
             }
 
             AppButton {
-                text: "恢复自动"
+                text: bridge.tr("恢复自动")
                 btnHeight: 36
                 accent: false
                 onClicked: root.clearCovers()
@@ -242,12 +264,12 @@ Rectangle {
             Avatar {
                 size: 40
                 source: root.coverImage
-                fallback: "封"
+                fallback: bridge.tr("封")
             }
 
             Text {
-                anchors.verticalCenter: parent.verticalCenter
-                width: parent.width - 64 - 8 - 112 - 8 - 96 - 8 - 40 - 8
+                Layout.alignment: Qt.AlignVCenter
+                Layout.fillWidth: true
                 text: root.coverSummary
                 color: Theme.textSecondary
                 font.family: Theme.fontFamily
@@ -271,7 +293,7 @@ Rectangle {
         y: flipUp ? -height - 4 : encoderTrigger.height + 4
 
         Repeater {
-            model: root.encoders
+            model: root.encoderValues
 
             delegate: Item {
                 width: encoderPopover.width - 16
@@ -287,7 +309,7 @@ Rectangle {
                     anchors.left: parent.left
                     anchors.leftMargin: 8
                     anchors.verticalCenter: parent.verticalCenter
-                    text: modelData
+                    text: root.encoderLabels[index]
                     color: Theme.textPrimary
                     font.family: Theme.fontFamily
                     font.pixelSize: Theme.fontBodySize

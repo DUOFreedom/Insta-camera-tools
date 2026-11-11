@@ -167,8 +167,25 @@ Running without args prints usage and exits with code 1. Three positional args p
 |----------|---------|-------------|
 | `FFMPEG_PATH` | Auto-find | Absolute path to ffmpeg executable |
 | `FFPROBE_PATH` | Auto-find | Absolute path to ffprobe executable |
+| `INSTA_LANG` | Follow system | `zh` or `en`, overrides the UI language |
 
-Both must be existing files to be used; otherwise falls back to search order.
+The first two must be existing files to be used; otherwise falls back to search order.
+
+### UI Language
+
+Both the desktop app and the Android app follow the system UI language; there is no language switch. The product name is `instatools` in English and 影石相机工具 in Chinese.
+
+Resolution order: `INSTA_LANG` > Windows user UI language > Qt `QLocale` > English. `INSTA_LANG` exists for troubleshooting and screenshots (`set INSTA_LANG=en` before launching), not for everyday use.
+
+A missing translation falls back to the Chinese original — no crash, and no internal keys leaking into the UI. The table lives in `desktop/i18n.py` (210 entries, keyed by the Chinese text).
+
+### Camera Model Preset
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| Model preset | `Auto` | `Auto` = measure the spec from the native clip on the card; `Ace Pro 2` / `GO Ultra` = use the built-in preset |
+
+Only needed when the card has no native clip to use as a template: the spec then comes from `CAMERA_PRESETS` in `desktop/core.py` instead of the template. When a native clip is present it always wins, preset or not.
 
 ### Android Settings
 

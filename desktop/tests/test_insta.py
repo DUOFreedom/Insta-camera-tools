@@ -954,8 +954,24 @@ def test_shrink_entry_strips_extras_from_avc1(tmp_path):
 
 
 def _fn_ast(path, name):
-    """取单个顶层函数的 ast（剥掉 docstring），用于比对两份手工同步的实现。"""
+    """取单个顶层函数的 ast（剥掉 docstring），用于比对两份手工同步的实现。
+
+    安卓副本给用户可见文案包了 `i18n.t(...)`（安卓没有 bridge 那层统一出口），
+    桌面副本不包（桌面端在 `_set_status()` 出口统一查表）。比对前把 `i18n.t(x)`
+    还原成 `x`，否则「只是加了翻译」也会被当成逻辑漂移，守卫就失效了。
+    """
     import ast
+
+    class _DropTr(ast.NodeTransformer):
+        def visit_Call(self, node):
+            self.generic_visit(node)
+            f = node.func
+            if (isinstance(f, ast.Attribute) and f.attr == "t"
+                    and isinstance(f.value, ast.Name) and f.value.id == "i18n"
+                    and len(node.args) == 1 and not node.keywords):
+                return node.args[0]
+            return node
+
     with open(path, encoding="utf-8-sig") as f:
         tree = ast.parse(f.read())
     node = next(n for n in tree.body
@@ -966,6 +982,7 @@ def _fn_ast(path, name):
                 and isinstance(body[0].value, ast.Constant) \
                 and isinstance(body[0].value.value, str):
             sub.body = body[1:]
+    node = _DropTr().visit(node)
     return ast.dump(node)
 
 

@@ -44,10 +44,10 @@ Item {
 
         Repeater {
             model: [
-                { icon: "sidebar-toggle", label: "相机样本" },
-                { icon: "search", label: "导入文件" },
-                { icon: "settings", label: "输出选项" },
-                { icon: "info", label: "进度" }
+                { icon: "sidebar-toggle", label: bridge.tr("相机样本") },
+                { icon: "search", label: bridge.tr("导入文件") },
+                { icon: "settings", label: bridge.tr("输出选项") },
+                { icon: "info", label: bridge.tr("进度") }
             ]
 
             delegate: ListItem {

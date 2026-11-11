@@ -1,6 +1,8 @@
 # 影石相机工具 - v1.2.0 到当前版本的变更日志
 
 > 统计：v1.2.0 (tag `1a4eff8`) 以来共 **78 个提交**，涵盖桌面端 QML 重构、安卓端同步、GO Ultra 机型适配、ffmpeg 安装重写、代码质量提升等。
+>
+> 注：本文写于改名前，文中 `InstaAceQml.exe`、`InstaAceImporter`、`C:\Program Files\InstaAce\bin`、`com.duofreedom.instaace` 现分别为 `instatools.exe`、`instatoolsImporter`、`C:\Program Files\instatools\bin`、`com.duofreedom.instatools`。逐条改名记录见 `desktop/CHANGELOG.md`。
 
 ---
 

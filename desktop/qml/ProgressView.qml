@@ -3,8 +3,8 @@ import QtQuick
 Rectangle {
     id: root
     property real value: 0
-    property string eta: "剩余 --:--"
-    property string status: "就绪。添加视频后点击「开始转换」。"
+    property string eta: bridge.tr("剩余 --:--")
+    property string status: bridge.tr("就绪。添加视频后点击「开始转换」。")
 
     radius: 12
     color: Theme.card
@@ -20,7 +20,7 @@ Rectangle {
 
         Text {
             width: parent.width
-            text: "进度"
+            text: bridge.tr("进度")
             color: Theme.textPrimary
             font.family: Theme.fontFamily
             font.pixelSize: Theme.fontTitleSize

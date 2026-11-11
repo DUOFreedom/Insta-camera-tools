@@ -2,6 +2,58 @@
 
 ## 未发布
 
+### 新增（桌面端中英双语，跟随系统界面语言）
+
+新增 `desktop/i18n.py`：键是中文原文、值是英文译文的文案表，共 210 条。查不到的键**原样返回中文** —— 漏译时界面显示中文，既不崩也不会露出内部键名，可以增量补齐。
+
+语言判定顺序（`i18n.detect()`）：环境变量 `INSTA_LANG` > Windows 用户界面语言 > Qt 的 `QLocale` > 英文。Windows 这一级用 `GetUserDefaultUILanguage()` 而不是 `locale.getdefaultlocale()`：后者读的是进程的 C locale，中文系统上照样可能返回 `en_US`，判断不了用户实际看到的界面语言。`langid & 0x3FF == 0x04` 判中文（低 10 位是主语言 ID，0x04 是 `LANG_CHINESE`，因此简体、繁体、香港、新加坡全部落到中文）。进程内只判定一次 —— 系统界面语言不会在运行期间变化。
+
+**产品名**按用户要求区分大小写：英文界面 `instatools`（全小写，写成 `InstaTools` 就算错），中文界面「影石相机工具」。此前界面里出现的「导入器」措辞全部去掉。
+
+接线的三处：
+
+- `desktop/bridge.py` 新增 `appName` / `lang` 两个 constant Property 和 `tr(text)` 槽。`_set_status()` / `_set_error()` 在**出口**统一过一遍文案表，而不是逐个调用点去包 —— 核心层把 `log` 直接接到 `_set_status` 上，逐个改必然漏。属性与槽直接返回给 QML 的字符串（封面状态、样本摘要、序号提示、卡校验结果、硬件编码器名）逐个单独包。
+- **模板反查**是这一轮必须解决的问题：核心层先把参数套进模板再把字符串送到界面（`转换失败：源文件不存在`），到 `_set_status` 时 `%s` 早被替换，按原键必然查不到。`i18n._templates()` 把带占位符的键按 `re.split(r"%[sd]", key)` 拆成几段、用 `(.+?)` 连接、`re.DOTALL` 编译，`t()` 用 `fullmatch` 命中后按捕获组顺序替换。递归深度限制 3 层 —— 参数本身常常又是一条中文（`权限被拒`），要再查一次。
+- 23 个 QML 文件里 96 处中文字面量包成 `bridge.tr("…")`；窗口标题、页面大标题、托盘提示与通知标题改为 `bridge.appName`，`desktop/main.py` 的 `setApplicationName()` 与新增的 `setApplicationDisplayName()` 都走 `i18n.app_name()`（任务栏与 Alt+Tab 显示的是 displayName）。跨行拼接的文案合并成单键，带标点的整句（`当前版本 %1，最新版本 %2。`）也合并 —— 中文句号「。」拼在英文后面很刺眼。编码器下拉框改成「值/显示」分离（`encoderValues` + `encoderLabels`），否则翻译后的标签会被当成编码器名传给核心。
+
+### 测试（双语文案层 25 条 + 4 条守卫）
+
+`desktop/tests/test_i18n.py`：语言判定 5 条（环境变量覆盖、大小写、非法值回落系统、Windows 优先于 Qt、全链回落英文）、产品名 3 条（英文全小写、中文正确、不得出现「导入器」）、翻译 9 条（中文原样、已知译出、未知原样、空串安全、模板反查、参数逐字节保留、嵌套递归、多行整段译出、重复参数不炸）、守卫 8 条。
+
+守卫里三条是**用 AST 而不是 grep** 的：这些字符串常常是多行隐式拼接（解析时已合成一个常量），包住它们的调用也可能跨行，正则数不准。做法是先标出「在 `t()` / `_tf()` / `_set_status()` / `_set_error()` 实参位置上的」字符串常量，剩下的中文常量就是漏网的；同时反过来要求「每个进界面的字面量都必须有译文」。第四条是 QML 侧的「任何中文都必须包在 `bridge.tr()` 里」—— 一块中文一块英文比整屏中文更像半成品。
+
+回滚验证四处：删掉文案表里 `文件夹不存在` 的译文 → `test_status_and_error_message_templates_are_translated` 红；把 `self._hw = i18n.t("未检测到")` 还原成裸字符串 → `test_no_untranslated_chinese_left_in_bridge` 红；去掉 `Sidebar.qml` 里一处 `bridge.tr()` → `test_no_untranslated_chinese_left_in_qml` 红。三条都实测变红后还原。
+
+顺带修掉一个测试环境的坑：`desktop/i18n.py` 与 `android/app/src/main/python/i18n.py` 同名，而 `test_android_fallback.py` 把安卓的 python 目录插到了 `sys.path[0]`，于是同一次 pytest 会话里 `import i18n` 可能拿到安卓那份（只有几十条标签文案），桌面端的翻译断言整片报错、单独跑 test_i18n.py 又全绿。新增 `desktop/tests/conftest.py` 把桌面目录钉在 `sys.path` 最前面并清掉误加载的 `i18n`，`test_android_fallback.py` 改为 `sys.path.append()`。
+
+### 新增（安卓端中英双语资源）
+
+`android/app/src/main/res/values/strings.xml` 13 键 → 124 键（英文），新建 `values-zh/strings.xml` 124 键（中文）。选 `values-zh` 而非 `values-zh-rCN`：一份文件覆盖 zh-CN / zh-HK / zh-TW / zh-SG，繁体用户拿到简体中文仍比回落到英文可用，也免维护第二套。Manifest 两处 `android:label` 由 `${appLabel}` 改 `@string/app_name`，`build.gradle.kts` 删掉 `manifestPlaceholders["appLabel"]`。
+
+aapt2 实测：`application-label:'instatools'`、`application-label-zh:'影石相机工具'`。
+
+145 行中文字面量换成 130 处 `stringResource` / `getString`。有三处不是纯替换，因为原来的逻辑拿**中文文案前缀**做判断，一翻译必然失效：
+
+- 新增 `enum class StageKind { Idle, Running, Canceling, Canceled, Done, Partial, Failed }` 与 `AppState.stageKind` / `setStage(kind, text, error?)` / `stageError`。`stage` 只负责显示；Snackbar 分支与 `cardStateFor()` 改按 `StageKind` 走；失败卡不再从文案里 `removePrefix("失败：")` 猜错误内容。旧的 `cardStateFor(..., stage: String)` 重载保留给既有单测。
+- 编码器由 `"自动"/"硬件"` 改为稳定 code `"auto"/"hardware"`（`AppState.ENCODER_AUTO/HW`），显示走资源。
+- `PythonEngine.status()` 改返回 `CoreStatus(ok, text)`，`AppState.pythonStatus` 不再对本地化文案做 `startsWith("Python 核心就绪")`。
+
+Java 包目录 `com/duofreedom/instaace` 一并搬到 `com/duofreedom/instatools`（上一轮重命名只改了 `package` 声明，漏了 12 处 `import com.duofreedom.instaace.*`，HEAD 上其实**编不过**）。`instaace_consent.json` → `instatools_consent.json` —— 副作用是已装过的用户会重新看到一次同意页，这是改名后该有的结果。
+
+### 修复（英文界面下「输出与选项」区的排版）
+
+英文文案普遍比中文长，而这一区原本按中文宽度写死：标签列固定 64 像素（只够「机型」两个字），下拉按钮固定 160，说明文字的可用宽度靠 `parent.width - 64 - 8 - 160 - 8` 手算。换成英文后实测：`Camera model` 压在 `Automatic (measured from the card)` 上，`Output folder` 被截成 `Output fold`，`Locate the SD card` 挤出卡片右边界，`Verify index` 的说明跑出窗口。
+
+改成 `RowLayout`（`desktop/qml/OutputOptionView.qml`，新增 `import QtQuick.Layouts`）：标签列宽度由 `FontMetrics` 实测四个标签取最大值（`labelWidth` 属性），按钮按 `implicitWidth` 撑开（`Layout.preferredWidth: Math.max(160, implicitWidth)`），说明文字 `Layout.fillWidth` 并在过长时省略。手算宽度全部删掉。
+
+两种语言都真窗口核对过（`INSTA_LANG=en` / `zh`，截图确认标签列对齐、按钮不出界、省略号正常）。这类问题单元测试看不出来 —— QML 里既没有布局断言也没法在无窗口环境下量文字宽度，只能真渲染一遍。
+
+### 产物（本轮）
+
+- `desktop/dist/instatools.exe` 80,519,132 B，`INSTA_LANG=en` 与 `zh` 下 `--self-test` 均为 `QML_OK roots=1`、exit 0。
+- 安卓 release APK 75,311,427 B，`aapt2 dump badging` → `application-label:'instatools'`、`application-label-zh:'影石相机工具'`，包名 `com.duofreedom.instatools`，versionCode 14 / versionName 1.2.0。
+- 单测：`IndexTest` 7 skipped（缺真机样本）、`PythonI18nTest` 4、`ConsentLogicTest` 5、`ImportCardStateTest` 6，0 失败；桌面 `pytest` **202 passed, 3 skipped**。
+
 ### 变更（删除 PyQt5 经典界面，桌面端只剩 QML 版）
 
 `desktop/gui.py`（PyQt5 经典界面）、`desktop/instatoolsImporter.spec`、`desktop/build.bat`、`desktop/run.bat` 一并删除，`requirements.txt` 与 `requirements-dev.txt` 里的 `PyQt5>=5.15` 去掉。理由是维护两套界面的成本全落在「同一处缺陷修两遍、第二遍总忘」上 —— 本轮删掉的 `_resolve_encoder` 形参覆盖、`batch_convert` 静默推翻软件编码，都是先在经典版发现、再手工同步到 QML 侧的同类问题。合并成一套之后这类漂移不可能再发生。

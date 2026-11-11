@@ -2,7 +2,7 @@ import QtQuick
 
 Rectangle {
     id: root
-    property string status: "未设置样本（回退到影石默认结构）"
+    property string status: bridge.tr("未设置样本（回退到影石默认结构）")
     //   样本结构摘要：解析成功后摊开给用户看，否则「样本已读取」四个字
     //   分不清是真读到了还是拿到一份空结构。
     property string summary: ""
@@ -24,7 +24,7 @@ Rectangle {
 
         Text {
             width: parent.width
-            text: "相机样本 · 读取存储卡原生录制视频"
+            text: bridge.tr("相机样本 · 读取存储卡原生录制视频")
             color: Theme.textPrimary
             font.family: Theme.fontFamily
             font.pixelSize: Theme.fontTitleSize
@@ -36,7 +36,7 @@ Rectangle {
 
         Text {
             width: parent.width
-            text: "请插入存有原生录制视频的存储卡，程序将分析其编码、分辨率、帧率与音频轨结构，据此生成新文件。"
+            text: bridge.tr("请插入存有原生录制视频的存储卡，程序将分析其编码、分辨率、帧率与音频轨结构，据此生成新文件。")
             color: Theme.textSecondary
             font.family: Theme.fontFamily
             font.pixelSize: Theme.fontAuxSize
@@ -50,14 +50,14 @@ Rectangle {
             spacing: 8
 
             AppButton {
-                text: "选择原生录制视频"
+                text: bridge.tr("选择原生录制视频")
                 btnHeight: 36
                 accent: true
                 onClicked: root.pickSample()
             }
 
             AppButton {
-                text: "自动从存储卡分析"
+                text: bridge.tr("自动从存储卡分析")
                 btnHeight: 28
                 accent: false
                 onClicked: root.autoDetect()

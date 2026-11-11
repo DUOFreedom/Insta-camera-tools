@@ -3,7 +3,7 @@ import QtQuick
 Rectangle {
     id: root
     property string state: "empty"
-    property string errorText: "无法访问所选文件，请检查路径是否存在。"
+    property string errorText: bridge.tr("无法访问所选文件，请检查路径是否存在。")
     property var files: []
 
     signal addVideo()
@@ -27,7 +27,7 @@ Rectangle {
             width: parent.width
 
             Text {
-                text: "待转换视频"
+                text: bridge.tr("待转换视频")
                 color: Theme.textPrimary
                 font.family: Theme.fontFamily
                 font.pixelSize: Theme.fontTitleSize
@@ -44,7 +44,7 @@ Rectangle {
             Text {
                 anchors.verticalCenter: parent.verticalCenter
                 visible: root.files.length > 0
-                text: root.files.length + " 个"
+                text: root.files.length + bridge.tr(" 个")
                 color: Theme.textSecondary
                 font.family: Theme.fontFamily
                 font.pixelSize: Theme.fontAuxSize
@@ -150,9 +150,9 @@ Rectangle {
                 Text {
                     anchors.horizontalCenter: parent.horizontalCenter
                     horizontalAlignment: Text.AlignHCenter
-                    text: root.state === "empty" ? "暂无待转换视频"
-                        : root.state === "loading" ? "正在读取…"
-                        : "出错了"
+                    text: root.state === "empty" ? bridge.tr("暂无待转换视频")
+                        : root.state === "loading" ? bridge.tr("正在读取…")
+                        : bridge.tr("出错了")
                     color: root.state === "error" ? Theme.error : Theme.textSecondary
                     font.family: Theme.fontFamily
                     font.pixelSize: Theme.fontBodySize
@@ -179,7 +179,7 @@ Rectangle {
                 AppButton {
                     anchors.horizontalCenter: parent.horizontalCenter
                     visible: root.state !== "loading"
-                    text: root.state === "error" ? "重试" : "添加视频"
+                    text: root.state === "error" ? bridge.tr("重试") : bridge.tr("添加视频")
                     btnHeight: 28
                     accent: root.state !== "error"
                     onClicked: root.addVideo()
@@ -191,21 +191,21 @@ Rectangle {
             spacing: 8
 
             AppButton {
-                text: "添加视频"
+                text: bridge.tr("添加视频")
                 btnHeight: 36
                 accent: true
                 onClicked: root.addVideo()
             }
 
             AppButton {
-                text: "添加文件夹"
+                text: bridge.tr("添加文件夹")
                 btnHeight: 36
                 accent: false
                 onClicked: root.addFolder()
             }
 
             AppButton {
-                text: "清空"
+                text: bridge.tr("清空")
                 btnHeight: 36
                 accent: false
                 visible: root.files.length > 0

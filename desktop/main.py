@@ -8,6 +8,7 @@ from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtQuickControls2 import QQuickStyle
 from PySide6.QtWidgets import QApplication
 
+import i18n
 from bridge import Bridge
 from tray import Tray
 from updater import Updater
@@ -54,7 +55,10 @@ def main() -> int:
     #   QMenu，QMenu 是 QWidget，没有 QApplication 会直接报
     #   「QWidget: Cannot create a QWidget without QApplication」。
     app = QApplication(sys.argv)
-    app.setApplicationName("影石相机工具")
+    app.setApplicationName(i18n.app_name())
+    #   任务栏与 Alt+Tab 显示的是 displayName；不设它会退回应用名，
+    #   但显式写一遍更稳（某些 Windows 版本下应用名走的是进程名）。
+    QGuiApplication.setApplicationDisplayName(i18n.app_name())
     #   关窗由 QML 的 onClosing 决定，别让 Qt 自己把最后一个窗口关掉就退出 ——
     #   否则「最小化到托盘继续跑」那一路刚隐藏窗口，进程就结束了。
     app.setQuitOnLastWindowClosed(False)

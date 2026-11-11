@@ -20,7 +20,7 @@ ANDROID_PY = os.path.abspath(
     os.path.join(HERE, "..", "..", "android", "app", "src", "main", "python")
 )
 if ANDROID_PY not in sys.path:
-    sys.path.insert(0, ANDROID_PY)
+    sys.path.append(ANDROID_PY)
 
 import insta_core as ic  # noqa: E402
 

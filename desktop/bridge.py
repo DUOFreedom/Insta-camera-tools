@@ -4,6 +4,7 @@ import threading
 from PySide6.QtCore import Property, QObject, QUrl, Signal, Slot
 
 import core
+import i18n
 
 VIDEO_EXTS = (".mp4", ".mov", ".mkv", ".avi", ".ts", ".flv", ".wmv", ".m4v")
 #   自动找样本时比「可选输入」多认几种：真机原片是 VID_*.mp4 + LRV_*.lrv，
@@ -15,6 +16,16 @@ SAMPLE_EXTS = VIDEO_EXTS + (".lrv", ".insv", ".ins")
 def _now() -> str:
     from datetime import datetime
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _tf(fmt: str, *args) -> str:
+    """先翻译模板再套参数。
+
+    文案表里的键是带 %s/%d 的原始模板，所以必须在格式化之前查表。先套参数
+    再查表就永远查不到，英文界面会漏成中文。
+    """
+    text = i18n.t(fmt)
+    return text % args if args else text
 
 
 class Bridge(QObject):
@@ -39,9 +50,9 @@ class Bridge(QObject):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._busy = False
-        self._status = "就绪。添加视频后点击「开始转换」。"
+        self._status = i18n.t("就绪。添加视频后点击「开始转换」。")
         self._progress = 0.0
-        self._eta = "剩余 --:--"
+        self._eta = i18n.t("剩余 --:--")
         self._files: list[str] = []
         self._sample = ""
         self._spec = None
@@ -81,6 +92,22 @@ class Bridge(QObject):
     @Property(bool, notify=busyChanged)
     def busy(self) -> bool:
         return self._busy
+
+    #   产品名与界面语言都只在启动时判定一次：系统界面语言不会在程序运行期间
+    #   改变，做成可变属性只会让 QML 里出现一堆拿不到更新的绑定。
+    @Property(str, constant=True)
+    def appName(self) -> str:
+        """英文 locale 是 instatools，中文 locale 是影石相机工具。"""
+        return i18n.app_name()
+
+    @Property(str, constant=True)
+    def lang(self) -> str:
+        return i18n.lang()
+
+    @Slot(str, result=str)
+    def tr(self, text: str) -> str:
+        """QML 里的界面文案统一走这里。中文原样返回，英文查表。"""
+        return i18n.t(text)
 
     @Property(str, notify=statusChanged)
     def status(self) -> str:
@@ -152,14 +179,14 @@ class Bridge(QObject):
     def coverSummary(self) -> str:
         """给界面显示的一句话封面状态。"""
         if not self._files:
-            return "自动（源视频第 10 秒）"
+            return i18n.t("自动（源视频第 10 秒）")
         if len(self._files) > 1:
             n = sum(1 for f in self._files if os.path.normpath(f) in self._covers)
-            return "同名图自动配对（已配 %d/%d）" % (n, len(self._files))
+            return _tf("同名图自动配对（已配 %d/%d）", n, len(self._files))
         cur = self._covers.get(os.path.normpath(self._files[0]))
         if cur:
             return "%s → %s" % (os.path.basename(self._files[0]), os.path.basename(cur))
-        return "自动（源视频第 10 秒）"
+        return i18n.t("自动（源视频第 10 秒）")
 
     @Property(str, notify=verifyChanged)
     def verifyResult(self) -> str:
@@ -201,17 +228,17 @@ class Bridge(QObject):
         v = spec.get("video", {}) or {}
         lv = spec.get("lrv_video", {}) or {}
         audio = spec.get("audio_tracks", []) or []
-        lines = ["主视频: %sx%s @%s %s lvl%s" % (
-            v.get("width", "?"), v.get("height", "?"), v.get("fps", "?"),
-            v.get("codec", "?"), v.get("level", "?"))]
+        lines = [_tf("主视频: %sx%s @%s %s lvl%s",
+                     v.get("width", "?"), v.get("height", "?"), v.get("fps", "?"),
+                     v.get("codec", "?"), v.get("level", "?"))]
         if lv:
-            lines.append("预览: %sx%s @%s %s" % (
-                lv.get("width", "?"), lv.get("height", "?"),
-                lv.get("fps", "?"), lv.get("codec", "?")))
-        lines.append("色域: %s" % (
-            "full-range(PC)" if v.get("color_range") == "pc"
-            else v.get("color_range", "?")))
-        lines.append("音频 %d 轨" % len(audio))
+            lines.append(_tf("预览: %sx%s @%s %s",
+                             lv.get("width", "?"), lv.get("height", "?"),
+                             lv.get("fps", "?"), lv.get("codec", "?")))
+        lines.append(_tf("色域: %s",
+                         "full-range(PC)" if v.get("color_range") == "pc"
+                         else v.get("color_range", "?")))
+        lines.append(_tf("音频 %d 轨", len(audio)))
         return chr(10).join(lines)
 
     @Property(str, notify=seqChanged)
@@ -228,7 +255,7 @@ class Bridge(QObject):
     def setModelOverride(self, value: str) -> None:
         val = str(value or "auto")
         if val not in ("auto", "ace_pro_2", "go_ultra"):
-            self._set_error("未知机型预设: %s" % val)
+            self._set_error(i18n.t("未知机型预设: %s") % val)
             return
         if val == self._model_override:
             return
@@ -243,15 +270,17 @@ class Bridge(QObject):
     def resumeSummary(self) -> str:
         if not self._resume_remain:
             return ""
-        return "上次这个输出目录已完成 %d 条，还有 %d 条没跑完。" % (
-            self._resume_done, len(self._resume_remain))
+        return _tf("上次这个输出目录已完成 %d 条，还有 %d 条没跑完。",
+                   self._resume_done, len(self._resume_remain))
 
     def _set_status(self, text: str) -> None:
-        self._status = str(text)
+        #   统一在这里过一遍文案表：核心层把 log 直接接到 _set_status 上，
+        #   逐条改调用点容易漏，集中在出口拦截才是闭合的。
+        self._status = i18n.t(str(text))
         self.statusChanged.emit()
 
     def _set_error(self, text: str) -> None:
-        self._error = str(text)
+        self._error = i18n.t(str(text))
         self.errorChanged.emit()
 
     @Slot(QUrl, result=str)
@@ -288,7 +317,7 @@ class Bridge(QObject):
                 "ffmpeg 未就绪：%s。可以装到系统目录（需管理员权限），"
                 "也可以只装到程序目录。" % msg)
         elif self._ffmpeg_source == "system":
-            self._set_status("已使用系统已安装的 ffmpeg：%s" % msg)
+            self._set_status(i18n.t("已使用系统已安装的 ffmpeg：%s") % msg)
 
     @Slot(result=str)
     def ffmpegState(self) -> str:
@@ -349,7 +378,7 @@ class Bridge(QObject):
             self.detectHardware()
             self._set_status("ffmpeg 安装完成，可开始转换")
         else:
-            self._set_error("ffmpeg 安装失败：%s" % msg)
+            self._set_error(i18n.t("ffmpeg 安装失败：%s") % msg)
 
     @Slot()
     def clearError(self) -> None:
@@ -396,7 +425,7 @@ class Bridge(QObject):
             self._sample = ""
             self.sampleChanged.emit()
             self.specChanged.emit()
-            self._set_error("样本分析失败：%s" % exc)
+            self._set_error(i18n.t("样本分析失败：%s") % exc)
             return
 
         self._spec = spec
@@ -407,7 +436,7 @@ class Bridge(QObject):
         #   「样本已读取」会亮而结构摘要一直是空的。
         self.specChanged.emit()
         video = spec.get("video", {}) or {}
-        self._set_status("样本已读取：%sx%s @%s" % (
+        self._set_status(i18n.t("样本已读取：%sx%s @%s") % (
             video.get("width", "?"), video.get("height", "?"), video.get("fps", "?")))
 
     @Slot(str)
@@ -535,7 +564,7 @@ class Bridge(QObject):
             self._set_error("封面图片不存在")
             return
         if not image_path.lower().endswith(core.SIDECAR_IMG_EXTS):
-            self._set_error("封面只支持 %s" % " / ".join(core.SIDECAR_IMG_EXTS))
+            self._set_error(i18n.t("封面只支持 %s") % " / ".join(core.SIDECAR_IMG_EXTS))
             return
         if len(self._files) != 1:
             self._set_error(
@@ -544,7 +573,7 @@ class Bridge(QObject):
             return
         self._covers[os.path.normpath(self._files[0])] = os.path.normpath(image_path)
         self.coversChanged.emit()
-        self._set_status("封面已指定：%s → %s" % (
+        self._set_status(i18n.t("封面已指定：%s → %s") % (
             os.path.basename(self._files[0]), os.path.basename(image_path)))
 
     @Slot()
@@ -574,7 +603,7 @@ class Bridge(QObject):
             if hw and len(hw) == 3:
                 self._hw = str(hw[2])
             else:
-                self._hw = "未检测到"
+                self._hw = i18n.t("未检测到")
             self.hwChanged.emit()
 
         threading.Thread(target=run, daemon=True).start()
@@ -588,16 +617,16 @@ class Bridge(QObject):
         """
         out = (output_dir or "").strip()
         if not auto_seq:
-            text = "从 000 开始"
+            text = i18n.t("从 000 开始")
         elif out and os.path.isdir(out):
             try:
-                text = "自动续接，下一序号 %03d" % core.next_seq(out)
+                text = _tf("自动续接，下一序号 %03d", core.next_seq(out))
             except Exception:  # noqa: BLE001
-                text = "自动"
+                text = i18n.t("自动")
         elif out:
-            text = "目录不存在"
+            text = i18n.t("目录不存在")
         else:
-            text = "设置输出目录后显示下一序号"
+            text = i18n.t("设置输出目录后显示下一序号")
         if text != self._seq_text:
             self._seq_text = text
             self.seqChanged.emit()
@@ -625,7 +654,7 @@ class Bridge(QObject):
             return
         self._located = found
         self.locatedChanged.emit()
-        self._set_status("已定位到 %s" % found)
+        self._set_status(i18n.t("已定位到 %s") % found)
 
     @Slot(str)
     def verifyCard(self, card_root: str) -> None:
@@ -637,7 +666,7 @@ class Bridge(QObject):
             self._set_error("请先选择存储卡目录（DCIM 或 DCIM\\Camera01）")
             return
         self._verifying = True
-        self._verify = "正在校验索引…"
+        self._verify = i18n.t("正在校验索引…")
         self._verify_bad = 0
         self.verifyChanged.emit()
         threading.Thread(target=self._verify_worker, args=(root,), daemon=False).start()
@@ -647,19 +676,19 @@ class Bridge(QObject):
             res = core.verify_card(root)
         except Exception as exc:  # noqa: BLE001
             self._verifying = False
-            self._verify = "校验失败：%s" % exc
+            self._verify = _tf("校验失败：%s", exc)
             self._verify_bad = 0
             self.verifyChanged.emit()
             self._set_error(self._verify)
             return
         ok_list = res.get("ok") or []
         bad_list = res.get("bad") or []
-        lines = ["共 %d 条索引：正常 %d，异常 %d" % (
-            res.get("entries") or 0, len(ok_list), len(bad_list))]
+        lines = [_tf("共 %d 条索引：正常 %d，异常 %d",
+                     res.get("entries") or 0, len(ok_list), len(bad_list))]
         for path, why in bad_list[:15]:
             lines.append("  • %s — %s" % (os.path.basename(str(path)), why))
         if len(bad_list) > 15:
-            lines.append("  … 另有 %d 条" % (len(bad_list) - 15))
+            lines.append(_tf("  … 另有 %d 条", len(bad_list) - 15))
         self._verify = "\n".join(lines)
         self._verify_bad = len(bad_list)
         self._verifying = False
@@ -680,10 +709,10 @@ class Bridge(QObject):
         try:
             res = core.repair_card(root, log=self._set_status)
         except Exception as exc:  # noqa: BLE001
-            self._set_error("清理失败：%s" % exc)
+            self._set_error(i18n.t("清理失败：%s") % exc)
             return ""
-        msg = "保留 %d 条，移除 %d 条。请重新插卡让相机刷新相册。" % (
-            res.get("kept") or 0, len(res.get("removed") or []))
+        msg = _tf("保留 %d 条，移除 %d 条。请重新插卡让相机刷新相册。",
+                  res.get("kept") or 0, len(res.get("removed") or []))
         self._verify = msg
         self._verify_bad = 0
         self.verifyChanged.emit()
@@ -725,7 +754,7 @@ class Bridge(QObject):
         self.addFiles(files)
         added = len(self._files) - before
         if added:
-            self._set_status("已拖入 %d 个视频，共 %d 个" % (added, len(self._files)))
+            self._set_status(i18n.t("已拖入 %d 个视频，共 %d 个") % (added, len(self._files)))
 
     @Slot("QVariantList")
     def addFiles(self, paths) -> None:
@@ -750,7 +779,7 @@ class Bridge(QObject):
         if added:
             self.filesChanged.emit()
             self.coversChanged.emit()
-            self._set_status("已添加 %d 个视频，共 %d 个" % (added, len(self._files)))
+            self._set_status(i18n.t("已添加 %d 个视频，共 %d 个") % (added, len(self._files)))
 
     @Slot(str)
     def addFolder(self, folder: str) -> None:
@@ -762,7 +791,7 @@ class Bridge(QObject):
         try:
             names = sorted(os.listdir(folder))
         except OSError as exc:
-            self._set_error("读取文件夹失败：%s" % exc)
+            self._set_error(i18n.t("读取文件夹失败：%s") % exc)
             return
         self.addFiles([os.path.join(folder, n) for n in names if n.lower().endswith(VIDEO_EXTS)])
 
@@ -782,7 +811,7 @@ class Bridge(QObject):
                 self._covers.pop(key, None)
                 self.filesChanged.emit()
                 self.coversChanged.emit()
-                self._set_status("已移除 %s，剩余 %d 个" % (
+                self._set_status(i18n.t("已移除 %s，剩余 %d 个") % (
                     os.path.basename(f), len(self._files)))
                 return
         self._set_error("列表里没有这个文件")
@@ -823,14 +852,14 @@ class Bridge(QObject):
         try:
             os.makedirs(out, exist_ok=True)
         except OSError as exc:
-            self._set_error("无法创建输出目录：%s" % exc)
+            self._set_error(i18n.t("无法创建输出目录：%s") % exc)
             return
         if not os.access(out, os.W_OK):
-            self._set_error("输出目录不可写：%s" % out)
+            self._set_error(i18n.t("输出目录不可写：%s") % out)
             return
         ok, msg = core.ffmpeg_available()
         if not ok:
-            self._set_error("ffmpeg 不可用：%s" % msg)
+            self._set_error(i18n.t("ffmpeg 不可用：%s") % msg)
             return
 
         #   开工前体检：把「跑到最后才失败」的问题提前到 1 秒内。
@@ -860,7 +889,7 @@ class Bridge(QObject):
 
         self._busy = True
         self._progress = 0.0
-        self._eta = "剩余 --:--"
+        self._eta = i18n.t("剩余 --:--")
         self.busyChanged.emit()
         self.progressChanged.emit()
         self._cancel.clear()
@@ -919,7 +948,7 @@ class Bridge(QObject):
             try:
                 core.save_job(out, job)
             except OSError as exc:
-                self._set_status("断点续跑进度保存失败: %s" % exc)
+                self._set_status(i18n.t("断点续跑进度保存失败: %s") % exc)
 
         save_job()
         #   auto_seq=True（默认）：交给 core 扫目录自动接续下一个序号；
@@ -959,14 +988,15 @@ class Bridge(QObject):
                 if self._cancel.is_set():
                     break
                 name = os.path.basename(src)
-                self._set_status("[%d/%d] %s" % (index + 1, total, name))
+                self._set_status(i18n.t("[%d/%d] %s") % (index + 1, total, name))
                 item_cover = self._covers.get(os.path.normpath(src))
                 self._job_item(job, src)["status"] = "running"
                 save_job()
 
                 def on_progress(frac, label, speed, eta, _i=index):
                     self._progress = min(1.0, (_i + float(frac or 0)) / total)
-                    self._eta = "剩余 %s" % core.format_duration(eta) if eta and eta > 0 else "剩余 --:--"
+                    self._eta = (i18n.t("剩余 %s") % core.format_duration(eta)
+                                  if eta and eta > 0 else i18n.t("剩余 --:--"))
                     self.progressChanged.emit()
 
                 try:
@@ -981,7 +1011,7 @@ class Bridge(QObject):
                             model_override=self._model_override,
                         )
                         if not result.get("inst_ok"):
-                            raise RuntimeError(result.get("inst_error") or "inst 移植失败")
+                            raise RuntimeError(result.get("inst_error") or i18n.t("inst 移植失败"))
                     else:
                         core.convert(
                             src, out, encoder=encoder, spec=self._spec,
@@ -1003,21 +1033,21 @@ class Bridge(QObject):
                     _item = self._job_item(job, src)
                     _item["status"] = "failed"
                     _item["err"] = str(exc)
-                    self._set_status("[失败] %s：%s" % (name, exc))
+                    self._set_status(i18n.t("[失败] %s：%s") % (name, exc))
                 job["updated"] = _now()
                 save_job()
 
             if self._cancel.is_set():
-                self._set_status("已取消：成功 %d，失败 %d" % (ok_count, fail_count))
+                self._set_status(i18n.t("已取消：成功 %d，失败 %d") % (ok_count, fail_count))
             elif fail_count:
-                self._set_status("完成：成功 %d，失败 %d" % (ok_count, fail_count))
+                self._set_status(i18n.t("完成：成功 %d，失败 %d") % (ok_count, fail_count))
             else:
                 self._progress = 1.0
-                self._eta = "完成"
+                self._eta = i18n.t("完成")
                 self.progressChanged.emit()
-                self._set_status("完成：成功 %d" % ok_count)
+                self._set_status(i18n.t("完成：成功 %d") % ok_count)
         except Exception as exc:
-            self._set_error("转换异常：%s" % exc)
+            self._set_error(i18n.t("转换异常：%s") % exc)
         finally:
             try:
                 core.set_awake(False)

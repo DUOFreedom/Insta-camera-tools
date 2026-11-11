@@ -1,4 +1,4 @@
-"""系统托盘：转换中关窗时让用户选择「最小化继续跑」。
+﻿"""系统托盘：转换中关窗时让用户选择「最小化继续跑」。
 
 为什么需要它：转换一跑就是几分钟到几十分钟，用户想关窗干别的很正常。
 但直接退出会让 ffmpeg 变孤儿继续往相机卡里写，卡上留下半截 VID/LRV 且
@@ -13,6 +13,8 @@ from PySide6.QtCore import Property, QObject, Signal, Slot
 from PySide6.QtGui import QAction, QIcon
 from PySide6.QtWidgets import QMenu, QSystemTrayIcon
 
+import i18n
+
 
 class Tray(QObject):
     """托盘图标 + 右键菜单。窗口显隐由 QML 侧负责，这里只发信号。"""
@@ -24,13 +26,13 @@ class Tray(QObject):
     def __init__(self, icon_path: str = "", parent=None):
         super().__init__(parent)
         self._icon = QSystemTrayIcon(QIcon(icon_path) if icon_path else QIcon(), self)
-        self._icon.setToolTip("影石相机工具")
+        self._icon.setToolTip(i18n.app_name())
         self._menu = QMenu()
-        act_show = QAction("显示主窗口", self._menu)
+        act_show = QAction(i18n.t("显示主窗口"), self._menu)
         act_show.triggered.connect(self.showRequested.emit)
         self._menu.addAction(act_show)
         self._menu.addSeparator()
-        act_quit = QAction("退出", self._menu)
+        act_quit = QAction(i18n.t("退出"), self._menu)
         act_quit.triggered.connect(self.quitRequested.emit)
         self._menu.addAction(act_quit)
         self._icon.setContextMenu(self._menu)
