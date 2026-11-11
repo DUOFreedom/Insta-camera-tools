@@ -265,7 +265,7 @@ pip install -r requirements-dev.txt
 python -m pytest tests/ -q
 ```
 
-预期 `178 passed, 2 skipped`。跳过的两条依赖真机索引样本（`desktop/samples/`、`android/app/src/test/resources/samples/`），样本含设备标识，按约定不入库。
+预期 `202 passed, 3 skipped`。跳过的三条里两条依赖真机索引样本（`desktop/samples/`、`android/app/src/test/resources/samples/`，样本含设备标识，按约定不入库），一条需要有可用的 ffmpeg 才能构造「必然失败的转码」。
 
 改代码前请先读 [`docs/BUILD.md`](docs/BUILD.md)。两处容易踩：
 

@@ -273,7 +273,7 @@ pip install -r requirements-dev.txt
 python -m pytest tests/ -q
 ```
 
-Expected `178 passed, 2 skipped`. Skipped two depend on real device index samples (`desktop/samples/`, `android/app/src/test/resources/samples/`), samples contain device IDs, not committed by convention.
+Expected `202 passed, 3 skipped`. Two of the three skips need real device index samples (`desktop/samples/`, `android/app/src/test/resources/samples/`; samples contain device IDs, not committed by convention), the third needs a working ffmpeg to construct a transcode that must fail.
 
 Before changing code, read [`docs/BUILD.md`](docs/BUILD.md). Two common pitfalls:
 
