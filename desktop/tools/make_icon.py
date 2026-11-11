@@ -1,5 +1,5 @@
-# InstaAce Importer --- 影石 Ace Pro 2 第三方视频导入工具
-# Copyright (C) 2026  InstaAce Importer contributors
+# instatools Importer --- 影石 Ace Pro 2 第三方视频导入工具
+# Copyright (C) 2026  instatools Importer contributors
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by

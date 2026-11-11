@@ -1,4 +1,4 @@
-package com.duofreedom.instaace.ui
+package com.duofreedom.instatools.ui
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState

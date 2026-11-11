@@ -16,7 +16,7 @@
         android:requestLegacyExternalStorage="false"
         android:roundIcon="@mipmap/ic_launcher"
         android:supportsRtl="true"
-        android:theme="@style/Theme.InstaAce">
+        android:theme="@style/Theme.instatools">
 
         <activity
             android:name=".MainActivity"
@@ -24,7 +24,7 @@
             android:exported="true"
             android:label="${appLabel}"
             android:launchMode="singleTop"
-            android:theme="@style/Theme.InstaAce"
+            android:theme="@style/Theme.instatools"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

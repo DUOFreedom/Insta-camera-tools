@@ -1,4 +1,4 @@
-package com.duofreedom.instaace.ui
+package com.duofreedom.instatools.ui
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse

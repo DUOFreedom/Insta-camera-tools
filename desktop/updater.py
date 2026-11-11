@@ -82,7 +82,7 @@ class Updater(QObject):
     def _run(self) -> None:
         try:
             request = urllib.request.Request(API, headers={
-                "User-Agent": "InstaAceQml/%s" % core.__version__,
+                "User-Agent": "instatools/%s" % core.__version__,
                 "Accept": "application/vnd.github+json",
             })
             with urllib.request.urlopen(request, timeout=TIMEOUT) as response:

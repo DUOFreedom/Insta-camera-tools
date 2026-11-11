@@ -40,13 +40,13 @@
 
 ## 下载
 
-从 [**Releases**](../../releases/latest) 下载 `InstaAceQml.exe`，双击运行，无需安装。
+从 [**Releases**](../../releases/latest) 下载 `instatools.exe`，双击运行，无需安装。
 
 ```text
-InstaAceQml.exe   约 79 MB（单文件，免安装）
+instatools.exe   约 79 MB（单文件，免安装）
 ```
 
-> 校验方法：`Get-FileHash .\InstaAceQml.exe -Algorithm SHA256`
+> 校验方法：`Get-FileHash .\instatools.exe -Algorithm SHA256`
 >
 > 每个 Release 页面会公布该次产物的 SHA256。从源码自行打包得到的哈希必然不同——PyInstaller 会把构建时间写进产物，同样的代码每次构建结果都不一致。
 
@@ -83,7 +83,7 @@ InstaAceQml.exe   约 79 MB（单文件，免安装）
 - 💤 **防休眠** — 处理长片时系统不会中途睡过去
 - ⚡ **硬件加速** — 自动探测并优先使用 QSV / NVENC / AMF，不可用时回落到软件编码
 - 🧪 **离线回归** — 31 项测试，不需要真机也能跑
-- 🪵 **运行日志** — 写入 `%LOCALAPPDATA%\InstaAceImporter\`，出问题可回溯
+- 🪵 **运行日志** — 写入 `%LOCALAPPDATA%\instatoolsImporter\`，出问题可回溯
 
 </td></tr>
 </table>
@@ -165,10 +165,10 @@ cd Insta-camera-tools\desktop
 pip install -r requirements.txt
 
 python main.py
-python -m PyInstaller --noconfirm InstaAceQml.spec
+python -m PyInstaller --noconfirm instatools.spec
 ```
 
-打包产物是 `dist\InstaAceQml.exe`。
+打包产物是 `dist\instatools.exe`。
 
 **环境要求：** Windows 10 / 11，Python 3.10 及以上，ffmpeg 与 ffprobe 在 PATH 中或放在 `bin\`。
 
@@ -187,7 +187,7 @@ Insta-camera-tools\
 │  ├─ tests\test_insta.py         离线回归测试套件
 │  ├─ tools\make_icon.py          SVG 转多尺寸 ICO 生成器
 │  ├─ build_qml.bat / run_qml.bat 一键构建 / 一键运行
-│  ├─ InstaAceQml.spec            PyInstaller 配置（onefile）
+│  ├─ instatools.spec            PyInstaller 配置（onefile）
 │  ├─ requirements.txt            运行时依赖
 │  ├─ requirements-dev.txt        开发与测试依赖
 │  ├─ CHANGELOG.md                版本变更记录

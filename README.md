@@ -2,7 +2,7 @@
   <img src="desktop/assets/app.svg" width="112" alt="影石相机工具">
 </p>
 
-<h1 align="center">InstaAce</h1>
+<h1 align="center">instatools</h1>
 
 <p align="center">
 把普通视频转成影石相机相册认得的原生格式：产出 VID + LRV 成对文件、移植相机私有的 <code>inst</code> box、登记 DCIM 索引。
@@ -36,7 +36,7 @@ pip install -r requirements.txt
 
 `requirements.txt` 只装 `PySide6>=6.5`。要求 Python 3.10+。
 
-桌面端入口 `desktop/run_qml.bat`（`pythonw main.py`），打包脚本 `desktop/build_qml.bat` → `desktop/dist/InstaAceQml.exe`（单文件，约 79 MB）。
+桌面端入口 `desktop/run_qml.bat`（`pythonw main.py`），打包脚本 `desktop/build_qml.bat` → `desktop/dist/instatools.exe`（单文件，约 79 MB）。
 
 <details>
 <summary>桌面端功能对照</summary>
@@ -80,11 +80,11 @@ gradle --offline :app:assembleRelease
 |---|---|
 | 1 | 环境变量 `FFMPEG_PATH` / `FFPROBE_PATH` |
 | 2 | 注册表 `App Paths\ffmpeg.exe`（安装器登记的位置，HKLM 优先于 HKCU） |
-| 3 | `C:\Program Files\InstaAce\bin`（本程序「装到系统目录」的目标） |
+| 3 | `C:\Program Files\instatools\bin`（本程序「装到系统目录」的目标） |
 | 4 | `C:\Program Files\ffmpeg\bin`、`C:\Program Files (x86)\ffmpeg\bin`、`C:\ffmpeg\bin`、`%ProgramData%\chocolatey\bin`、`~\scoop\shims`、`%LOCALAPPDATA%\Microsoft\WinGet\Links` |
 | 5 | 系统 `PATH`（`shutil.which`） |
 | 6 | exe 所在目录及其 `bin\` 子目录 |
-| 7 | `%LOCALAPPDATA%\InstaAceImporter\bin`、`~\InstaAceImporter\bin` |
+| 7 | `%LOCALAPPDATA%\instatoolsImporter\bin`、`~\instatoolsImporter\bin` |
 
 实现见 `desktop/core.py:161` 的 `_system_tool_dirs()`、`desktop/core.py:146` 的 `_portable_tool_dirs()` 与 `desktop/core.py:179` 的 `_registry_ffmpeg()`。找到后还会实跑一次 `ffmpeg -version` 确认可用。
 
@@ -92,8 +92,8 @@ gradle --offline :app:assembleRelease
 
 | 按钮 | 装到哪 | 需要什么 |
 |---|---|---|
-| 装到系统目录 | `C:\Program Files\InstaAce\bin`，所有程序都能用，并登记到注册表 `App Paths` | 管理员权限（弹 UAC） |
-| 装到程序目录 | exe 同目录下的 `bin\`，程序目录不可写时退回 `%LOCALAPPDATA%\InstaAceImporter\bin` | 不需要任何权限 |
+| 装到系统目录 | `C:\Program Files\instatools\bin`，所有程序都能用，并登记到注册表 `App Paths` | 管理员权限（弹 UAC） |
+| 装到程序目录 | exe 同目录下的 `bin\`，程序目录不可写时退回 `%LOCALAPPDATA%\instatoolsImporter\bin` | 不需要任何权限 |
 
 两个按钮都是**先下载到临时目录、再落盘**：用户拒绝 UAC 时只损失几秒，不用重下 200 MB。装完会自动重探硬件编码器，否则横幅消失了「未检测到硬件编码器」也不会更新。
 
@@ -139,7 +139,7 @@ python desktop/core.py D:/clips D:/card/DCIM/Camera01
 
 ### 图形界面
 
-1. 双击 `desktop/dist/InstaAceQml.exe`，或在 `desktop/` 下运行 `run_qml.bat`。
+1. 双击 `desktop/dist/instatools.exe`，或在 `desktop/` 下运行 `run_qml.bat`。
 2. 输出目录选到卡上的 `DCIM\Camera01`。
 3. 样本选卡里任意一段相机原生录制的 `VID_*.mp4`，或点「自动从存储卡分析」让它自己找。
 4. 添加视频，点「开始转换」。

@@ -1,5 +1,5 @@
 """
-InstaAce Importer —— 影石 Ace Pro 2 第三方视频导入核心转换逻辑（独立实现）。
+instatools Importer —— 影石 Ace Pro 2 第三方视频导入核心转换逻辑（独立实现）。
 
 原理:
     影石 Ace Pro 2 相册只认"自己录的样子"。本模块把普通视频重新编码/重封装为
@@ -181,9 +181,9 @@ class CardError(RuntimeError):
 
 
 def log_path() -> str:
-    """本次导入的日志文件路径（%LOCALAPPDATA%\\InstaAceImporter\\import.log）。"""
+    """本次导入的日志文件路径（%LOCALAPPDATA%\\instatoolsImporter\\import.log）。"""
     base = os.environ.get("LOCALAPPDATA") or os.path.expanduser("~")
-    d = os.path.join(base, "InstaAceImporter")
+    d = os.path.join(base, "instatoolsImporter")
     try:
         os.makedirs(d, exist_ok=True)
     except OSError:
@@ -210,8 +210,8 @@ def _tool_dirs() -> list[str]:
     dirs = [base, os.path.join(base, "bin")]
     local = os.environ.get("LOCALAPPDATA")
     if local:
-        dirs.append(os.path.join(local, "InstaAceImporter", "bin"))
-    dirs.append(os.path.join(os.path.expanduser("~"), "InstaAceImporter", "bin"))
+        dirs.append(os.path.join(local, "instatoolsImporter", "bin"))
+    dirs.append(os.path.join(os.path.expanduser("~"), "instatoolsImporter", "bin"))
     # 常见第三方安装位置（用户机器上已存在 ffmpeg 时省去重新下载）
     for c in (r"C:\ffmpeg\bin", r"C:\Program Files\ffmpeg\bin",
               r"C:\Program Files (x86)\ffmpeg\bin",
@@ -224,7 +224,7 @@ def _find_tool(name: str, env_key: str) -> str | None:
     """按优先级定位 ffmpeg / ffprobe:
     1) 环境变量 FFMPEG_PATH / FFPROBE_PATH
     2) 本脚本(或打包后的 exe)同目录 / bin 子目录
-    3) 用户目录下的 InstaAceImporter\\bin
+    3) 用户目录下的 instatoolsImporter\\bin
     4) 常见第三方安装位置 (C:\\ffmpeg\\bin 等)
     5) 系统 PATH
     """
@@ -271,7 +271,7 @@ def ffmpeg_install_dir() -> str:
         return base
     except OSError:
         local = os.environ.get("LOCALAPPDATA") or os.path.expanduser("~")
-        d = os.path.join(local, "InstaAceImporter", "bin")
+        d = os.path.join(local, "instatoolsImporter", "bin")
         os.makedirs(d, exist_ok=True)
         return d
 
@@ -2378,7 +2378,7 @@ def preflight(dest: str, sources, do_index: bool = True) -> dict:
 
 def _jobs_dir() -> str:
     base = os.environ.get("LOCALAPPDATA") or os.path.expanduser("~")
-    d = os.path.join(base, "InstaAceImporter", "jobs")
+    d = os.path.join(base, "instatoolsImporter", "jobs")
     os.makedirs(d, exist_ok=True)
     return d
 

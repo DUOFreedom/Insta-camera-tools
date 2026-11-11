@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="desktop/assets/app.svg" width="112" alt="InstaAce">
+  <img src="desktop/assets/app.svg" width="112" alt="instatools">
 </p>
 
-<h1 align="center">InstaAce</h1>
+<h1 align="center">instatools</h1>
 
 <p align="center">
 Convert ordinary videos into native formats recognized by Insta360 camera albums: produce paired VID + LRV files, transplant the camera's proprietary <code>inst</code> box, and register DCIM index.
@@ -36,7 +36,7 @@ pip install -r requirements.txt
 
 `requirements.txt` only installs `PySide6>=6.5`. Requires Python 3.10+.
 
-Desktop entry: `desktop/run_qml.bat` (`pythonw main.py`), build script: `desktop/build_qml.bat` → `desktop/dist/InstaAceQml.exe` (single file, ~79 MB).
+Desktop entry: `desktop/run_qml.bat` (`pythonw main.py`), build script: `desktop/build_qml.bat` → `desktop/dist/instatools.exe` (single file, ~79 MB).
 
 <details>
 <summary>Desktop Feature Matrix</summary>
@@ -80,11 +80,11 @@ Desktop needs ffmpeg **with libx264 + libx265**. The program searches in this or
 |-------|----------|
 | 1 | Env vars `FFMPEG_PATH` / `FFPROBE_PATH` |
 | 2 | Registry `App Paths\ffmpeg.exe` (installer-registered, HKLM before HKCU) |
-| 3 | `C:\Program Files\InstaAce\bin` (program's "install to system" target) |
+| 3 | `C:\Program Files\instatools\bin` (program's "install to system" target) |
 | 4 | `C:\Program Files\ffmpeg\bin`, `C:\Program Files (x86)\ffmpeg\bin`, `C:\ffmpeg\bin`, `%ProgramData%\chocolatey\bin`, `~\scoop\shims`, `%LOCALAPPDATA%\Microsoft\WinGet\Links` |
 | 5 | System `PATH` (`shutil.which`) |
 | 6 | exe directory and its `bin\` subdirectory |
-| 7 | `%LOCALAPPDATA%\InstaAceImporter\bin`, `~\InstaAceImporter\bin` |
+| 7 | `%LOCALAPPDATA%\instatoolsImporter\bin`, `~\instatoolsImporter\bin` |
 
 Implementation: `desktop/core.py:161` `_system_tool_dirs()`, `desktop/core.py:146` `_portable_tool_dirs()`, `desktop/core.py:179` `_registry_ffmpeg()`. After finding, runs `ffmpeg -version` to verify.
 
@@ -92,8 +92,8 @@ If none found, UI shows an orange banner with two buttons:
 
 | Button | Installs to | Requires |
 |--------|-------------|----------|
-| Install to system | `C:\Program Files\InstaAce\bin`, available to all apps, registers in Registry `App Paths` | Admin rights (UAC prompt) |
-| Install to program dir | `bin\` next to exe, falls back to `%LOCALAPPDATA%\InstaAceImporter\bin` if unwritable | No permissions needed |
+| Install to system | `C:\Program Files\instatools\bin`, available to all apps, registers in Registry `App Paths` | Admin rights (UAC prompt) |
+| Install to program dir | `bin\` next to exe, falls back to `%LOCALAPPDATA%\instatoolsImporter\bin` if unwritable | No permissions needed |
 
 Both buttons **download to temp first, then install**: if user cancels UAC, only a few seconds lost, no re-download of 200 MB. After install, hardware encoder detection re-runs automatically, so the "no hardware encoder" banner disappears.
 
@@ -141,7 +141,7 @@ Ends with `Succeeded N, failed M.`, failures listed with reasons.
 
 ### GUI
 
-1. Double-click `desktop/dist/InstaAceQml.exe`, or run `run_qml.bat` in `desktop/`.
+1. Double-click `desktop/dist/instatools.exe`, or run `run_qml.bat` in `desktop/`.
 2. Set output directory to card's `DCIM\Camera01`.
 3. Pick any camera-native `VID_*.mp4` on the card as sample, or click "Auto detect from SD card" to let it find one.
 4. Add videos, click "Start Convert".

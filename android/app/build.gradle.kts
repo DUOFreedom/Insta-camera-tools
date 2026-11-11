@@ -17,17 +17,17 @@ repositories {
 }
 
 android {
-    namespace = "com.duofreedom.instaace"
+    namespace = "com.duofreedom.instatools"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.duofreedom.instaace"
+        applicationId = "com.duofreedom.instatools"
         minSdk = 26
         targetSdk = 35
         versionCode = 14
         versionName = "1.2.0"
         resourceConfigurations += listOf("zh", "en")
-        manifestPlaceholders["appLabel"] = "影石相机工具"
+        manifestPlaceholders["appLabel"] = "instatools"
 
         // 双 ABI：同时支持 64 位与 32 位 ARM。
         //   只带 arm64-v8a 时，32 位设备会 INSTALL_FAILED_NO_MATCHING_ABIS，

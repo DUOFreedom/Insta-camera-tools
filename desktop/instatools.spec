@@ -50,7 +50,7 @@ exe = EXE(
     a.datas,
     [],
     exclude_binaries=False,
-    name='InstaAceQml',
+    name='instatools',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

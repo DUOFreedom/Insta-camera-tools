@@ -120,9 +120,9 @@ class CardError(RuntimeError):
     """相机卡结构或索引操作失败，不可重试。"""
 
 def log_path() -> str:
-    """本次导入的日志文件路径（%LOCALAPPDATA%\\InstaAceImporter\\import.log）。"""
+    """本次导入的日志文件路径（%LOCALAPPDATA%\\instatoolsImporter\\import.log）。"""
     base = os.environ.get("LOCALAPPDATA") or os.path.expanduser("~")
-    d = os.path.join(base, "InstaAceImporter")
+    d = os.path.join(base, "instatoolsImporter")
     try:
         os.makedirs(d, exist_ok=True)
     except OSError:
@@ -149,14 +149,14 @@ def _portable_tool_dirs() -> list[str]:
     dirs = [os.path.join(base, "bin"), base]
     local = os.environ.get("LOCALAPPDATA")
     if local:
-        dirs.append(os.path.join(local, "InstaAceImporter", "bin"))
-    dirs.append(os.path.join(os.path.expanduser("~"), "InstaAceImporter", "bin"))
+        dirs.append(os.path.join(local, "instatoolsImporter", "bin"))
+    dirs.append(os.path.join(os.path.expanduser("~"), "instatoolsImporter", "bin"))
     return dirs
 
 def global_install_dir() -> str:
     """系统级安装目录。往这里写需要管理员权限。"""
     base = os.environ.get("ProgramFiles") or r"C:\Program Files"
-    return os.path.join(base, "InstaAce", "bin")
+    return os.path.join(base, "instatools", "bin")
 
 def _system_tool_dirs() -> list[str]:
     """用户自己装过的 ffmpeg，以及本工具申请管理员权限装的那一份。"""
@@ -199,7 +199,7 @@ def _find_tool(name: str, env_key: str) -> str | None:
     """按优先级定位 ffmpeg / ffprobe:
     1) 环境变量 FFMPEG_PATH / FFPROBE_PATH（显式指定最优先）
     2) 系统全局安装：注册表 App Paths → 常见安装目录 → 系统 PATH
-    3) 程序运行目录及其 bin 子目录 → 用户目录下的 InstaAceImporter\\bin
+    3) 程序运行目录及其 bin 子目录 → 用户目录下的 instatoolsImporter\\bin
 
     先全局后本地：用户机器上已经装了 ffmpeg 就别再下一份 200 MB 的东西
     塞在程序旁边；只有系统里确实没有，才用程序目录里那一份。
@@ -273,7 +273,7 @@ def ffmpeg_install_dir() -> str:
         return base
     except OSError:
         local = os.environ.get("LOCALAPPDATA") or os.path.expanduser("~")
-        d = os.path.join(local, "InstaAceImporter", "bin")
+        d = os.path.join(local, "instatoolsImporter", "bin")
         os.makedirs(d, exist_ok=True)
         return d
 
@@ -355,7 +355,7 @@ def _download_one(url: str, zip_path: str, progress_cb=None) -> None:
 
 def _staging_dir() -> str:
     """下载中转目录。放在用户临时目录下，不需要任何权限。"""
-    d = os.path.join(tempfile.gettempdir(), "InstaAceFfmpeg")
+    d = os.path.join(tempfile.gettempdir(), "instatoolsFfmpeg")
     os.makedirs(d, exist_ok=True)
     return d
 
@@ -2378,7 +2378,7 @@ def preflight(dest: str, sources, do_index: bool = True,
 
 def _jobs_dir() -> str:
     base = os.environ.get("LOCALAPPDATA") or os.path.expanduser("~")
-    d = os.path.join(base, "InstaAceImporter", "jobs")
+    d = os.path.join(base, "instatoolsImporter", "jobs")
     os.makedirs(d, exist_ok=True)
     return d
 

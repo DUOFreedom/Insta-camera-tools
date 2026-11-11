@@ -27,7 +27,7 @@ def _touch(path):
 @pytest.fixture
 def two_dirs(tmp_path, monkeypatch):
     """一个「系统目录」一个「程序目录」，两边都有 ffmpeg.exe。"""
-    system = tmp_path / "ProgramFiles" / "InstaAce" / "bin"
+    system = tmp_path / "ProgramFiles" / "instatools" / "bin"
     portable = tmp_path / "app" / "bin"
     for d in (system, portable):
         _touch(str(d / "ffmpeg.exe"))
@@ -87,7 +87,7 @@ def test_global_install_asks_for_uac_when_not_admin(tmp_path, monkeypatch):
     src = tmp_path / "staging"
     _touch(str(src / "ffmpeg.exe"))
     _touch(str(src / "ffprobe.exe"))
-    dest = tmp_path / "ProgramFiles" / "InstaAce" / "bin"
+    dest = tmp_path / "ProgramFiles" / "instatools" / "bin"
     monkeypatch.setattr(core, "global_install_dir", lambda: str(dest))
     monkeypatch.setattr(core, "_is_admin", lambda: False)
     monkeypatch.setattr(core, "_staging_dir", lambda: str(tmp_path / "stage"))
@@ -112,7 +112,7 @@ def test_global_install_does_not_elevate_when_already_admin(tmp_path, monkeypatc
     src = tmp_path / "staging"
     _touch(str(src / "ffmpeg.exe"))
     _touch(str(src / "ffprobe.exe"))
-    dest = tmp_path / "ProgramFiles" / "InstaAce" / "bin"
+    dest = tmp_path / "ProgramFiles" / "instatools" / "bin"
     monkeypatch.setattr(core, "global_install_dir", lambda: str(dest))
     monkeypatch.setattr(core, "_is_admin", lambda: True)
     called = []

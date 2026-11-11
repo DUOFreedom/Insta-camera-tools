@@ -1,4 +1,4 @@
-package com.duofreedom.instaace.ui
+package com.duofreedom.instatools.ui
 
 import android.content.Context
 import android.net.Uri

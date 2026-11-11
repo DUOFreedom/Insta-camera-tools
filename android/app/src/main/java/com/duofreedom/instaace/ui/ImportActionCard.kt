@@ -1,4 +1,4 @@
-package com.duofreedom.instaace.ui
+package com.duofreedom.instatools.ui
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
@@ -44,7 +44,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.duofreedom.instaace.ui.theme.InstaAceTheme
+import com.duofreedom.instatools.ui.theme.instatoolsTheme
 import kotlinx.coroutines.delay
 
 /**
@@ -326,7 +326,7 @@ private fun StaggeredIn(
 @Preview(name = "空状态", showBackground = true)
 @Composable
 private fun PreviewEmpty() {
-    InstaAceTheme {
+    instatoolsTheme {
         ImportActionCard(
             state = ImportCardState.Empty,
             stage = "", progress = 0f, logLine = "", errorText = "", canceling = false,
@@ -338,7 +338,7 @@ private fun PreviewEmpty() {
 @Preview(name = "未选卡", showBackground = true)
 @Composable
 private fun PreviewDisabled() {
-    InstaAceTheme {
+    instatoolsTheme {
         ImportActionCard(
             state = ImportCardState.Disabled,
             stage = "", progress = 0f, logLine = "", errorText = "", canceling = false,
@@ -350,7 +350,7 @@ private fun PreviewDisabled() {
 @Preview(name = "可开始", showBackground = true)
 @Composable
 private fun PreviewReady() {
-    InstaAceTheme {
+    instatoolsTheme {
         ImportActionCard(
             state = ImportCardState.Ready,
             stage = "", progress = 0f, logLine = "", errorText = "", canceling = false,
@@ -362,7 +362,7 @@ private fun PreviewReady() {
 @Preview(name = "导入中", showBackground = true)
 @Composable
 private fun PreviewLoading() {
-    InstaAceTheme {
+    instatoolsTheme {
         ImportActionCard(
             state = ImportCardState.Loading,
             stage = "第 2/3 条 · 编码 VID",
@@ -378,7 +378,7 @@ private fun PreviewLoading() {
 @Preview(name = "失败", showBackground = true)
 @Composable
 private fun PreviewError() {
-    InstaAceTheme {
+    instatoolsTheme {
         ImportActionCard(
             state = ImportCardState.Error,
             stage = "",
@@ -394,7 +394,7 @@ private fun PreviewError() {
 @Preview(name = "深色 · 导入中", showBackground = true)
 @Composable
 private fun PreviewLoadingDark() {
-    InstaAceTheme(darkTheme = true) {
+    instatoolsTheme(darkTheme = true) {
         ImportActionCard(
             state = ImportCardState.Loading,
             stage = "第 1/2 条 · 移植 inst box",

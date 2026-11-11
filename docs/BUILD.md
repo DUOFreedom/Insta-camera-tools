@@ -24,15 +24,15 @@ cd desktop
 build_qml.bat
 ```
 
-脚本只是 `python -m PyInstaller --noconfirm InstaAceQml.spec` 的薄封装，
+脚本只是 `python -m PyInstaller --noconfirm instatools.spec` 的薄封装，
 真正的打包参数在 spec 文件里（避免命令行漏掉 `--add-data`）。
-脚本会先检查 PyInstaller 与 PySide6 是否可导入，再调用 `InstaAceQml.spec`。
+脚本会先检查 PyInstaller 与 PySide6 是否可导入，再调用 `instatools.spec`。
 
 ### 产物
 
 | 文件 | 说明 |
 |------|------|
-| `desktop/dist/InstaAceQml.exe` | PySide6，单文件（约 79 MB） |
+| `desktop/dist/instatools.exe` | PySide6，单文件（约 79 MB） |
 
 > QML 版为 onefile 单文件：首次启动需把约 79 MB 内容解压到 `%TEMP%`，
 > 冷启动约 2-5 秒，之后由系统缓存加速。若更在意启动速度，可把 spec 末尾改回
@@ -171,7 +171,7 @@ ndk {
 
 - 必须保持 `jniLibs { useLegacyPackaging = true }`，否则文件会被压缩，无法执行。
 - 该目录被 `.gitignore` 排除（约 92 MB）。重建方式见
-  `InstaAceAndroid` 导出包里的 `BUILD_NOTES.md`（含 9 条交叉编译踩坑记录）。
+  `instatoolsAndroid` 导出包里的 `BUILD_NOTES.md`（含 9 条交叉编译踩坑记录）。
 - 若只改 Python 逻辑、不动编码参数，不需要重建这两个二进制。
 
 ## 三、共享库说明

@@ -6,7 +6,7 @@
 
 > **阅读提示**：本文档记录的是 2026-11-08 那次整改的当时状态。其中提到的
 > `desktop/gui.py`（PyQt5 经典界面）、`desktop/build.bat`、`desktop/run.bat`、
-> `desktop/InstaAceImporter.spec` 与 `dist/InstaAceImporter.exe` 已在后续版本删除，
+> `desktop/instatoolsImporter.spec` 与 `dist/instatoolsImporter.exe` 已在后续版本删除，
 > 现在桌面端只有 QML 版（PySide6，`desktop/main.py` + `desktop/qml/`）。
 > 保留原文是为了让后来者能对照当时的判断依据。
 
@@ -19,7 +19,7 @@
 | 全量语法检查 | 17 个 `.py` 全部通过 `py_compile`，失败 0 |
 | 桌面端回归测试 | **34 passed, 2 skipped**（原 31 passed，本轮新增 3 条 AMBA 测试） |
 | AMBA 字段偏移探针 | 通过：偏移 29 = 1001（帧率分母未被覆写）、84 = 5624、91 = 1406 |
-| 打包产物 | `dist/InstaAceImporter.exe`，40,817,330 B |
+| 打包产物 | `dist/instatoolsImporter.exe`，40,817,330 B |
 | 产物 SHA256 | `2562DD7423571E89A7C05C4605AC998510A75D1131AF76EB4C53A09829858F49` |
 | 产物序列号扫描 | 命中 **0** |
 | 源码序列号扫描 | 命中 **0** |
@@ -100,7 +100,7 @@ python -m pytest desktop\tests -q
 
 - 新增：`desktop/build_qml.bat`、`desktop/run_qml.bat`
 - 问题：原 `build.bat` / `run.bat` 只覆盖 PyQt5 版，QML 版只能手敲 PyInstaller 命令。
-- 修复：两个脚本分别做 PySide6 存在性检查后调 `InstaAceQml.spec` / `pythonw main.py`。
+- 修复：两个脚本分别做 PySide6 存在性检查后调 `instatools.spec` / `pythonw main.py`。
 
 **8. AndroidManifest 缺 `INTERNET` 权限**
 
@@ -134,7 +134,7 @@ python -m pytest desktop\tests -q
 
 **12. QML 版打包产物没有图标**
 
-- 位置：`desktop/InstaAceQml.spec:57`
+- 位置：`desktop/instatools.spec:57`
 - 修复：补 `icon=['assets/app.ico']`。
 
 **13. 相机卡判断静默降级**
@@ -196,8 +196,8 @@ export GRADLE_USER_HOME=/d/android-build/.gradle
 
 ### 补充 2：QML 版已实际打包（原未修项 2）
 
-PySide6 环境就绪，`python -m PyInstaller --noconfirm InstaAceQml.spec` 成功。
-产物 `desktop/dist/InstaAceQml.exe`，约 79 MB（onefile），`--self-test` 输出
+PySide6 环境就绪，`python -m PyInstaller --noconfirm instatools.spec` 成功。
+产物 `desktop/dist/instatools.exe`，约 79 MB（onefile），`--self-test` 输出
 `QML_OK roots=1`、退出码 0。
 
 ### 补充 3：第三方产品名引用已清零
@@ -275,10 +275,10 @@ instaace-fusion/
 │   ├── tests/test_insta.py     （34 passed）
 │   ├── tools/make_icon.py
 │   ├── build.bat  run.bat  build_qml.bat  run_qml.bat
-│   ├── InstaAceImporter.spec  InstaAceQml.spec
+│   ├── instatoolsImporter.spec  instatools.spec
 │   ├── requirements.txt  requirements-dev.txt
 │   ├── CHANGELOG.md  LICENSE
-│   └── dist/InstaAceImporter.exe   ← 本轮构建的修复版产物
+│   └── dist/instatoolsImporter.exe   ← 本轮构建的修复版产物
 └── android/
     ├── app/src/main/python/     （5 个 .py，已修）
     ├── app/src/main/java/       （Kotlin，未改）
@@ -293,7 +293,7 @@ instaace-fusion/
 
 ## 六、与旧交付快照的关系
 
-2026-10-27 的旧交付快照是扁平结构 + 旧版 `InstaAceImporter.exe`，**不包含本轮任何修复**，
+2026-10-27 的旧交付快照是扁平结构 + 旧版 `instatoolsImporter.exe`，**不包含本轮任何修复**，
 其 exe 仍带 AMBA 0x20 缺陷。本仓库才是修复后的版本。
 
 ---

@@ -13,7 +13,7 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
-"""InstaAceImporter 回归测试（离线，不需要相机、不需要 ffmpeg）。
+"""instatoolsImporter 回归测试（离线，不需要相机、不需要 ffmpeg）。
 
 覆盖三条最容易回归、且一回归相机就"能识别但打不开"的铁律：
 
@@ -382,7 +382,7 @@ def test_camera_udta_writes_expected_amba_fields(tmp_path):
 
 # 铁律：shared/instbox 下的模块必须能被【包导入】与【平铺导入】两种方式加载。
 #   桌面端 core._load_inst_modules() 走 `import instbox.moov_rewrap`；
-#   PyInstaller（InstaAceQml.spec 的 pathex=['../shared','../shared/instbox']）与
+#   PyInstaller（instatools.spec 的 pathex=['../shared','../shared/instbox']）与
 #   直接跑脚本走平铺 `import moov_rewrap`。
 #   曾因 moov_rewrap 只做平铺导入（`import inst_transplant`，而该模块在
 #   shared/instbox/ 下），包导入必然 ModuleNotFoundError —— 桌面端从源码运行

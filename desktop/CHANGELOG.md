@@ -4,7 +4,7 @@
 
 ### 变更（删除 PyQt5 经典界面，桌面端只剩 QML 版）
 
-`desktop/gui.py`（PyQt5 经典界面）、`desktop/InstaAceImporter.spec`、`desktop/build.bat`、`desktop/run.bat` 一并删除，`requirements.txt` 与 `requirements-dev.txt` 里的 `PyQt5>=5.15` 去掉。理由是维护两套界面的成本全落在「同一处缺陷修两遍、第二遍总忘」上 —— 本轮删掉的 `_resolve_encoder` 形参覆盖、`batch_convert` 静默推翻软件编码，都是先在经典版发现、再手工同步到 QML 侧的同类问题。合并成一套之后这类漂移不可能再发生。
+`desktop/gui.py`（PyQt5 经典界面）、`desktop/instatoolsImporter.spec`、`desktop/build.bat`、`desktop/run.bat` 一并删除，`requirements.txt` 与 `requirements-dev.txt` 里的 `PyQt5>=5.15` 去掉。理由是维护两套界面的成本全落在「同一处缺陷修两遍、第二遍总忘」上 —— 本轮删掉的 `_resolve_encoder` 形参覆盖、`batch_convert` 静默推翻软件编码，都是先在经典版发现、再手工同步到 QML 侧的同类问题。合并成一套之后这类漂移不可能再发生。
 
 被删掉的能力在 QML 侧补齐或明确记录：
 
@@ -23,20 +23,20 @@
 |---|---|
 | 1 | 环境变量 `FFMPEG_PATH` / `FFPROBE_PATH` |
 | 2 | 注册表 `App Paths\ffmpeg.exe`（安装器登记的权威位置，HKLM 优先 HKCU） |
-| 3 | `C:\Program Files\InstaAce\bin`（本程序装全局的目标） |
+| 3 | `C:\Program Files\instatools\bin`（本程序装全局的目标） |
 | 4 | `Program Files\ffmpeg\bin`、`Program Files (x86)\ffmpeg\bin`、`C:\ffmpeg\bin`、chocolatey、scoop shims、WinGet Links |
 | 5 | 系统 `PATH` |
 | 6 | exe 所在目录及其 `bin\` |
-| 7 | `%LOCALAPPDATA%\InstaAceImporter\bin`、`~\InstaAceImporter\bin` |
+| 7 | `%LOCALAPPDATA%\instatoolsImporter\bin`、`~\instatoolsImporter\bin` |
 
 配套拆成三个函数：`_system_tool_dirs()`（全局）、`_portable_tool_dirs()`（程序目录）、`_registry_ffmpeg()`（注册表）。新增 `ffmpeg_source(path)` 返回 `missing` / `env` / `system` / `portable`，界面据此告诉用户「这份 ffmpeg 是你系统里那个」，否则用户会以为自己没装。
 
 下载与安装分离成两步（`desktop/core.py:548` 的 `install_ffmpeg(scope)`）：
 
-- **先下到 `%TEMP%\InstaAceFfmpeg`，再按 scope 落盘**。选「装到系统」时 UAC 弹窗只覆盖最后那次复制 —— 用户点了「否」也不会白下 200 MB 再重来。
+- **先下到 `%TEMP%\instatoolsFfmpeg`，再按 scope 落盘**。选「装到系统」时 UAC 弹窗只覆盖最后那次复制 —— 用户点了「否」也不会白下 200 MB 再重来。
 - `scope="global"` 走 `install_ffmpeg_global()`：已是管理员就直接复制；否则写一个 `.bat`（`mkdir` + 两条 `copy /y` + `reg add` 登记 `App Paths`）用 `ShellExecuteExW(lpVerb="runas")` 提权执行。`SEE_MASK_NOCLOSEPROCESS` 是必须的 —— 不加这一位 `ShellExecuteEx` 立刻返回，复制还在跑就去做存在性校验了，会误报失败。用户拒绝时 `ShellExecuteExW` 返回 0 且 `GetLastError() == 1223`（`ERROR_CANCELLED`），据此回「已取消（未获得管理员权限）」而不是笼统的失败。
 - 不改系统 `PATH`：改 `PATH` 有把 `%SystemRoot%` 这类展开值写坏的风险（`setx` 截断、注册表里混入未展开变量），而登记 `App Paths` 已经足够让「运行」对话框和本程序的探测找到它。
-- `scope="portable"` 走 `ffmpeg_install_dir()`（exe 同目录 `bin\`，不可写则退回 `%LOCALAPPDATA%\InstaAceImporter\bin`），全程不需要任何权限，绝不弹 UAC。
+- `scope="portable"` 走 `ffmpeg_install_dir()`（exe 同目录 `bin\`，不可写则退回 `%LOCALAPPDATA%\instatoolsImporter\bin`），全程不需要任何权限，绝不弹 UAC。
 - `download_and_install_ffmpeg()` 保留为兼容壳，等价 `install_ffmpeg("portable")`。
 
 界面（`desktop/qml/main.qml` 的橙色横幅）从单个「下载 ffmpeg」按钮改成两个：「装到系统目录」与「装到程序目录」，并补一行说明两者区别（全局所有程序能用但要管理员，程序目录只给本程序用但不需要权限）。`Bridge` 新增 `installFfmpeg(scope)` Slot 与 `ffmpegSource` / `ffmpegScope` 两个 Property；`downloadFfmpeg()` 保留，默认 `portable`。
@@ -78,7 +78,7 @@
 
 ### 产物重建与核对（本轮）
 
-- 桌面端 `desktop/dist/InstaAceQml.exe` 80,501,272 B，`--self-test` → `QML_OK roots=1`，exit 0。解包 `PYZ.pyz` 核对：`tray` 在包内、`gui` 不在；`bridge.start` 的关键字常量含 `('do_index','template_names')`、`bridge._run` 含 `('template','encoder','spec','progress','cancel','log','start_number','template_names')`；`autoDetectSample` 引用 `SAMPLE_EXTS`，常量含 `DEFGHIJ`、`DCIM`、`Camera01`；本轮补齐的 15 个函数（`addPaths`/`pickCover`/`clearCovers`/`verifyCard`/`repairCard`/`locateCard`/`removeFile`/`detectHardware`/`refreshSequence`/`checkResume`/`specSummary`/`hardwareEncoder`/`nextSequence`/`coverImage`/`clearError`）在 `bridge` 的 `co_names` 与函数定义表里全部存在，`fromLocalFile` 也在（封面预览要用 file:// URL）；`core._build_hw_transcode_cmd` 常量含 `qsv`/`amf`；`instbox.inst_transplant.video_gop` 的 `co_names` 含 `Path` 与 `read_bytes`；`moov_rewrap` 的 `co_names` 含 `_MAX_32BIT` 与 `zlib`、函数表含 `_chunk_offsets` 与 `udta_with_mcrc`；本轮 ffmpeg 改造的 15 个符号（`_portable_tool_dirs`/`global_install_dir`/`_system_tool_dirs`/`_registry_ffmpeg`/`_find_tool`/`ffmpeg_source`/`_staging_dir`/`_is_admin`/`_ShellExecInfo`/`_run_elevated`/`_install_to`/`install_ffmpeg_global`/`_download_ffmpeg_to`/`install_ffmpeg`/`download_and_install_ffmpeg`）全部在 `core` 的函数表里，`ctypes` 在 `co_names` 里，删掉的 `_tool_dirs` 已不在；`bridge` 的 `installFfmpeg`/`downloadFfmpeg`/`checkFfmpeg` 与 `ffmpegSource`/`ffmpegScope` 也都打包进去了。
+- 桌面端 `desktop/dist/instatools.exe` 80,501,272 B，`--self-test` → `QML_OK roots=1`，exit 0。解包 `PYZ.pyz` 核对：`tray` 在包内、`gui` 不在；`bridge.start` 的关键字常量含 `('do_index','template_names')`、`bridge._run` 含 `('template','encoder','spec','progress','cancel','log','start_number','template_names')`；`autoDetectSample` 引用 `SAMPLE_EXTS`，常量含 `DEFGHIJ`、`DCIM`、`Camera01`；本轮补齐的 15 个函数（`addPaths`/`pickCover`/`clearCovers`/`verifyCard`/`repairCard`/`locateCard`/`removeFile`/`detectHardware`/`refreshSequence`/`checkResume`/`specSummary`/`hardwareEncoder`/`nextSequence`/`coverImage`/`clearError`）在 `bridge` 的 `co_names` 与函数定义表里全部存在，`fromLocalFile` 也在（封面预览要用 file:// URL）；`core._build_hw_transcode_cmd` 常量含 `qsv`/`amf`；`instbox.inst_transplant.video_gop` 的 `co_names` 含 `Path` 与 `read_bytes`；`moov_rewrap` 的 `co_names` 含 `_MAX_32BIT` 与 `zlib`、函数表含 `_chunk_offsets` 与 `udta_with_mcrc`；本轮 ffmpeg 改造的 15 个符号（`_portable_tool_dirs`/`global_install_dir`/`_system_tool_dirs`/`_registry_ffmpeg`/`_find_tool`/`ffmpeg_source`/`_staging_dir`/`_is_admin`/`_ShellExecInfo`/`_run_elevated`/`_install_to`/`install_ffmpeg_global`/`_download_ffmpeg_to`/`install_ffmpeg`/`download_and_install_ffmpeg`）全部在 `core` 的函数表里，`ctypes` 在 `co_names` 里，删掉的 `_tool_dirs` 已不在；`bridge` 的 `installFfmpeg`/`downloadFfmpeg`/`checkFfmpeg` 与 `ffmpegSource`/`ffmpegScope` 也都打包进去了。
 - 安卓 `android/app/build/outputs/apk/release/app-release.apk` 75,279,539 B；单元测试 IndexTest 7 跳过 / ConsentLogicTest 5 / ImportCardStateTest 6，失败与错误均 0。解包 `assets/chaquopy/app.imy` 核对：7 组零调用符号（`_num`/`_audio_map`/`add_file_entry`/`add_edit_entry`/`find_entry`/`repair_inst_metadata_layout`/`patch_media_thumbnail`/`patch_nail_thumbnail`）在两份 pyc 里都已不存在；`camera_moov_rewrap` 的 `co_names` 含 `_MAX_32BIT` 与 `zlib`、函数表含 `_chunk_offsets` 与 `udta_with_mcrc`、`stco_box` 常量含 `b'co64'`、`rebuild_stbl` 的元组常量含 `(b'stco', b'co64')`。
 - **APK 的字节数与 sha256 都不能当校验和**：同一份源码连编两次，签名（`META-INF/CERT.RSA`/`CERT.SF`/`MANIFEST.MF`）、`assets/chaquopy/build.json`、`assets/chaquopy/app.imy` 五项都会变。`app.imy` 里每个 pyc 只有第 8～12 字节（CPython 源文件 mtime 字段）不同，把这段清零后全部逐字节相同。要确认「装上去的就是这一轮构建的包」，解包比对 pyc 比比对哈希可靠。
 
@@ -286,7 +286,7 @@ worker 非 daemon、`waitWorker` 的两态、以及一条源码守卫（`replace
 - **回调异常不再完全静默**：`_safe_call` / `_safe_log` 原来 `except Exception: pass`，Kotlin 侧抛异常时表现为「进度条卡在某个值 + 日志一片空白」，现场无法判断是编码慢还是桥接坏了。改为写一行到 `import.log`。
 - **`android_bridge.py` 重复 import**：`threading` / `json` 在顶部已导入，第 188 行附近又导了一遍；`re` 与 `urllib.request` 是新增的却留在函数体里。统一提到顶部。
 - **死代码清理**：`ImportCallback.lastLogAt`（只有声明与赋值，无任何读取）、`PythonEngine.statusVerbose()`（带 `@Suppress("unused")`，与 `status()` 重复，无调用）删除。
-- **`ImportCardState` 推导抽成纯函数 `cardStateFor()`**：五态优先级从 `InstaAceApp` 的内联 `when` 移到可测的位置。
+- **`ImportCardState` 推导抽成纯函数 `cardStateFor()`**：五态优先级从 `instatoolsApp` 的内联 `when` 移到可测的位置。
 
 ### 测试（镜像污染 / 模板固定 / 卡片状态）
 
@@ -320,7 +320,7 @@ worker 非 daemon、`waitWorker` 的两态、以及一条源码守卫（`replace
 
 错峰入场：`StaggeredIn` 按 index 延后 40ms 再打开 `AnimatedVisibility`，而不是给 tween 加 `delayMillis`——后者是固定时长动画，与「全部走弹簧」的约束冲突。
 
-顺带清掉 `InstaAceApp.kt` 里因此不再使用的 4 个 import（`Icons.Rounded.Close`、`Icons.Rounded.PlayArrow`、`Button`、`LinearProgressIndicator`）。
+顺带清掉 `instatoolsApp.kt` 里因此不再使用的 4 个 import（`Icons.Rounded.Close`、`Icons.Rounded.PlayArrow`、`Button`、`LinearProgressIndicator`）。
 
 验证：`:app:compileReleaseKotlin` 零 Kotlin 警告；`:app:assembleRelease` BUILD SUCCESSFUL，APK 75,272,122 B；`:app:testReleaseUnitTest` IndexTest 7 skipped / ConsentLogicTest 5 passed。
 
@@ -336,7 +336,7 @@ worker 非 daemon、`waitWorker` 的两态、以及一条源码守卫（`replace
 
 - **Python 桥（`android_bridge.py`）**：新增 `new_cancel_event()` 返回一个真正的 `threading.Event`，Kotlin 以 `PyObject` 持有它并回传给 `run_import(..., cancel=...)`；`run_import` 再把事件透传给 `insta_core.import_with_inst`。取消令牌的生命周期由 Kotlin 的引用决定，不需要跨 JNI 的登记表。
 - **返回契约**：取消与失败在 JSON 上分开——取消返回 `{"ok": false, "canceled": true}`，失败返回 `{"ok": false, "canceled": false}`。此前两者都只有一个 `error` 字符串，Kotlin 无法区分「用户主动停」和「出错了」。
-- **Kotlin（`PythonEngine` / `AppState` / `InstaAceApp`）**：`PythonEngine.newCancelEvent()` / `cancelEventSet()`；`AppState.cancelImport()` 只置位事件、不阻塞，可从 UI 线程直接调用；队列循环在每条开始前检查取消标志，当前条被中断则不记入结果；导入中按钮换成「取消导入」，取消后显示「正在取消…」并在收尾时清空事件。
+- **Kotlin（`PythonEngine` / `AppState` / `instatoolsApp`）**：`PythonEngine.newCancelEvent()` / `cancelEventSet()`；`AppState.cancelImport()` 只置位事件、不阻塞，可从 UI 线程直接调用；队列循环在每条开始前检查取消标志，当前条被中断则不记入结果；导入中按钮换成「取消导入」，取消后显示「正在取消…」并在收尾时清空事件。
 - **取消时的写回语义**：已经转好的条目是完整产物，照常写回卡；正在转的那条只留在镜像目录里，不会写回。取消后状态显示「已取消（已完成的 N 条已写回卡）」，而不是笼统的「部分完成」。
 
 ### 测试（安卓取消链路）
@@ -403,10 +403,10 @@ worker 非 daemon、`waitWorker` 的两态、以及一条源码守卫（`replace
   与 `AppState.cancelImport()`（含 `Dispatchers.getIO` 调用）均已生成。
   `:app:testReleaseUnitTest` → IndexTest 7 skipped / ConsentLogicTest 5 passed。
 - 桌面两个可执行文件此前都打包着旧 `core.py`（11-08 构建），已重建：
-  `InstaAceQml.exe` 78,828,822 B / sha256 `2705143e589ee60029c136d6b4319eab033cad5451872c2e18eca7ecccaf55d7`；
-  `InstaAceImporter.exe` 39,072,517 B / sha256 `d94aa3f60a7bf65b83ad40b4582ba20f55c55df8ada4c25bab03c332da16aede`。
+  `instatools.exe` 78,828,822 B / sha256 `2705143e589ee60029c136d6b4319eab033cad5451872c2e18eca7ecccaf55d7`；
+  `instatoolsImporter.exe` 39,072,517 B / sha256 `d94aa3f60a7bf65b83ad40b4582ba20f55c55df8ada4c25bab03c332da16aede`。
   从两者内嵌的 `PYZ.pyz` 取出 `core` 模块核对：`convert` 有 `canceled`、`batch_convert` 有 `success`/`failed`、`_source_stamp` 存在。
-  `InstaAceQml.exe --self-test` → `QML_OK roots=1`，exit 0。
+  `instatools.exe --self-test` → `QML_OK roots=1`，exit 0。
 - `docs/BUILD.md` 的实测产物同步更新，并记下「同一源码两次构建哈希不同、字节数稳定」，提醒不要把哈希当校验和。
 
 ### 修复（`shared/instbox` 与安卓端的模块导入）
@@ -439,7 +439,7 @@ worker 非 daemon、`waitWorker` 的两态、以及一条源码守卫（`replace
 - 重新离线构建 release APK 通过：75,257,520 B，sha256 `bd45835bc208aaa8cb115cf9824cd9a97cb6434edadfe96ada0daa087c1f1515`。
 - 解开 `assets/chaquopy/app.imy` 反序列化 `insta_core.pyc` 核对名字表：`_run_transcode` 的 `freevars`/`varnames` 里都已没有 `first_error`（缺陷的病根就是它），`convert` 有 `canceled`、无 `my_error`，两处都引用了 `CanceledError`。
 - `:app:testReleaseUnitTest` → IndexTest 7 skipped / ConsentLogicTest 5 passed / 0 failures。
-- `desktop/dist/InstaAceQml.exe --self-test` → `QML_OK roots=1`，exit 0。
+- `desktop/dist/instatools.exe --self-test` → `QML_OK roots=1`，exit 0。
 
 ### 测试（模块导入与 IndexTest）
 
@@ -474,7 +474,7 @@ worker 非 daemon、`waitWorker` 的两态、以及一条源码守卫（`replace
 - **版本号统一**：桌面端与安卓端统一为 `1.2.0`（`desktop/core.py`、`android/.../insta_core.py` 的 `__version__`，gradle 的 `versionName`，以及安卓关于页文案）；`versionCode` 13→14。
 - **移除联想商业字体**：删除 `assets/fonts/Lenovo-XiaoxinChaokuGB.ttf`（商业授权不允许随 GPL 项目分发）；`qml/Theme.qml` 改为探测 `loadedFonts`，没有则回退系统「Microsoft YaHei UI」。
 - **补 AMBA 回归测试**：`desktop/tests/test_insta.py` 新增 3 条（帧率分母不被覆写、AMBA 过短抛错、九个字段偏移逐一核对），此前对 AMBA 零覆盖，正是 P0 能被带进发布的原因。
-- **QML spec 补图标**：`InstaAceQml.spec:57` 补 `icon=['assets/app.ico']`。
+- **QML spec 补图标**：`instatools.spec:57` 补 `icon=['assets/app.ico']`。
 - **相机卡判断降级留痕**：勾了「登记索引」但输出目录不是相机卡结构时，原先静默降级为纯转码；现在写日志并提示「改为仅转码」（`bridge.py:274-281`）。
 - **更新检查不再吞异常**：`updater.py:105` 从裸 `pass` 改为写 `import.log`。
 
@@ -486,7 +486,7 @@ worker 非 daemon、`waitWorker` 的两态、以及一条源码守卫（`replace
 ### 第二轮补充（同日，具备完整构建环境后）
 
 - **APK 已重打**：`versionCode 14 / versionName 1.2.0`，双 ABI，72,830,835 B。产物内设备序列号与第三方产品名均 0 命中（含 `assets/chaquopy` 下 5 个 `.pyc`）。
-- **QML 版已实际打包**：`InstaAceQml.exe --self-test` 输出 `QML_OK roots=1`、退出码 0，产物 205 MB。
+- **QML 版已实际打包**：`instatools.exe --self-test` 输出 `QML_OK roots=1`、退出码 0，产物 205 MB。
 - **第三方产品名引用清零**：原 16 处注释（`insta_core.py` 12、`insta_index.py` 4）全部改为「真机原片」等中性表述；技术内容（偏移、参数、字节布局）未动，只去掉产品名与溯源表述。
 - **`release` 关掉 `isDebuggable`**：原为 `true`，正式包不允许（会放行调试器 attach、堆栈导出与 `run-as`）。
 - **签名证书可配置**：改为环境变量 `INSTA_KEYSTORE*` → `local.properties` → debug.keystore 三级查找，不再把口令写死在仓库里。回退 debug.keystore 只为覆盖旧版，正式分发必须配自有证书。
@@ -502,7 +502,7 @@ worker 非 daemon、`waitWorker` 的两态、以及一条源码守卫（`replace
 
 ### 首个公开版本
 
-影石相机工具（原名 InstaAce Importer）正式发布。把普通视频转成影石
+影石相机工具（原名 instatools Importer）正式发布。把普通视频转成影石
 Ace Pro 2 可识别的原生素材：转码为 VID + LRV 双文件、移植 `inst` box、
 登记相机索引。
 
@@ -549,7 +549,7 @@ Ace Pro 2 可识别的原生素材：转码为 VID + LRV 双文件、移植 `ins
   输出目录、剩余空间（按 7MB/分钟 估算）、是否相机卡、索引文件可写（含只读属性提示）、
   真机原片模板。阻断项弹窗直接拦下，不再“转完 20 分钟才失败”。
 - **断点续跑**：每条视频的状态/产物落盘到
-  `%LOCALAPPDATA%\InstaAceImporter\jobs\<dest>.json`；同一输出目录再次开跑时
+  `%LOCALAPPDATA%\instatoolsImporter\jobs\<dest>.json`；同一输出目录再次开跑时
   会问“只跑未完成的 N 条 / 全部重跑”。
 - **防休眠**：转码期间调用 `SetThreadExecutionState(ES_SYSTEM_REQUIRED)`，
   跑长片时不会因为系统休眠前功尽弃；结束后自动恢复。

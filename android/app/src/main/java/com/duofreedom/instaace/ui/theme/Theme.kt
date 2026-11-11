@@ -1,4 +1,4 @@
-package com.duofreedom.instaace.ui.theme
+package com.duofreedom.instatools.ui.theme
 
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -51,7 +51,7 @@ private val LightColors = lightColorScheme(
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-fun InstaAceTheme(
+fun instatoolsTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     content: @Composable () -> Unit
 ) {

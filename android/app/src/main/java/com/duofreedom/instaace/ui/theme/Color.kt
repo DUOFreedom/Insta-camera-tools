@@ -1,4 +1,4 @@
-package com.duofreedom.instaace.ui.theme
+package com.duofreedom.instatools.ui.theme
 
 import androidx.compose.ui.graphics.Color
 

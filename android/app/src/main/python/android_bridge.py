@@ -264,7 +264,7 @@ class _Updater:
     def _run(self, callback):
         try:
             request = urllib.request.Request(_API_URL, headers={
-                "User-Agent": "InstaAceAndroid/%s" % _core_version(),
+                "User-Agent": "instatoolsAndroid/%s" % _core_version(),
                 "Accept": "application/vnd.github+json",
             })
             with urllib.request.urlopen(request, timeout=_TIMEOUT) as resp:

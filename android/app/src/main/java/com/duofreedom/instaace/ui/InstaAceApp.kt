@@ -1,6 +1,6 @@
 @file:OptIn(ExperimentalMaterial3Api::class)
 
-package com.duofreedom.instaace.ui
+package com.duofreedom.instatools.ui
 
 import android.content.ActivityNotFoundException
 import android.content.Context
@@ -102,7 +102,7 @@ private const val PREFS_UPDATE = "update_prefs"
 private const val KEY_IGNORED_TAG = "ignored_update_tag"
 
 @Composable
-fun InstaAceApp() {
+fun instatoolsApp() {
     val ctx = LocalContext.current
     var docName by remember { mutableStateOf<String?>(null) }
     var docTitle by remember { mutableStateOf<String>("") }

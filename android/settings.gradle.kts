@@ -20,5 +20,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "InstaAceAndroid"
+rootProject.name = "InstaToolsAndroid"
 include(":app")
