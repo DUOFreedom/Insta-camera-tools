@@ -29,7 +29,7 @@ Both desktop and Android run the same conversion logic (two manually-synced copi
 ### Desktop (Windows)
 
 ```bash
-git clone https://github.com/duofreedom/Insta-camera-tools.git
+git clone https://github.com/DUOFreedom/Insta-camera-tools.git
 cd Insta-camera-tools/desktop
 pip install -r requirements.txt
 ```
@@ -303,7 +303,7 @@ Project links libx264 / libx265 (GPL-2.0-or-later); actual FFmpeg 7.1 is therefo
 <summary>Repository Structure & Module Responsibilities</summary>
 
 ```
-instaace-fusion/
+Insta-camera-tools/
 ├── shared/                       # Desktop's sole reference source
 │   ├── insta_index.py            # Camera index protobuf parse / generate
 │   └── instbox/

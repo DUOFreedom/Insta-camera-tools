@@ -159,7 +159,7 @@ PySide6 是 Qt 官方绑定，LGPL-3.0 授权。
 ## 从源码构建
 
 ```powershell
-git clone https://github.com/duofreedom/Insta-camera-tools.git
+git clone https://github.com/DUOFreedom/Insta-camera-tools.git
 cd Insta-camera-tools\desktop
 
 pip install -r requirements.txt

@@ -29,7 +29,7 @@
 ### 桌面端（Windows）
 
 ```bash
-git clone https://github.com/duofreedom/Insta-camera-tools.git
+git clone https://github.com/DUOFreedom/Insta-camera-tools.git
 cd Insta-camera-tools/desktop
 pip install -r requirements.txt
 ```
@@ -291,7 +291,7 @@ python -m pytest tests/ -q
 <summary>仓库结构与模块职责</summary>
 
 ```
-instaace-fusion/
+Insta-camera-tools/
 ├── shared/                       # 桌面端唯一引用源
 │   ├── insta_index.py            # 相机索引 protobuf 解析 / 生成
 │   └── instbox/

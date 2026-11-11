@@ -260,7 +260,7 @@ Ace Pro 2 实拍 4K/8K HEVC 源上硬解是否真能开启、`hwdownload` 帧格
 ## 五、包内结构
 
 ```
-instaace-fusion/
+Insta-camera-tools/
 ├── FIXES.md                    ← 本文件
 ├── README.md
 ├── .gitignore
