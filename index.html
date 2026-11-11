@@ -15,18 +15,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="google-site-verification" content="Z1_5-kb9bWtHmbRLohl3fSZsMe-5Ndwo5JdBoWjXVhI" />
     <meta name="msvalidate.01" content="04A099263FCA8257EDD252806D30A4AA" />
-    <title>影石相机工具 · 把普通视频变成影石 Ace Pro 2 的「原生」素材</title>
+    <title>影石相机工具 · 把普通视频变成影石相机能认的「原生」素材</title>
     <meta
       name="description"
-      content="影石相机工具（InstaAceImporter）：把普通视频转码成影石 Ace Pro 2 原生结构，移植 inst box 并登记相机索引；插回相机，相册里能识别、能播放、封面正确。"
+      content="影石相机工具（instatools）：把普通视频转码成影石相机原生结构，移植 inst box 并登记相机索引；插回相机，相册里能识别、能播放、封面正确。支持 Windows 桌面端与安卓端。"
     />
     <meta name="color-scheme" content="light" />
     <meta name="theme-color" content="#FFFFFF" />
     <meta property="og:type" content="website" />
-    <meta property="og:title" content="影石相机工具 · InstaAceImporter" />
+    <meta property="og:title" content="影石相机工具 · instatools" />
     <meta
       property="og:description"
-      content="把普通视频变成影石 Ace Pro 2 的「原生」素材：转码 VID + LRV、移植 inst box、登记相机索引。支持 Windows 桌面端与安卓端。"
+      content="把普通视频变成影石相机能认的「原生」素材：转码 VID + LRV、移植 inst box、登记相机索引。适配 Ace Pro 2 与 GO Ultra，支持 Windows 桌面端与安卓端。"
     />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -49,10 +49,10 @@
           {
             "@type": "SoftwareApplication",
             "name": "影石相机工具",
-            "alternateName": "InstaAceImporter",
+            "alternateName": "instatools",
             "applicationCategory": "MultimediaApplication",
-            "operatingSystem": "Windows 10, Windows 11",
-            "description": "把普通视频转码成影石 Ace Pro 2 原生结构：转码 VID（HEVC）+ LRV（H.264）、移植 inst box、登记相机索引。插回相机后相册可识别、可播放、封面正确。",
+            "operatingSystem": "Windows 10, Windows 11, Android 8.0+",
+            "description": "把普通视频转码成影石相机原生结构：转码 VID + LRV、移植 inst box、登记相机索引。规格默认从卡里真机原片量出，也可以手选机型预设。插回相机后相册可识别、可播放、封面正确。",
             "url": "https://duofreedom.github.io/Insta-camera-tools/",
             "downloadUrl": "https://github.com/DUOFreedom/Insta-camera-tools/releases/latest",
             "softwareVersion": "1.2.0",
@@ -167,10 +167,10 @@
           <div>
             <p class="section__eyebrow">v1.2.0</p>
             <h1 class="hero__title" id="hero-title">
-              把普通视频变成影石 Ace Pro 2 的「原生」素材
+              把普通视频变成影石相机能认的「原生」素材
             </h1>
             <p class="hero__tagline">
-              转码成相机原生结构（VID + LRV）、移植 inst box、登记相机索引。插回相机，相册里能识别、能播放、封面正确。桌面端已发布，安卓端开发中。
+              转码成相机原生结构（VID + LRV）、移植 inst box、登记相机索引。插回相机，相册里能识别、能播放、封面正确。适配 Ace Pro 2 与 GO Ultra：分辨率、帧率、关键帧间隔、编码格式默认从卡里真机原片量出，卡里没有原片时可按机型预设。桌面端已发布，安卓端开发中。
             </p>
             <div class="hero__actions">
               <a
@@ -263,16 +263,16 @@
               </span>
               <h3 class="card__title">Windows 桌面端</h3>
               <p class="card__text">
-                两套界面共用同一份转码核心：经典版基于 PyQt5，QML 版基于 PySide6 / Qt Quick，界面更现代。
+                单文件 exe，PySide6 + Qt Quick 界面，界面语言跟随系统（中文 / 英文）。
               </p>
               <dl class="dl">
                 <div class="dl__row">
-                  <dt class="dl__key">QML 版</dt>
+                  <dt class="dl__key">界面</dt>
                   <dd class="dl__value">PySide6 + Qt Quick，单文件 exe 约 75 MB</dd>
                 </div>
                 <div class="dl__row">
-                  <dt class="dl__key">经典版</dt>
-                  <dd class="dl__value dl__value--muted">PyQt5，单文件 exe 约 39 MB</dd>
+                  <dt class="dl__key">语言</dt>
+                  <dd class="dl__value dl__value--muted">跟随系统，可用 INSTA_LANG 覆盖</dd>
                 </div>
                 <div class="dl__row">
                   <dt class="dl__key">硬件加速</dt>
@@ -322,7 +322,7 @@
         <div class="container">
           <div class="section__head">
             <h2 class="section__title" id="problem-title">
-              Ace Pro 2 只认自己录出来的文件
+              相机只认自己录出来的文件
             </h2>
             <p class="section__lead">
               把手机或相机拍的视频拷进卡里，相册里要么看不见，要么能列出来但点了打不开，要么没有封面。
@@ -544,7 +544,7 @@
                   </svg>
                   <div>
                     <p class="feature__title">离线回归</p>
-                    <p class="feature__text">34 项测试，不需要真机也能跑。</p>
+                    <p class="feature__text">202 项测试，不需要真机也能跑。</p>
                   </div>
                 </li>
                 <li class="feature">
@@ -553,7 +553,7 @@
                   </svg>
                   <div>
                     <p class="feature__title">运行日志</p>
-                    <p class="feature__text">写入 %LOCALAPPDATA%\InstaAceImporter\，出问题可回溯。</p>
+                    <p class="feature__text">写入 %LOCALAPPDATA%\instatools\，出问题可回溯。</p>
                   </div>
                 </li>
               </ul>
@@ -582,7 +582,7 @@
               <dl class="meta">
                 <div>
                   <dt class="meta__key">文件</dt>
-                  <dd class="meta__value">InstaAceQml.exe</dd>
+                  <dd class="meta__value">instatools.exe</dd>
                 </div>
                 <div>
                   <dt class="meta__key">平台</dt>
@@ -590,7 +590,7 @@
                 </div>
                 <div>
                   <dt class="meta__key">大小</dt>
-                  <dd class="meta__value">75.18 MB（78,828,598 字节）</dd>
+                  <dd class="meta__value">80.5 MB（80,519,132 字节）</dd>
                 </div>
                 <div>
                   <dt class="meta__key">运行方式</dt>
@@ -616,7 +616,7 @@
                 <span class="code-label" id="sha-win-label">SHA256</span>
                 <div class="sha-row">
                   <code class="code code--wrap" id="sha-win"
-                    >24C4EBF36172A6BFF0ADFD86090328AF317B0CD9FA8B5D813775251C22CED429</code
+                    >E658DEF769C037373F2F7AF62C55BA59433053EACA853BFBAFE7D85238E1F3A3</code
                   >
                   <button class="copy-btn" data-copy="sha-win" data-label="copy-win-label" type="button">
                     <svg class="copy-btn__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
@@ -680,9 +680,9 @@
               <circle cx="12" cy="12" r="9" /><path d="M12 8v4.5" /><path d="M12 16h.01" />
             </svg>
             <div>
-              <p class="notice__title">桌面端需要自备 ffmpeg</p>
+              <p class="notice__title">桌面端需要 ffmpeg（可自动安装）</p>
               <p class="notice__body">
-                下载 ffmpeg 后把 ffmpeg.exe 与 ffprobe.exe 放进 exe 同目录的 bin\ 文件夹。程序按「环境变量 → exe 目录 → exe\bin → 用户目录的 InstaAceImporter\bin → 常见安装位置 → 系统 PATH」顺序查找，都找不到会明确报错并指出缺哪个。
+                启动时若找不到 ffmpeg，界面上会出现一条提示，点按钮可自动下载安装：装到系统目录（需要管理员确认）或装到程序目录。也可以自己放 —— 把 ffmpeg.exe 与 ffprobe.exe 放进 exe 同目录的 bin\ 文件夹。程序按「环境变量 → 注册表登记 → 系统安装目录 → 系统 PATH → exe 目录 → 用户目录」顺序查找，都找不到才提示安装。
               </p>
               <p class="notice__body">
                 两个文件都要：只放 ffmpeg.exe 不够，程序需要用 ffprobe.exe 读取源文件信息。
@@ -709,7 +709,7 @@
           <ol class="steps">
             <li class="steps__item">
               <span class="steps__num" aria-hidden="true">1</span>
-              <p class="steps__text">把 ffmpeg.exe 与 ffprobe.exe 放进 exe 同目录的 bin\ 文件夹。</p>
+              <p class="steps__text">首次运行缺 ffmpeg 时界面会提示，点按钮装到系统目录或程序目录即可；也可以手动把 ffmpeg.exe 与 ffprobe.exe 放进 exe 同目录的 bin\ 文件夹。</p>
             </li>
             <li class="steps__item">
               <span class="steps__num" aria-hidden="true">2</span>
@@ -768,7 +768,7 @@
                 </svg>
               </summary>
               <div class="faq__a">
-                <p>把 ffmpeg.exe 和 ffprobe.exe 放进 exe 同目录的 bin\ 文件夹，或者装进系统 PATH。</p>
+                <p>界面上会出现「未找到 ffmpeg」的提示条，点右侧按钮可以让程序自己下载安装（装到系统目录需要管理员确认）；也可以手动把 ffmpeg.exe 和 ffprobe.exe 放进 exe 同目录的 bin\ 文件夹，或者装进系统 PATH。</p>
                 <p>注意两个文件都要，只放 ffmpeg.exe 不够——程序需要用 ffprobe.exe 读取源文件信息。</p>
               </div>
             </details>
@@ -1042,34 +1042,22 @@
                   <td class="table__muted">运行环境</td>
                 </tr>
                 <tr>
-                  <td><a class="link" href="https://riverbankcomputing.com/software/pyqt/" target="_blank" rel="noopener noreferrer">PyQt5</a></td>
-                  <td class="table__muted">≥ 5.15</td>
-                  <td><a class="link" href="https://www.gnu.org/licenses/gpl-3.0.html" target="_blank" rel="noopener noreferrer">GPL-3.0</a></td>
-                  <td class="table__muted">图形界面（Qt5 绑定）</td>
-                </tr>
-                <tr>
-                  <td><a class="link" href="https://www.qt.io/" target="_blank" rel="noopener noreferrer">Qt 5</a></td>
-                  <td class="table__muted">5.15</td>
-                  <td class="table__muted">LGPL-3.0 / GPL-3.0</td>
-                  <td class="table__muted">PyQt5 底层框架</td>
-                </tr>
-                <tr>
                   <td><a class="link" href="https://doc.qt.io/qtforpython/" target="_blank" rel="noopener noreferrer">PySide6</a></td>
                   <td class="table__muted">≥ 6.5</td>
                   <td class="table__muted">LGPL-3.0 / GPL-3.0</td>
-                  <td class="table__muted">QML 版桌面界面</td>
+                  <td class="table__muted">桌面界面</td>
                 </tr>
                 <tr>
                   <td><a class="link" href="https://www.qt.io/" target="_blank" rel="noopener noreferrer">Qt 6</a></td>
                   <td class="table__muted">6.5+</td>
                   <td class="table__muted">LGPL-3.0 / GPL-3.0</td>
-                  <td class="table__muted">QML 版底层框架</td>
+                  <td class="table__muted">桌面界面底层框架</td>
                 </tr>
                 <tr>
                   <td><a class="link" href="https://ffmpeg.org/" target="_blank" rel="noopener noreferrer">FFmpeg</a></td>
                   <td class="table__muted">7.1（安卓端静态链接）</td>
                   <td class="table__muted">GPL-2.0+（含 libx264 / libx265）</td>
-                  <td class="table__muted">转码与封装；桌面端需自备</td>
+                  <td class="table__muted">转码与封装；桌面端可自动安装，也可自备</td>
                 </tr>
                 <tr>
                   <td><a class="link" href="https://chaquo.com/chaquopy/" target="_blank" rel="noopener noreferrer">Chaquopy</a></td>
@@ -1079,7 +1067,7 @@
                 </tr>
                 <tr>
                   <td><a class="link" href="https://developer.android.com/jetpack/compose" target="_blank" rel="noopener noreferrer">Jetpack Compose</a></td>
-                  <td class="table__muted">BOM 2024.06.00</td>
+                  <td class="table__muted">BOM 2026.03.01</td>
                   <td class="table__muted">Apache-2.0</td>
                   <td class="table__muted">安卓端界面</td>
                 </tr>
@@ -1133,7 +1121,7 @@
             除上述组件外，共享核心仅使用 Python 标准库（struct、zlib、subprocess、urllib、threading、ctypes、pathlib、dataclasses 等），无其他第三方代码依赖；索引的 protobuf 编解码为自行实现，未引入 protobuf 库。
           </p>
           <p class="section__lead">
-            PyQt5 采用 GPL-3.0 授权，本项目同样以 GPL-3.0 发布，二者兼容。
+            PySide6 与 Qt 6 采用 LGPL-3.0（亦可按 GPL-3.0 使用），本项目以 GPL-3.0 发布，二者兼容。
           </p>
 
           <h3 class="subhead">致谢</h3>
@@ -1145,7 +1133,7 @@
               </span>
             </li>
             <li><span>FFmpeg —— 转码与封装</span></li>
-            <li><span>PyQt5 / PySide6 —— 桌面端界面框架</span></li>
+            <li><span>PySide6 / Qt Quick —— 桌面端界面框架</span></li>
             <li><span>Jetpack Compose —— 安卓端界面框架</span></li>
             <li><span>Chaquopy —— 让 Python 核心跑在 Android 上</span></li>
             <li>
