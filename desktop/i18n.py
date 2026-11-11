@@ -89,7 +89,11 @@ def _templates() -> list[tuple[re.Pattern[str], str]]:
     global _TEMPLATES
     if _TEMPLATES is None:
         built: list[tuple[re.Pattern[str], str]] = []
-        for key, value in EN_TEXT.items():
+        #   长的键先匹配：泛用短模板会抢走长句。典型反例是
+        #   "完成：成功 %d" 排在 "完成：成功 %d，失败 %d" 前面时，
+        #   "完成：成功 3，失败 1" 会被对成 "Done: 3，失败 1 succeeded"。
+        for key in sorted(EN_TEXT, key=len, reverse=True):
+            value = EN_TEXT[key]
             if "%" not in key:
                 continue
             parts = re.split(r"%[sd]", key)
@@ -442,4 +446,44 @@ EN_TEXT.update({
 
 EN_TEXT.update({
     "inst 移植失败": "inst box transplant failed",
+})
+
+EN_TEXT.update({
+    #   ffmpeg 安装/下载流程的进度文案：这些走 bridge 的 stage() 回调，
+    #   直接显示在状态栏上，英文界面必须是英文。
+    "ffmpeg 未就绪：%s。可以装到系统目录（需管理员权限），也可以只装到程序目录。":
+        "ffmpeg is not ready: %s. You can install it into the system folder "
+        "(needs administrator rights), or only into the program folder.",
+    "正在为 ffmpeg 下载源测速...": "Checking the ffmpeg download sources...",
+    "  %s 不可达": "  %s is unreachable",
+    "正在从 %s 下载 ffmpeg ...": "Downloading ffmpeg from %s ...",
+    "正在下载 ffmpeg %s% (%s)": "Downloading ffmpeg %s% (%s)",
+    "正在下载 %s%": "Downloading %s%",
+    "正在安装到 %s ...": "Installing to %s ...",
+    "正在校验 ffmpeg ...": "Verifying ffmpeg ...",
+    "ffmpeg 安装完成 ✓ (%s)": "ffmpeg installed ✓ (%s)",
+})
+
+EN_TEXT.update({
+    #   进度阶段名与轨道标签：经 progress 回调显示在进度条旁。
+    "转码": "Transcoding",
+    "移植 inst box": "Transplanting inst box",
+    "登记索引": "Registering index",
+    "VID (主视频)": "VID (main video)",
+    "LRV (低清预览)": "LRV (low-res preview)",
+})
+
+EN_TEXT.update({
+    #   两条会进 UI 日志区的运行记录。日志整体保持中文，但这两条
+    #   已由用户明确要求可读，且与相邻译文风格不一致会显得突兀。
+    "[resume] 只跑未完成的 %d 条（已完成 %d 条）":
+        "[resume] running only the %d unfinished item(s), %d already done",
+    "[warn] 输出目录不是影石相机卡结构，跳过 inst 移植与索引登记：%s":
+        "[warn] the output folder is not an Insta360 card layout, "
+        "skipping inst transplant and index registration: %s",
+})
+
+EN_TEXT.update({
+    #   ffmpeg 探测超时（新增的 10 秒上限）后返回的说明。
+    "%s 无响应（>10s）": "%s is not responding (>10s)",
 })

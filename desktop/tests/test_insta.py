@@ -1569,3 +1569,41 @@ def test_build_spec_tasks_auto_keeps_defaults():
         model_override="auto")
     assert tasks[0][4] == core.VID_WIDTH and tasks[0][5] == core.VID_HEIGHT
     assert tasks[0][14] == 0, "无模板无预设时 GOP 应为 0（跟随模板）"
+
+
+def test_ffmpeg_probe_has_timeout(tmp_path, monkeypatch):
+    """ffmpeg -version 探测必须带 timeout。
+
+    ffmpeg.exe 损坏或被杀软拦在半路时这条命令会一直等，而
+    ffmpeg_available() 在启动、硬件探测、开始转换四处被调用，
+    挂住就是整个程序起不来。
+    """
+    fake = tmp_path / "ffmpeg.exe"
+    fake.write_bytes(b"MZ")
+    monkeypatch.setattr(core, "find_ffmpeg", lambda: str(fake))
+    monkeypatch.setattr(core, "find_ffprobe", lambda: str(fake))
+
+    seen = {}
+
+    def boom(args, **kw):
+        seen["kwargs"] = kw
+        raise core.subprocess.TimeoutExpired(args, kw.get("timeout"))
+
+    monkeypatch.setattr(core.subprocess, "run", boom)
+    ok, msg = core.ffmpeg_available()
+    assert ok is False
+    assert seen["kwargs"].get("timeout") == 10, seen["kwargs"]
+    assert "无响应" in msg, msg
+
+
+def test_ffmpeg_probe_timeout_matches_android():
+    """超时值两端必须一致，否则安卓端仍会挂死。"""
+    desktop_src = open(os.path.join(ROOT, "core.py"), encoding="utf-8").read()
+    android = os.path.join(os.path.dirname(ROOT), "android", "app", "src",
+                           "main", "python", "insta_core.py")
+    if not os.path.isfile(android):
+        pytest.skip("安卓端副本不在")
+    android_src = open(android, encoding="utf-8").read()
+    for src, label in ((desktop_src, "desktop"), (android_src, "android")):
+        assert "timeout=10" in src, f"{label} 的 ffmpeg 探测没有 timeout"
+        assert "subprocess.TimeoutExpired" in src, f"{label} 没处理超时"

@@ -340,10 +340,15 @@ def ffmpeg_available() -> tuple[bool, str]:
         return False, "未找到 ffmpeg/ffprobe"
     for tool in (ff, fp):
         try:
+            #   必须有 timeout：ffmpeg.exe 损坏、或被杀软拦在半路时，
+            #   -version 会一直等下去。这个函数在启动、硬件探测、开始转换
+            #   四处被调用，挂住就是整个程序起不来。
             r = subprocess.run([tool, "-version"], capture_output=True,
-                               creationflags=_NO_WINDOW)
+                               creationflags=_NO_WINDOW, timeout=10)
             if r.returncode != 0:
                 return False, f"{tool} 无法运行"
+        except subprocess.TimeoutExpired:
+            return False, f"{tool} 无响应（>10s）"
         except Exception as e:  # noqa: BLE001
             return False, f"{tool} 无法运行: {e}"
     return True, ff

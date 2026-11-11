@@ -51,7 +51,9 @@ Rectangle {
             spacing: 8
 
             Text {
-                width: parent.width - 72
+                //   按按钮实际宽度反算，不写死 72：英文「知道了」/「Got it」
+                //   与中文宽度不同，固定值会在某一边留下多余空白或挤压文字。
+                width: parent.width - dismissButton.width - parent.spacing
                 anchors.verticalCenter: parent.verticalCenter
                 text: root.errorText
                 color: Theme.error
@@ -64,6 +66,7 @@ Rectangle {
             }
 
             AppButton {
+                id: dismissButton
                 text: bridge.tr("知道了")
                 btnHeight: 28
                 accent: false

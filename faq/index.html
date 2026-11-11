@@ -1,0 +1,472 @@
+<!doctype html>
+<!--
+  影石相机工具 · 常见问题
+  ------------------------------------------------------------------
+  部署：GitHub 仓库 Settings → Pages → Source = Deploy from a branch
+        → Branch = main，Folder = / (root)
+  依赖：零构建步骤。页面是静态 HTML + style.css，字体走 Google Fonts（Inter）。
+  改色 / 改圆角：只改 style.css 第 1 节令牌。
+-->
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="google-site-verification" content="Z1_5-kb9bWtHmbRLohl3fSZsMe-5Ndwo5JdBoWjXVhI" />
+    <meta name="msvalidate.01" content="04A099263FCA8257EDD252806D30A4AA" />
+    <meta name="robots" content="index, follow, max-image-preview:large" />
+    <title>常见问题：相机不认、ffmpeg 缺失、机型选择 | 影石相机工具</title>
+    <meta name="description" content="影石相机工具的常见问题：相册里看不到文件怎么排查、ffmpeg 找不到怎么办、自动与机型预设怎么选、会不会改动原片、支持哪些相机、安卓端安装包情况。" />
+    <meta name="color-scheme" content="light" />
+    <meta name="theme-color" content="#FFFFFF" />
+    <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="../assets/apple-touch-icon.png" />
+    <link rel="canonical" href="https://duofreedom.github.io/Insta-camera-tools/faq/" />
+    <link rel="sitemap" type="application/xml" href="../sitemap.xml" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="影石相机工具" />
+    <meta property="og:locale" content="zh_CN" />
+    <meta property="og:title" content="常见问题 · 影石相机工具" />
+    <meta property="og:description" content="导进去了但相机不认？按编码结构、inst box、索引登记三层顺序排查。" />
+    <meta property="og:url" content="https://duofreedom.github.io/Insta-camera-tools/faq/" />
+    <meta property="og:image" content="https://duofreedom.github.io/Insta-camera-tools/assets/og-cover.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="影石相机工具 instatools：把普通视频变成影石相机能认的原生素材" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="常见问题 · 影石相机工具" />
+    <meta name="twitter:description" content="导进去了但相机不认？按编码结构、inst box、索引登记三层顺序排查。" />
+    <meta name="twitter:image" content="https://duofreedom.github.io/Insta-camera-tools/assets/og-cover.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="../style.css" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "BreadcrumbList",
+            "itemListElement": [
+              {
+                "@type": "ListItem",
+                "position": 1,
+                "name": "首页",
+                "item": "https://duofreedom.github.io/Insta-camera-tools/"
+              },
+              {
+                "@type": "ListItem",
+                "position": 2,
+                "name": "常见问题",
+                "item": "https://duofreedom.github.io/Insta-camera-tools/faq/"
+              }
+            ]
+          },
+          {
+            "@type": "WebPage",
+            "name": "常见问题",
+            "url": "https://duofreedom.github.io/Insta-camera-tools/faq/",
+            "description": "相机不认、ffmpeg、机型选择等常见问题",
+            "inLanguage": "zh-CN",
+            "isPartOf": {
+              "@type": "WebSite",
+              "name": "影石相机工具",
+              "url": "https://duofreedom.github.io/Insta-camera-tools/"
+            }
+          },
+          {
+            "@type": "FAQPage",
+            "@id": "https://duofreedom.github.io/Insta-camera-tools/faq/#faq",
+            "mainEntity": []
+          }
+        ]
+      }
+    </script>
+  </head>
+
+  <body id="top">
+    <a class="sr-only skip-link" href="#main">跳到主要内容</a>
+
+    <header class="nav">
+      <div class="container nav__inner">
+        <a class="brand" href="../" aria-label="影石相机工具，回到首页">
+          <svg
+            class="brand__mark"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.7"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+            focusable="false"
+          >
+            <rect x="2.5" y="6.5" width="19" height="13" rx="3.5" />
+            <path d="M8.5 6.5l1.2-2.2h4.6l1.2 2.2" />
+            <circle cx="12" cy="13" r="3.6" />
+          </svg>
+          <span>影石相机工具</span>
+          <span class="brand__sub">桌面端 + 安卓端</span>
+        </a>
+
+        <nav class="nav__links" aria-label="主导航">
+          <a class="nav__link" href="../">双端</a>
+          <a class="nav__link" href="../features/">功能</a>
+          <a class="nav__link" href="../how-it-works/">技术原理</a>
+          <a class="nav__link" href="../guide/">使用指南</a>
+          <a class="nav__link" href="../faq/" aria-current="page">常见问题</a>
+        </nav>
+
+        <div class="nav__actions">
+          <a
+            class="icon-btn nav__gh"
+            href="https://github.com/DUOFreedom/Insta-camera-tools"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="GitHub 仓库（在新标签页打开）"
+          >
+            <svg class="icon-btn__icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false">
+              <path d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48l-.01-1.7c-2.78.6-3.37-1.34-3.37-1.34-.45-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.61.07-.61 1 .07 1.53 1.03 1.53 1.03.89 1.53 2.34 1.09 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.56-1.11-4.56-4.95 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02a9.5 9.5 0 0 1 5 0c1.91-1.29 2.75-1.02 2.75-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.59 1.03 2.68 0 3.85-2.35 4.7-4.57 4.94.36.31.68.92.68 1.86l-.01 2.75c0 .27.18.58.69.48A10 10 0 0 0 12 2z" />
+            </svg>
+          </a>
+          <a class="btn btn--filled" href="../download/">下载</a>
+          <button
+            class="icon-btn"
+            id="menu-btn"
+            type="button"
+            aria-expanded="false"
+            aria-controls="mobile-nav"
+            aria-label="打开导航菜单"
+          >
+            <svg class="icon-btn__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true" focusable="false">
+              <path d="M4 7h16M4 12h16M4 17h16" />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="mobile-nav" id="mobile-nav" hidden>
+        <nav aria-label="移动端导航">
+          <ul class="mobile-nav__list">
+            <li><a class="mobile-nav__link" href="../">双端</a></li>
+            <li><a class="mobile-nav__link" href="../features/">功能</a></li>
+            <li><a class="mobile-nav__link" href="../how-it-works/">技术原理</a></li>
+            <li><a class="mobile-nav__link" href="../guide/">使用指南</a></li>
+            <li><a class="mobile-nav__link" href="../faq/">常见问题</a></li>
+            <li><a class="mobile-nav__link" href="../download/">下载</a></li>
+            <li><a class="mobile-nav__link" href="../changelog/">更新日志</a></li>
+            <li><a class="mobile-nav__link" href="../license/">开源声明</a></li>
+          </ul>
+        </nav>
+      </div>
+    </header>
+
+    <div class="page-head">
+      <div class="container">
+        <nav class="crumbs" aria-label="面包屑导航">
+          <ol class="crumbs__list">
+            <li class="crumbs__item"><a class="crumbs__link" href="../">首页</a></li>
+            <li class="crumbs__item" aria-current="page">常见问题</li>
+          </ol>
+        </nav>
+        <h1 class="page-head__title" id="page-title">常见问题</h1>
+        <p class="page-head__lead">十三条，覆盖「导进去了但相机不认」的排查顺序，以及两端各自的环境问题。</p>
+      </div>
+    </div>
+
+    <main id="main">
+      <section class="section" id="faq">
+        <div class="container">
+
+          <div class="faq">
+            <details class="faq__item">
+              <summary class="faq__q" id="faq-q1" aria-expanded="false">
+                点开始没反应，或者报错找不到 ffmpeg
+                <svg class="faq__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                  <path d="M6 9l6 6 6-6" />
+                </svg>
+              </summary>
+              <div class="faq__a">
+                <p>界面上会出现「未找到 ffmpeg」的提示条，点右侧按钮可以让程序自己下载安装（装到系统目录需要管理员确认）；也可以手动把 ffmpeg.exe 和 ffprobe.exe 放进 exe 同目录的 bin\ 文件夹，或者装进系统 PATH。</p>
+                <p>注意两个文件都要，只放 ffmpeg.exe 不够——程序需要用 ffprobe.exe 读取源文件信息。</p>
+              </div>
+            </details>
+
+            <details class="faq__item">
+              <summary class="faq__q" id="faq-q2" aria-expanded="false">
+                视频导进去了，但相机相册里看不到
+                <svg class="faq__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                  <path d="M6 9l6 6 6-6" />
+                </svg>
+              </summary>
+              <div class="faq__a">
+                <p>按顺序检查三件事：</p>
+                <ol>
+                  <li>编码结构是否达标——主视频必须是 HEVC hvc1、1080p、无 B 帧、关键帧间隔 16</li>
+                  <li>inst box 是否移植成功——用卡内真机原片当模板，模板片不能是别的机型录的</li>
+                  <li>索引是否登记——见下方「技术原理」</li>
+                </ol>
+                <p>三者任一缺失都会导致相册里没有这个文件。</p>
+              </div>
+            </details>
+
+            <details class="faq__item">
+              <summary class="faq__q" id="faq-q3" aria-expanded="false">
+                相册里能看到条目，但点了打不开
+                <svg class="faq__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                  <path d="M6 9l6 6 6-6" />
+                </svg>
+              </summary>
+              <div class="faq__a">
+                <p>通常是索引字段写错，最常见两种：</p>
+                <ul>
+                  <li>f7 时间戳不是 14 位纯数字 YYYYMMDDHHMMSS（写成 9 位带序号就会这样）</li>
+                  <li>f9 偏移不是 inst box 在文件内的真实字节偏移（写成了文件大小也会这样）</li>
+                </ul>
+              </div>
+            </details>
+
+            <details class="faq__item">
+              <summary class="faq__q" id="faq-q4" aria-expanded="false">
+                相册里出现了 0KB 打不开的条目
+                <svg class="faq__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                  <path d="M6 9l6 6 6-6" />
+                </svg>
+              </summary>
+              <div class="faq__a">
+                <p>索引里多登记了 .lrv 文件。规则是只登记主视频，不登记 LRV。</p>
+                <p>重新导入时程序会覆盖修正，不需要手动删。</p>
+              </div>
+            </details>
+
+            <details class="faq__item">
+              <summary class="faq__q" id="faq-q5" aria-expanded="false">
+                超过 4GB 的长视频会失败吗
+                <svg class="faq__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                  <path d="M6 9l6 6 6-6" />
+                </svg>
+              </summary>
+              <div class="faq__a">
+                <p>不会。重封装对 32 位 size 与 64 位 largesize box 头、以及 stco / co64 两种分块偏移表都做了完整支持。</p>
+              </div>
+            </details>
+
+            <details class="faq__item">
+              <summary class="faq__q" id="faq-q6" aria-expanded="false">
+                Windows 提示「未知发布者」或杀毒软件报毒
+                <svg class="faq__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                  <path d="M6 9l6 6 6-6" />
+                </svg>
+              </summary>
+              <div class="faq__a">
+                <p>PyInstaller 打包的未签名程序会触发 SmartScreen，这是预期行为。点「更多信息 → 仍要运行」即可。</p>
+                <p>杀软误报通常是启发式规则对 PyInstaller 启动器敏感，加白名单即可，不需要关闭实时防护。</p>
+              </div>
+            </details>
+
+            <details class="faq__item">
+              <summary class="faq__q" id="faq-q7" aria-expanded="false">
+                能导入到相机的哪个位置？会不会覆盖原有素材
+                <svg class="faq__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                  <path d="M6 9l6 6 6-6" />
+                </svg>
+              </summary>
+              <div class="faq__a">
+                <p>写入 DCIM 目录，文件名按相机规则生成（VID_YYYYMMDD_HHMMSS_000.mp4），文件名冲突时自动递增序号。</p>
+                <p>不会覆盖已有素材。索引写入前会重读现有内容，只追加/替换自己的条目。</p>
+              </div>
+            </details>
+
+            <details class="faq__item">
+              <summary class="faq__q" id="faq-q8" aria-expanded="false">
+                安卓端提示「卡里缺一对真机模板」
+                <svg class="faq__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                  <path d="M6 9l6 6 6-6" />
+                </svg>
+              </summary>
+              <div class="faq__a">
+                <p>卡里必须有一对相机自己录制的 <code class="code code--inline">VID_*.mp4</code> 与 <code class="code code--inline">LRV_*.lrv</code>，导入时需要拿它们当 moov 骨架与 inst box 模板。</p>
+                <p>用相机录一小段（几秒即可），再回来执行导入。</p>
+              </div>
+            </details>
+
+            <details class="faq__item">
+              <summary class="faq__q" id="faq-q9" aria-expanded="false">
+                安卓端导入很慢，或者日志里出现「回退」
+                <svg class="faq__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                  <path d="M6 9l6 6 6-6" />
+                </svg>
+              </summary>
+              <div class="faq__a">
+                <p>编码器默认走软件编码（libx265 + libx264），与桌面端一致，相机识别最稳；设置页可切到「硬件」走 MediaCodec，速度更快。</p>
+                <p>硬编的 i-frame-interval 受系统限制只能取整数秒，拿不到相机要求的 16 帧密集关键帧，若导入后相机不显示缩略图或无法识别，请切回「自动」。</p>
+                <p>硬件解码与硬件编码失败时都会自动回退到软件路径，日志里会打印 <code class="code code--inline">[回退]</code> 行。</p>
+              </div>
+            </details>
+          </div>
+          <div class="faq mt-32">
+            <details class="faq__item">
+              <summary class="faq__q" id="faq-q10" aria-expanded="false">
+                「自动」和机型预设有什么区别，该选哪个
+                <svg class="faq__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                  <path d="M6 9l6 6 6-6" />
+                </svg>
+              </summary>
+              <div class="faq__a">
+                <p>「自动」从卡里现成的真机原片量参数，最准，能跟着固件升级走；机型预设是卡里没有原片时的兜底，参数写死在程序里。</p>
+                <p>判断方法：卡里还有没有相机自己录的 <code class="code code--inline">VID_</code>/<code class="code code--inline">LRV_</code>。有就留「自动」，没有才指定机型，选错了相机不会报错，只会不出现在相册里。</p>
+              </div>
+            </details>
+
+            <details class="faq__item">
+              <summary class="faq__q" id="faq-q11" aria-expanded="false">
+                会不会动到卡里的原片
+                <svg class="faq__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                  <path d="M6 9l6 6 6-6" />
+                </svg>
+              </summary>
+              <div class="faq__a">
+                <p>不改原片视频本身：程序只读取原片，写出来的是新文件。会改动的是索引文件（<code class="code code--inline">fileinfo_list.list</code> 与 <code class="code code--inline">.editinfo_list.list</code>），这是让相册认出新条目必须做的一步。</p>
+                <p>所以导入前建议先备份这两个文件；不勾选「登记索引」时只在输出目录里生成文件，不碰卡。</p>
+              </div>
+            </details>
+
+            <details class="faq__item">
+              <summary class="faq__q" id="faq-q12" aria-expanded="false">
+                安卓端什么时候有安装包
+                <svg class="faq__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                  <path d="M6 9l6 6 6-6" />
+                </svg>
+              </summary>
+              <div class="faq__a">
+                <p>暂不提供。现在只给源码，需要按构建说明自己打 APK：真机导入链路与部分机型兼容性还没验证完，用默认调试签名的包也不适合分发。</p>
+                <p>构建步骤见 <a class="link" href="https://github.com/DUOFreedom/Insta-camera-tools/blob/main/docs/BUILD.md" target="_blank" rel="noopener noreferrer">docs/BUILD.md</a>。</p>
+              </div>
+            </details>
+
+            <details class="faq__item">
+              <summary class="faq__q" id="faq-q13" aria-expanded="false">
+                支持哪些相机
+                <svg class="faq__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                  <path d="M6 9l6 6 6-6" />
+                </svg>
+              </summary>
+              <div class="faq__a">
+                <p>Ace Pro 2 与 GO Ultra 是按真机原片量过参数的，包括 GOP、代理编码与音轨数。其他机型取决于 inst box 布局是否一致，没有验证过，用前先拿一个短视频试：能进相册、能播放、封面正常，再批量。</p>
+                <p>全景机型（X 系列）不适用：文件名规则与文件结构都不是这一套。</p>
+              </div>
+            </details>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer" aria-label="页脚">
+      <div class="container">
+        <div class="footer__inner">
+          <div class="footer__brand">
+            <p class="footer__name">影石相机工具</p>
+            <p class="footer__meta">桌面端 v1.2.0 · GPL-3.0 · Windows 10 / 11 · 安卓端源码可构建</p>
+          </div>
+          <div class="footer__links">
+            <a class="btn btn--ghost" href="https://github.com/DUOFreedom/Insta-camera-tools" target="_blank" rel="noopener noreferrer">
+              <svg class="btn__icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false">
+                <path d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48l-.01-1.7c-2.78.6-3.37-1.34-3.37-1.34-.45-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.61.07-.61 1 .07 1.53 1.03 1.53 1.03.89 1.53 2.34 1.09 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.56-1.11-4.56-4.95 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02a9.5 9.5 0 0 1 5 0c1.91-1.29 2.75-1.02 2.75-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.59 1.03 2.68 0 3.85-2.35 4.7-4.57 4.94.36.31.68.92.68 1.86l-.01 2.75c0 .27.18.58.69.48A10 10 0 0 0 12 2z" />
+              </svg>
+              GitHub 仓库
+            </a>
+            <a class="btn btn--ghost" href="../">
+              <svg class="btn__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                <path d="M12 19V5" /><path d="M6 11l6-6 6 6" />
+              </svg>
+              回到顶部
+            </a>
+          </div>
+        </div>
+        <nav class="footer__nav" aria-label="页脚导航">
+          <a class="footer__link" href="../features/">功能</a>
+          <a class="footer__link" href="../how-it-works/">技术原理</a>
+          <a class="footer__link" href="../guide/">使用指南</a>
+          <a class="footer__link" href="../faq/">常见问题</a>
+          <a class="footer__link" href="../download/">下载</a>
+          <a class="footer__link" href="../changelog/">更新日志</a>
+          <a class="footer__link" href="../license/">开源声明</a>
+          <a class="footer__link" href="../sitemap/">站点地图</a>
+        </nav>
+        <p class="footer__note">第三方工具，与影石创新科技股份有限公司无任何关联，未获其授权或认可。</p>
+      </div>
+    </footer>
+
+    <script>
+      (function () {
+        "use strict";
+
+        var menuBtn = document.getElementById("menu-btn");
+        var menuPanel = document.getElementById("mobile-nav");
+
+        function setMenu(open) {
+          menuBtn.setAttribute("aria-expanded", String(open));
+          menuBtn.setAttribute("aria-label", open ? "关闭导航菜单" : "打开导航菜单");
+          if (open) menuPanel.removeAttribute("hidden");
+          else menuPanel.setAttribute("hidden", "");
+        }
+
+        menuBtn.addEventListener("click", function () {
+          setMenu(menuBtn.getAttribute("aria-expanded") !== "true");
+        });
+
+        menuPanel.addEventListener("click", function (event) {
+          if (event.target.closest("a")) setMenu(false);
+        });
+
+        document.addEventListener("keydown", function (event) {
+          if (event.key === "Escape" && menuBtn.getAttribute("aria-expanded") === "true") {
+            setMenu(false);
+            menuBtn.focus();
+          }
+        });
+
+        /* FAQ：<details> 自带状态，这里同步 aria-expanded */
+        Array.prototype.forEach.call(document.querySelectorAll(".faq__item"), function (item) {
+          var summary = item.querySelector("summary");
+          summary.setAttribute("aria-expanded", String(item.open));
+          summary.addEventListener("click", function () {
+            summary.setAttribute("aria-expanded", String(!item.open));
+          });
+          item.addEventListener("toggle", function () {
+            summary.setAttribute("aria-expanded", String(item.open));
+          });
+        });
+
+        /* 复制 SHA256：每个按钮通过 data-copy 指向自己的 <code> 元素 */
+        Array.prototype.forEach.call(document.querySelectorAll(".copy-btn[data-copy]"), function (btn) {
+          var target = document.getElementById(btn.getAttribute("data-copy"));
+          var label = document.getElementById(btn.getAttribute("data-label"));
+          if (!target) return;
+          if (!navigator.clipboard) {
+            btn.hidden = true;
+            return;
+          }
+          btn.addEventListener("click", function () {
+            navigator.clipboard.writeText(target.textContent.trim()).then(
+              function () {
+                label.textContent = "已复制";
+                window.setTimeout(function () {
+                  label.textContent = "复制";
+                }, 2000);
+              },
+              function () {
+                label.textContent = "复制失败";
+                window.setTimeout(function () {
+                  label.textContent = "复制";
+                }, 2000);
+              }
+            );
+          });
+        });
+      })();
+    </script>
+  </body>
+</html>

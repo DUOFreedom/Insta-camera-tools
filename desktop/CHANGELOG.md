@@ -24,9 +24,36 @@
 
 端到端复核（`.e2e/src.mp4`，`model_override="go_ultra"`，本机 ffmpeg 9.0.1 + QSV）：产物 `VID gop=120` / `LRV gop=10`，与真机 GO Ultra 模板一致。
 
+### 修复（审查发现的一批问题：模板遮蔽、安装流程漏译、探测挂死、英文宽度）
+
+**一、i18n 模板互相遮蔽。** `desktop/i18n.py` 的 `_templates()` 按 `EN_TEXT` 的插入顺序编译模板，而 `"完成：成功 %d"` 排在 `"完成：成功 %d，失败 %d"` 前面，`fullmatch` 先命中短的那条，长句被截成 `Done: 3，失败 1 succeeded` —— 半中半英，参数还错位。安卓副本 `android/app/src/main/python/i18n.py` 一直是 `sorted(EN_TEXT, key=len, reverse=True)`，桌面这份漏了。枚举全部 85 个带占位符的键做两两互测，只有这一对被遮蔽；改成按键长降序后与安卓一致。
+
+**二、ffmpeg 未就绪横幅整条漏译。** `desktop/bridge.py` 里那句「ffmpeg 未就绪：%s。可以装到系统目录（需管理员权限），也可以只装到程序目录。」不在文案表里，英文界面下是启动时最先看到的一段中文。
+
+**三、安装与下载流程的进度文案漏译。** `desktop/core.py` 的 9 条：`正在为 ffmpeg 下载源测速...`、`  %s 不可达`、`正在从 %s 下载 ffmpeg ...`、`正在下载 ffmpeg %s% (%s)`、`正在下载 %s%`、`正在安装到 %s ...`、`正在校验 ffmpeg ...`、`ffmpeg 安装完成 ✓ (%s)`。它们经 `bridge.stage()` 直贴状态栏。同一批里上一轮还误判了若干条「漏译」—— 那些其实早有译文，是核对时进程里没设 `INSTA_LANG=en`，`i18n` 判成中文就直接返回原文。查漏必须先把语言钉成英文再查。
+
+**四、阶段名与轨道标签漏译。** `转码` / `移植 inst box` / `登记索引` 是进度回调的阶段名，`VID (主视频)` / `LRV (低清预览)` 是日志里的轨道标签，都会显示在界面上，四条都没有英文。
+
+**五、`ffmpeg -version` 探测没有超时。** `desktop/core.py:343` 与 `android/app/src/main/python/insta_core.py:256` 的 `subprocess.run([tool, "-version"], ...)` 不带 `timeout`。`ffmpeg.exe` 损坏或被杀软拦在半路时这条命令会一直等，而这个函数在启动、硬件探测、开始转换四处被调用 —— 挂住就是整个程序起不来。两处都加 `timeout=10`，并单独捕获 `subprocess.TimeoutExpired` 报「无响应（>10s）」，不再落进通用失败分支。
+
+**六、英文界面的两处写死宽度。** `desktop/qml/main.qml` 的续跑按钮 `width: 120`：「只跑未完成」标签 65px 够用，英文 `Only unfinished` 标签 98px，`AppButton.implicitWidth` 算出 130，按钮里的 `Text` 又是 `anchors.centerIn` 且没有 `elide`，多出来的 10px 会横向溢出边框。改成 `Math.max(120, implicitWidth)`，左侧说明文字的宽度也从 `parent.width - 120 - 12` 改成按按钮实际宽度反算。`desktop/qml/ActionView.qml` 的错误文本同理，`parent.width - 72` 换成按「知道了」按钮的实际宽度算 —— 72 在两个语言下都够，但那是巧合，不该写成常量。
+
+### 测试（本轮 6 条，含两处回滚验证）
+
+`desktop/tests/test_i18n.py` 四条：`完成：成功 3，失败 1` 必须整句译成 `Done: 3 succeeded, 1 failed` 且不含任何汉字；16 条安装/下载流程文案逐条检查译出；5 条阶段名与轨道标签检查译出；未就绪横幅必须以 `ffmpeg is not ready:` 开头、以 `into the program folder.` 结尾。
+
+`desktop/tests/test_insta.py` 两条：monkeypatch `core.subprocess.run` 抛 `TimeoutExpired`，断言探测确实传了 `timeout=10`、返回 `False`、消息含「无响应」；另一条守两端源码都必须含 `timeout=10` 与 `subprocess.TimeoutExpired`，避免只改了桌面端。
+
+回滚验证两处，都实测变红后还原：`_templates()` 改回 `for key in EN_TEXT:` → 模板遮蔽那条红（`Done: 3，失败 1 succeeded`）；删掉 `core.py` 的 `timeout=10` → 探测的两条红（`desktop 的 ffmpeg 探测没有 timeout`）。全套 `python -m pytest desktop/tests/ -q` → **215 passed, 3 skipped**。
+
+### 产物（审查修复轮）
+
+- `desktop/dist/instatools.exe` 80,521,485 B（上一轮 80,519,132 B），`INSTA_LANG=en` 与 `zh` 下 `--self-test` 均为 `QML_OK roots=1`、exit 0。改动只涉及 Python 与两个 QML 文件，`pyside6-qmllint` 对 `main.qml`、`ActionView.qml` 只剩既有的 `Unqualified access` 提示（`bridge` 是上下文属性，qmllint 静态看不到），没有语法错误。
+- 安卓 release APK 75,311,489 B（上一轮 75,311,427 B），`aapt2 dump badging` 仍为 `com.duofreedom.instatools` / versionCode 14 / versionName 1.2.0。单元测试 `IndexTest` 7 skipped、`PythonI18nTest` 4、`ConsentLogicTest` 5、`ImportCardStateTest` 6，失败与错误均 0。`app/build/python/sources/release/insta_core.py:260` 已含 `timeout=10`，说明安卓副本的探测超时确实进了包。
+
 ### 新增（桌面端中英双语，跟随系统界面语言）
 
-新增 `desktop/i18n.py`：键是中文原文、值是英文译文的文案表，共 210 条。查不到的键**原样返回中文** —— 漏译时界面显示中文，既不崩也不会露出内部键名，可以增量补齐。
+新增 `desktop/i18n.py`：键是中文原文、值是英文译文的文案表，共 243 条。查不到的键**原样返回中文** —— 漏译时界面显示中文，既不崩也不会露出内部键名，可以增量补齐。
 
 语言判定顺序（`i18n.detect()`）：环境变量 `INSTA_LANG` > Windows 用户界面语言 > Qt 的 `QLocale` > 英文。Windows 这一级用 `GetUserDefaultUILanguage()` 而不是 `locale.getdefaultlocale()`：后者读的是进程的 C locale，中文系统上照样可能返回 `en_US`，判断不了用户实际看到的界面语言。`langid & 0x3FF == 0x04` 判中文（低 10 位是主语言 ID，0x04 是 `LANG_CHINESE`，因此简体、繁体、香港、新加坡全部落到中文）。进程内只判定一次 —— 系统界面语言不会在运行期间变化。
 

@@ -16,7 +16,7 @@ Convert ordinary videos into native formats recognized by Insta360 camera albums
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0--or--later-blue?style=flat-square" alt="License"></a>
   <a href="desktop/CHANGELOG.md"><img src="https://img.shields.io/badge/version-1.2.0-success?style=flat-square" alt="Version"></a>
   <a href="desktop/requirements.txt"><img src="https://img.shields.io/badge/python-3.10%2B-3776ab?style=flat-square" alt="Python"></a>
-  <a href="desktop/tests"><img src="https://img.shields.io/badge/tests-202%20passed-brightgreen?style=flat-square" alt="Tests"></a>
+  <a href="desktop/tests"><img src="https://img.shields.io/badge/tests-215%20passed-brightgreen?style=flat-square" alt="Tests"></a>
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20Android-6f42c1?style=flat-square" alt="Platform">
 </p>
 
@@ -273,7 +273,7 @@ pip install -r requirements-dev.txt
 python -m pytest tests/ -q
 ```
 
-Expected `202 passed, 3 skipped`. Two of the three skips need real device index samples (`desktop/samples/`, `android/app/src/test/resources/samples/`; samples contain device IDs, not committed by convention), the third needs a working ffmpeg to construct a transcode that must fail.
+Expected `215 passed, 3 skipped`. Two of the three skips need real device index samples (`desktop/samples/`, `android/app/src/test/resources/samples/`; samples contain device IDs, not committed by convention), the third needs a working ffmpeg to construct a transcode that must fail.
 
 Before changing code, read [`docs/BUILD.md`](docs/BUILD.md). Two common pitfalls:
 

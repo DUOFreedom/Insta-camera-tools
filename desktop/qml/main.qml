@@ -332,7 +332,10 @@ Window {
 
                             Text {
                                 anchors.verticalCenter: parent.verticalCenter
-                                width: parent.width - 120 - 12
+                                //   按按钮的实际宽度反算，不写死 120：
+                                //   英文的 "Only unfinished" 比中文长，
+                                //   固定的 120 会让按钮自己溢出边框。
+                                width: parent.width - resumeToggle.width - resumeRow.spacing
                                 text: bridge.resumeSummary
                                 color: Theme.textSecondary
                                 font.family: Theme.fontFamily
@@ -344,7 +347,8 @@ Window {
                             }
 
                             AppButton {
-                                width: 120
+                                id: resumeToggle
+                                width: Math.max(120, implicitWidth)
                                 btnHeight: 32
                                 text: bridge.resumeOnly ? bridge.tr("只跑未完成") : bridge.tr("全部重跑")
                                 onClicked: bridge.setResumeOnly(!bridge.resumeOnly)

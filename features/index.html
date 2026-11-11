@@ -1,0 +1,451 @@
+<!doctype html>
+<!--
+  影石相机工具 · 功能详解
+  ------------------------------------------------------------------
+  部署：GitHub 仓库 Settings → Pages → Source = Deploy from a branch
+        → Branch = main，Folder = / (root)
+  依赖：零构建步骤。页面是静态 HTML + style.css，字体走 Google Fonts（Inter）。
+  改色 / 改圆角：只改 style.css 第 1 节令牌。
+-->
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="google-site-verification" content="Z1_5-kb9bWtHmbRLohl3fSZsMe-5Ndwo5JdBoWjXVhI" />
+    <meta name="msvalidate.01" content="04A099263FCA8257EDD252806D30A4AA" />
+    <meta name="robots" content="index, follow, max-image-preview:large" />
+    <title>功能详解 · 导入、批量、续跑、机型预设 | 影石相机工具</title>
+    <meta name="description" content="影石相机工具的功能清单：转码 VID + LRV、移植 inst box、登记相机索引、批量排队、断点续跑、机型预设（Ace Pro 2 / GO Ultra）、硬件编码、封面选择与卡校验。" />
+    <meta name="color-scheme" content="light" />
+    <meta name="theme-color" content="#FFFFFF" />
+    <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="../assets/apple-touch-icon.png" />
+    <link rel="canonical" href="https://duofreedom.github.io/Insta-camera-tools/features/" />
+    <link rel="sitemap" type="application/xml" href="../sitemap.xml" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="影石相机工具" />
+    <meta property="og:locale" content="zh_CN" />
+    <meta property="og:title" content="功能详解 · 影石相机工具" />
+    <meta property="og:description" content="转码、移植、登记之外，还有批量排队、断点续跑、机型预设、硬件加速与卡校验。" />
+    <meta property="og:url" content="https://duofreedom.github.io/Insta-camera-tools/features/" />
+    <meta property="og:image" content="https://duofreedom.github.io/Insta-camera-tools/assets/og-cover.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="影石相机工具 instatools：把普通视频变成影石相机能认的原生素材" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="功能详解 · 影石相机工具" />
+    <meta name="twitter:description" content="转码、移植、登记之外，还有批量排队、断点续跑、机型预设、硬件加速与卡校验。" />
+    <meta name="twitter:image" content="https://duofreedom.github.io/Insta-camera-tools/assets/og-cover.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="../style.css" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "BreadcrumbList",
+            "itemListElement": [
+              {
+                "@type": "ListItem",
+                "position": 1,
+                "name": "首页",
+                "item": "https://duofreedom.github.io/Insta-camera-tools/"
+              },
+              {
+                "@type": "ListItem",
+                "position": 2,
+                "name": "功能详解",
+                "item": "https://duofreedom.github.io/Insta-camera-tools/features/"
+              }
+            ]
+          },
+          {
+            "@type": "WebPage",
+            "name": "功能详解",
+            "url": "https://duofreedom.github.io/Insta-camera-tools/features/",
+            "description": "影石相机工具的功能清单",
+            "inLanguage": "zh-CN",
+            "isPartOf": {
+              "@type": "WebSite",
+              "name": "影石相机工具",
+              "url": "https://duofreedom.github.io/Insta-camera-tools/"
+            }
+          }
+        ]
+      }
+    </script>
+  </head>
+
+  <body id="top">
+    <a class="sr-only skip-link" href="#main">跳到主要内容</a>
+
+    <header class="nav">
+      <div class="container nav__inner">
+        <a class="brand" href="../" aria-label="影石相机工具，回到首页">
+          <svg
+            class="brand__mark"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.7"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+            focusable="false"
+          >
+            <rect x="2.5" y="6.5" width="19" height="13" rx="3.5" />
+            <path d="M8.5 6.5l1.2-2.2h4.6l1.2 2.2" />
+            <circle cx="12" cy="13" r="3.6" />
+          </svg>
+          <span>影石相机工具</span>
+          <span class="brand__sub">桌面端 + 安卓端</span>
+        </a>
+
+        <nav class="nav__links" aria-label="主导航">
+          <a class="nav__link" href="../">双端</a>
+          <a class="nav__link" href="../features/" aria-current="page">功能</a>
+          <a class="nav__link" href="../how-it-works/">技术原理</a>
+          <a class="nav__link" href="../guide/">使用指南</a>
+          <a class="nav__link" href="../faq/">常见问题</a>
+        </nav>
+
+        <div class="nav__actions">
+          <a
+            class="icon-btn nav__gh"
+            href="https://github.com/DUOFreedom/Insta-camera-tools"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="GitHub 仓库（在新标签页打开）"
+          >
+            <svg class="icon-btn__icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false">
+              <path d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48l-.01-1.7c-2.78.6-3.37-1.34-3.37-1.34-.45-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.61.07-.61 1 .07 1.53 1.03 1.53 1.03.89 1.53 2.34 1.09 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.56-1.11-4.56-4.95 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02a9.5 9.5 0 0 1 5 0c1.91-1.29 2.75-1.02 2.75-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.59 1.03 2.68 0 3.85-2.35 4.7-4.57 4.94.36.31.68.92.68 1.86l-.01 2.75c0 .27.18.58.69.48A10 10 0 0 0 12 2z" />
+            </svg>
+          </a>
+          <a class="btn btn--filled" href="../download/">下载</a>
+          <button
+            class="icon-btn"
+            id="menu-btn"
+            type="button"
+            aria-expanded="false"
+            aria-controls="mobile-nav"
+            aria-label="打开导航菜单"
+          >
+            <svg class="icon-btn__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true" focusable="false">
+              <path d="M4 7h16M4 12h16M4 17h16" />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="mobile-nav" id="mobile-nav" hidden>
+        <nav aria-label="移动端导航">
+          <ul class="mobile-nav__list">
+            <li><a class="mobile-nav__link" href="../">双端</a></li>
+            <li><a class="mobile-nav__link" href="../features/">功能</a></li>
+            <li><a class="mobile-nav__link" href="../how-it-works/">技术原理</a></li>
+            <li><a class="mobile-nav__link" href="../guide/">使用指南</a></li>
+            <li><a class="mobile-nav__link" href="../faq/">常见问题</a></li>
+            <li><a class="mobile-nav__link" href="../download/">下载</a></li>
+            <li><a class="mobile-nav__link" href="../changelog/">更新日志</a></li>
+            <li><a class="mobile-nav__link" href="../license/">开源声明</a></li>
+          </ul>
+        </nav>
+      </div>
+    </header>
+
+    <div class="page-head">
+      <div class="container">
+        <nav class="crumbs" aria-label="面包屑导航">
+          <ol class="crumbs__list">
+            <li class="crumbs__item"><a class="crumbs__link" href="../">首页</a></li>
+            <li class="crumbs__item" aria-current="page">功能详解</li>
+          </ol>
+        </nav>
+        <h1 class="page-head__title" id="page-title">功能详解</h1>
+        <p class="page-head__lead">两端共用的能力，按处理顺序分两组：先把文件正确写进卡里，再保证几百个文件一起跑的时候不出事。</p>
+      </div>
+    </div>
+
+    <main id="main">
+      <section class="section section--alt" id="features">
+        <div class="container">
+
+          <div class="feature-groups">
+            <section aria-labelledby="features-import-title">
+              <h2 class="feature-group__title" id="features-import-title">导入与转码</h2>
+              <ul class="feature-list">
+                <li class="feature">
+                  <svg class="feature__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                    <circle cx="10.5" cy="10.5" r="6.5" /><path d="M15.5 15.5L21 21" /><path d="M7.8 10.6l2 2 3.2-3.4" />
+                  </svg>
+                  <div>
+                    <p class="feature__title">开工前体检</p>
+                    <p class="feature__text">
+                      开跑前 1 秒内检查 ffmpeg、源文件、输出目录、剩余空间、卡是否可写、模板片是否存在，有问题当场拦下。
+                    </p>
+                  </div>
+                </li>
+                <li class="feature">
+                  <svg class="feature__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                    <rect x="6" y="5" width="4" height="14" rx="1.2" /><rect x="14" y="5" width="4" height="14" rx="1.2" />
+                  </svg>
+                  <div>
+                    <p class="feature__title">随时取消</p>
+                    <p class="feature__text">转码中途点取消，ffmpeg 进程干净退出，不留孤儿进程。</p>
+                  </div>
+                </li>
+                <li class="feature">
+                  <svg class="feature__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                    <path d="M20 12a8 8 0 1 1-2.4-5.7" /><path d="M20 4v5h-5" />
+                  </svg>
+                  <div>
+                    <p class="feature__title">断点续跑</p>
+                    <p class="feature__text">中断后重新打开，会问「只跑未完成的 N 条」还是「全部重跑」。</p>
+                  </div>
+                </li>
+                <li class="feature">
+                  <svg class="feature__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                    <rect x="3" y="4.5" width="18" height="15" rx="2.5" /><circle cx="8.5" cy="9.5" r="1.6" /><path d="M4.5 17l5-4.5 4 3.5 3-2.5 3 3" />
+                  </svg>
+                  <div>
+                    <p class="feature__title">同名封面</p>
+                    <p class="feature__text">a.mp4 旁边有 a.jpg / a.png 就自动用它当封面。</p>
+                  </div>
+                </li>
+                <li class="feature">
+                  <svg class="feature__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                    <path d="M12 3l9 5-9 5-9-5 9-5z" /><path d="M3 12.5l9 5 9-5" /><path d="M3 16.5l9 5 9-5" />
+                  </svg>
+                  <div>
+                    <p class="feature__title">批量排队</p>
+                    <p class="feature__text">一次拖几百个文件进来也没问题。</p>
+                  </div>
+                </li>
+              </ul>
+            </section>
+
+            <section aria-labelledby="features-runtime-title">
+              <h2 class="feature-group__title" id="features-runtime-title">运行体验</h2>
+              <ul class="feature-list">
+                <li class="feature">
+                  <svg class="feature__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                    <rect x="4" y="12" width="4" height="8" rx="1.2" /><rect x="10" y="7" width="4" height="13" rx="1.2" /><rect x="16" y="4" width="4" height="16" rx="1.2" />
+                  </svg>
+                  <div>
+                    <p class="feature__title">三阶段进度</p>
+                    <p class="feature__text">转码 / 移植 / 登记分开显示，不糊成一条进度条。</p>
+                  </div>
+                </li>
+                <li class="feature">
+                  <svg class="feature__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                    <path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z" />
+                  </svg>
+                  <div>
+                    <p class="feature__title">防休眠</p>
+                    <p class="feature__text">处理长片时系统不会中途睡过去。</p>
+                  </div>
+                </li>
+                <li class="feature">
+                  <svg class="feature__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                    <path d="M13 2L5 13h5l-1 9 8-11h-5l1-9z" />
+                  </svg>
+                  <div>
+                    <p class="feature__title">硬件加速</p>
+                    <p class="feature__text">自动探测并优先使用 QSV / NVENC / AMF，不可用时回落到软件编码。</p>
+                  </div>
+                </li>
+                <li class="feature">
+                  <svg class="feature__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                    <path d="M9 3h6" /><path d="M10 3v5.5L4.8 18a2 2 0 0 0 1.7 3h11a2 2 0 0 0 1.7-3L14 8.5V3" /><path d="M7.5 15h9" />
+                  </svg>
+                  <div>
+                    <p class="feature__title">离线回归</p>
+                    <p class="feature__text">202 项测试，不需要真机也能跑。</p>
+                  </div>
+                </li>
+                <li class="feature">
+                  <svg class="feature__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                    <path d="M6 3h8l4 4v14H6z" /><path d="M14 3v4h4" /><path d="M9 12h6" /><path d="M9 16h6" />
+                  </svg>
+                  <div>
+                    <p class="feature__title">运行日志</p>
+                    <p class="feature__text">写入 %LOCALAPPDATA%\instatools\，出问题可回溯。</p>
+                  </div>
+                </li>
+              </ul>
+            </section>
+          </div>
+        </div>
+
+        <section class="mt-32" aria-labelledby="features-preset-title">
+          <h2 class="feature-group__title" id="features-preset-title">机型预设</h2>
+
+          <p class="section__lead section__lead--left">
+            默认用「自动」：从卡里现成的真机原片量出编码、分辨率、帧率、GOP 与音轨数，再套到新文件上。只要卡里有一对同机型录的
+            <code class="code code--inline">VID_</code>/<code class="code code--inline">LRV_</code>，这条路永远比手选准。
+          </p>
+
+          <p class="section__lead section__lead--left">
+            卡里没有原片时（先格式化过、或本来就是别的机器录的卡），可以在界面最上方指定机型预设。两个预设的差别集中在代理文件与关键帧间隔：
+          </p>
+
+          <div class="table-wrap mt-16">
+            <table class="table">
+              <caption class="sr-only">Ace Pro 2 与 GO Ultra 预设参数对照</caption>
+              <thead>
+                <tr>
+                  <th scope="col">项目</th>
+                  <th scope="col">Ace Pro 2</th>
+                  <th scope="col">GO Ultra</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>主视频</td>
+                  <td>HEVC <code>hvc1</code> 1920×1080 30fps</td>
+                  <td>HEVC <code>hvc1</code> 1920×1080 30fps</td>
+                </tr>
+                <tr>
+                  <td>主视频关键帧</td>
+                  <td><code>-g 16</code></td>
+                  <td><code>-g 120</code></td>
+                </tr>
+                <tr>
+                  <td>代理文件</td>
+                  <td>H.264 <code>avc1</code> 1280×720</td>
+                  <td>HEVC <code>hvc1</code> 1280×720</td>
+                </tr>
+                <tr>
+                  <td>代理关键帧</td>
+                  <td><code>-g 16</code></td>
+                  <td><code>-g 10</code></td>
+                </tr>
+                <tr>
+                  <td>音轨</td>
+                  <td>2 条（AAC + 时间码）</td>
+                  <td>1 条（AAC）</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <p class="steps__note">
+            选错机型不会报错，只会在相机上「什么都没有」——文件能播、电脑上完全正常，唯独相册不认。所以默认自动，找不到原片才用预设。
+          </p>
+        </section>
+
+      </section>
+    </main>
+
+    <footer class="footer" aria-label="页脚">
+      <div class="container">
+        <div class="footer__inner">
+          <div class="footer__brand">
+            <p class="footer__name">影石相机工具</p>
+            <p class="footer__meta">桌面端 v1.2.0 · GPL-3.0 · Windows 10 / 11 · 安卓端源码可构建</p>
+          </div>
+          <div class="footer__links">
+            <a class="btn btn--ghost" href="https://github.com/DUOFreedom/Insta-camera-tools" target="_blank" rel="noopener noreferrer">
+              <svg class="btn__icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false">
+                <path d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48l-.01-1.7c-2.78.6-3.37-1.34-3.37-1.34-.45-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.61.07-.61 1 .07 1.53 1.03 1.53 1.03.89 1.53 2.34 1.09 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.56-1.11-4.56-4.95 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02a9.5 9.5 0 0 1 5 0c1.91-1.29 2.75-1.02 2.75-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.59 1.03 2.68 0 3.85-2.35 4.7-4.57 4.94.36.31.68.92.68 1.86l-.01 2.75c0 .27.18.58.69.48A10 10 0 0 0 12 2z" />
+              </svg>
+              GitHub 仓库
+            </a>
+            <a class="btn btn--ghost" href="../">
+              <svg class="btn__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                <path d="M12 19V5" /><path d="M6 11l6-6 6 6" />
+              </svg>
+              回到顶部
+            </a>
+          </div>
+        </div>
+        <nav class="footer__nav" aria-label="页脚导航">
+          <a class="footer__link" href="../features/">功能</a>
+          <a class="footer__link" href="../how-it-works/">技术原理</a>
+          <a class="footer__link" href="../guide/">使用指南</a>
+          <a class="footer__link" href="../faq/">常见问题</a>
+          <a class="footer__link" href="../download/">下载</a>
+          <a class="footer__link" href="../changelog/">更新日志</a>
+          <a class="footer__link" href="../license/">开源声明</a>
+          <a class="footer__link" href="../sitemap/">站点地图</a>
+        </nav>
+        <p class="footer__note">第三方工具，与影石创新科技股份有限公司无任何关联，未获其授权或认可。</p>
+      </div>
+    </footer>
+
+    <script>
+      (function () {
+        "use strict";
+
+        var menuBtn = document.getElementById("menu-btn");
+        var menuPanel = document.getElementById("mobile-nav");
+
+        function setMenu(open) {
+          menuBtn.setAttribute("aria-expanded", String(open));
+          menuBtn.setAttribute("aria-label", open ? "关闭导航菜单" : "打开导航菜单");
+          if (open) menuPanel.removeAttribute("hidden");
+          else menuPanel.setAttribute("hidden", "");
+        }
+
+        menuBtn.addEventListener("click", function () {
+          setMenu(menuBtn.getAttribute("aria-expanded") !== "true");
+        });
+
+        menuPanel.addEventListener("click", function (event) {
+          if (event.target.closest("a")) setMenu(false);
+        });
+
+        document.addEventListener("keydown", function (event) {
+          if (event.key === "Escape" && menuBtn.getAttribute("aria-expanded") === "true") {
+            setMenu(false);
+            menuBtn.focus();
+          }
+        });
+
+        /* FAQ：<details> 自带状态，这里同步 aria-expanded */
+        Array.prototype.forEach.call(document.querySelectorAll(".faq__item"), function (item) {
+          var summary = item.querySelector("summary");
+          summary.setAttribute("aria-expanded", String(item.open));
+          summary.addEventListener("click", function () {
+            summary.setAttribute("aria-expanded", String(!item.open));
+          });
+          item.addEventListener("toggle", function () {
+            summary.setAttribute("aria-expanded", String(item.open));
+          });
+        });
+
+        /* 复制 SHA256：每个按钮通过 data-copy 指向自己的 <code> 元素 */
+        Array.prototype.forEach.call(document.querySelectorAll(".copy-btn[data-copy]"), function (btn) {
+          var target = document.getElementById(btn.getAttribute("data-copy"));
+          var label = document.getElementById(btn.getAttribute("data-label"));
+          if (!target) return;
+          if (!navigator.clipboard) {
+            btn.hidden = true;
+            return;
+          }
+          btn.addEventListener("click", function () {
+            navigator.clipboard.writeText(target.textContent.trim()).then(
+              function () {
+                label.textContent = "已复制";
+                window.setTimeout(function () {
+                  label.textContent = "复制";
+                }, 2000);
+              },
+              function () {
+                label.textContent = "复制失败";
+                window.setTimeout(function () {
+                  label.textContent = "复制";
+                }, 2000);
+              }
+            );
+          });
+        });
+      })();
+    </script>
+  </body>
+</html>

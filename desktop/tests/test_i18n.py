@@ -369,3 +369,73 @@ def test_main_py_does_not_hardcode_the_product_name():
     src = open(os.path.join(DESKTOP, "main.py"), encoding="utf-8").read()
     assert "i18n.app_name()" in src
     assert "影石相机工具" not in src
+
+
+# ---------- 覆盖率：模板遮蔽与安装流程文案 ----------
+
+_CJK = re.compile(r"[\u4e00-\u9fff]")
+
+
+def test_longer_template_wins_over_shorter_prefix(monkeypatch):
+    """长的模板必须先匹配。
+
+    "完成：成功 %d" 与 "完成：成功 %d，失败 %d" 同时存在时，短的那条
+    一旦排在前面，fullmatch 就会把长句截下来，结果是
+    "Done: 3，失败 1 succeeded"——半中半英、参数还错位。
+    """
+    monkeypatch.setenv("INSTA_LANG", "en")
+    i18n.set_lang("en")
+    out = i18n.t("完成：成功 3，失败 1")
+    assert out == "Done: 3 succeeded, 1 failed", out
+    assert out == "Done: 3 succeeded, 1 failed"
+    assert not _CJK.search(out), out
+
+
+def test_install_flow_messages_are_translated(monkeypatch):
+    """ffmpeg 下载/安装流程的进度文案必须都有英文。
+
+    这些字符串走 bridge 的 stage() 回调，直接贴在状态栏上。
+    """
+    monkeypatch.setenv("INSTA_LANG", "en")
+    i18n.set_lang("en")
+    cases = [
+        "正在申请管理员权限 ...",
+        "正在为 ffmpeg 下载源测速...",
+        "  mirror.example 不可达",
+        "正在从 mirror.example 下载 ffmpeg ...",
+        "正在下载 ffmpeg  45% (ffmpeg.zip)",
+        "正在下载  45%",
+        "mirror.example 下载失败，尝试下一个源 ...",
+        "自动下载失败: 所有下载源均不可用",
+        "全局安装失败: 安装超时",
+        "正在安装到 D:/bin ...",
+        "安装失败: 磁盘已满",
+        "正在校验 ffmpeg ...",
+        "安装后仍无法运行: D:/bin/ffmpeg.exe 无法运行",
+        "ffmpeg 安装完成 ✓ (D:/bin)",
+        "D:/bin/ffmpeg.exe 无法运行",
+        "D:/bin/ffmpeg.exe 无响应（>10s）",
+    ]
+    missed = [zh for zh in cases if i18n.t(zh) == zh or _CJK.search(i18n.t(zh))]
+    assert not missed, f"这些安装流程文案没有英文：{missed}"
+
+
+def test_stage_labels_and_track_names_are_translated(monkeypatch):
+    """进度阶段名与轨道标签会显示在进度条旁，不能留中文。"""
+    monkeypatch.setenv("INSTA_LANG", "en")
+    i18n.set_lang("en")
+    cases = ["转码", "移植 inst box", "登记索引", "VID (主视频)", "LRV (低清预览)"]
+    missed = [zh for zh in cases if i18n.t(zh) == zh]
+    assert not missed, f"这些阶段名没有英文：{missed}"
+
+
+def test_ffmpeg_missing_banner_is_translated(monkeypatch):
+    """启动时最常见的提示：ffmpeg 未就绪 + 两个安装去向。"""
+    monkeypatch.setenv("INSTA_LANG", "en")
+    i18n.set_lang("en")
+    zh = ("ffmpeg 未就绪：未找到 ffmpeg/ffprobe。"
+          "可以装到系统目录（需管理员权限），也可以只装到程序目录。")
+    out = i18n.t(zh)
+    assert out != zh
+    assert out.startswith("ffmpeg is not ready:"), out
+    assert out.endswith("into the program folder."), out
