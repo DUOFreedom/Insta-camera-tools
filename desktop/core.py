@@ -72,6 +72,93 @@ VID_FPS = "60000/1001"                 # 实测真机主视频为 60fps
 INS_PREFIX = "\x10"
 LRV_BITRATE = 4_000_000
 
+# 机型预设：用户手选机型后，即使卡里没有真机原片也能按该机型的规格生成。
+# "auto" 表示不预设，仍走 analyze_native() 从卡里原片实测。
+# 这份表与 android/app/src/main/python/insta_core.py 的同名常量必须一致，
+# 由 desktop/tests/test_insta.py 的漂移守卫逐字比对，改动时两端一起改。
+CAMERA_PRESETS = {
+    "auto": {
+        "label": "自动（从卡里原片量出）",
+        "spec": None,
+    },
+    "ace_pro_2": {
+        "label": "Ace Pro 2",
+        "spec": {
+            "video": {
+                "codec": "libx265",
+                "width": 1920,
+                "height": 1080,
+                "fps": "60000/1001",
+                "pix_fmt": "yuvj420p",
+                "color_range": "pc",
+                "codec_tag": "hvc1",
+                "handler": "INS.HVC",
+                "encoder": "HVC encoder",
+                "profile": "main",
+                "level": 153,
+                "gop": 16,
+            },
+            "lrv_video": {
+                "codec": "libx264",
+                "width": 1280,
+                "height": 720,
+                "fps": "30000/1001",
+                "pix_fmt": "yuvj420p",
+                "color_range": "pc",
+                "codec_tag": "avc1",
+                "handler": "INS.AVC",
+                "encoder": "AVC encoder",
+                "profile": "high",
+                "level": 153,
+                "gop": 16,
+            },
+            "audio_tracks": [
+                {"codec": "aac", "sample_rate": "48000", "channels": "2",
+                 "bit_rate": "192k", "handler": "INS.AAC"},
+                {"codec": "aac", "sample_rate": "48000", "channels": "2",
+                 "bit_rate": "192k", "handler": "INS.TimeCode"},
+            ],
+        },
+    },
+    "go_ultra": {
+        "label": "GO Ultra",
+        "spec": {
+            "video": {
+                "codec": "libx265",
+                "width": 1920,
+                "height": 1080,
+                "fps": "60000/1001",
+                "pix_fmt": "yuvj420p",
+                "color_range": "pc",
+                "codec_tag": "hvc1",
+                "handler": "INS.HVC",
+                "encoder": "HVC encoder",
+                "profile": "main",
+                "level": 153,
+                "gop": 120,
+            },
+            "lrv_video": {
+                "codec": "libx265",
+                "width": 1280,
+                "height": 720,
+                "fps": "30000/1001",
+                "pix_fmt": "yuvj420p",
+                "color_range": "pc",
+                "codec_tag": "hvc1",
+                "handler": "INS.HVC",
+                "encoder": "HVC encoder",
+                "profile": "main",
+                "level": 153,
+                "gop": 10,
+            },
+            "audio_tracks": [
+                {"codec": "aac", "sample_rate": "48000", "channels": "2",
+                 "bit_rate": "192k", "handler": "INS.AAC"},
+            ],
+        },
+    },
+}
+
 _NO_WINDOW = 0
 if os.name == "nt":
     _NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)

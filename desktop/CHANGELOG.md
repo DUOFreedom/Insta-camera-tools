@@ -2,6 +2,28 @@
 
 ## 未发布
 
+### 修复（机型预设：选了就崩，且选了不生效）
+
+「机型预设」这个功能从 `cb6099a` 加进来那天起就是坏的，两处：
+
+**一、桌面端 `CAMERA_PRESETS` 从来没定义过。** `cb6099a` 的提交说明写着「desktop/core.py: 新增 CAMERA_PRESETS 常量表」，但 `git show cb6099a -- desktop/core.py | grep CAMERA_PRESETS` 只命中一行 `+        preset = CAMERA_PRESETS.get(model_override)` —— 函数体里的引用贴上了，表本体没贴。后果是只要用户在界面选「Ace Pro 2」或「GO Ultra」、而卡里又没有真机原片可量（`spec` 为 None 或没有 `video` 段），`_build_spec_tasks()` 就 `NameError: name 'CAMERA_PRESETS' is not defined`，整个转换直接抛异常。把安卓侧那份完整的表抄过来即可 —— 两份必须逐字一致，由新增的 `test_camera_presets_match_android` 守着。
+
+**二、桌面端机型下拉框根本没接线。** `OutputOptionView.qml` 声明了 `signal modelOverrideSelected(string value)`，delegate 里也 `root.modelOverrideSelected(modelData)` 发了信号，但 `main.qml` 里 `OutputOptionView { id: outputView }` 的实例化只接了 `onBrowseOutput` / `onLocateCard` / `onPickCover` / `onClearCovers` / `onVerifyCard` 五个，`onModelOverrideSelected` 从来没接；`git log -S "onModelOverrideSelected" -- desktop/qml/main.qml` 是空的。`bridge.setModelOverride()` 全仓库零调用者。所以选机型只改了 QML 本地 property 和那行标签文字，`bridge._model_override` 永远是 `"auto"`，`convert(..., model_override=...)` 永远收到 auto。
+
+对照组 `encoder` 是通的：它由 delegate 直接写 `root.encoder`，最后 `main.qml` 把 `outputView.encoder` 作为 `bridge.start()` 的第 4 个实参传下去 —— 走的是属性而不是信号。机型也按这个思路补：既绑 `modelOverride: bridge.modelOverride`（重开界面要显示上次的选择），也接 `onModelOverrideSelected`（选中即生效）。
+
+两处都是「没有测试碰过这条路径」的后果：`grep -rn "model_override\|modelOverride\|CAMERA_PRESETS" desktop/tests/` 在修复前零命中，而 `cb6099a` 当时声称「全套 177 passed」。
+
+### 测试（机型预设 7 条，含三处回滚验证）
+
+`desktop/tests/test_insta.py` 四条：两端 `CAMERA_PRESETS` 逐字相等且键集恰好是 `{"auto","ace_pro_2","go_ultra"}`；`go_ultra` 无模板时出 `libx265/hvc1/gop120` 主视频 + `libx265/hvc1/gop10` 预览 + 单音轨，`ace_pro_2` 出 `gop16` + `libx264/avc1/gop16` 预览 + 双音轨；**卡里有真机原片时原片实测值优先于预设**（反过来的话，插着 GO Ultra 的卡选「Ace Pro 2」就会被静默按 Ace Pro 2 编，而卡里的 AMBA 与 nail 是按 GO Ultra 写的）；`auto` 档保持老行为（`VID_WIDTH`/`VID_HEIGHT`、gop 0）。
+
+`desktop/tests/test_qml_bridge.py` 三条：`setModelOverride` 只认三个值，非法值报错且不改当前选择；`bridge._run()` 必须把 `model_override` 传到 `core.convert`（monkeypatch 记录实参）；`main.qml` 的 `OutputOptionView` 那段必须同时含 `modelOverride: bridge.modelOverride`、`onModelOverrideSelected:`、`bridge.setModelOverride(`，`OutputOptionView.qml` 必须含 `root.modelOverrideSelected(modelData)`。
+
+回滚验证三处，都实测变红后还原：删掉整份 `CAMERA_PRESETS`（2799 字符）→ 两条测试红，报 `NameError` 于 `desktop/core.py:1154`；删掉 `main.qml` 里那 7 行接线（339 字符）→ 接线测试红；删掉 `bridge.py` 的 `convert` 分支里 `model_override=self._model_override,` → 转发测试红（`At index 0 diff: None != 'go_ultra'`）。**只删 `import_with_inst` 分支那处不会变红** —— 该测试走的是 `convert` 分支（`use_inst=False`），两处得分别验。
+
+端到端复核（`.e2e/src.mp4`，`model_override="go_ultra"`，本机 ffmpeg 9.0.1 + QSV）：产物 `VID gop=120` / `LRV gop=10`，与真机 GO Ultra 模板一致。
+
 ### 新增（桌面端中英双语，跟随系统界面语言）
 
 新增 `desktop/i18n.py`：键是中文原文、值是英文译文的文案表，共 210 条。查不到的键**原样返回中文** —— 漏译时界面显示中文，既不崩也不会露出内部键名，可以增量补齐。

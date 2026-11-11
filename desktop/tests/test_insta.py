@@ -1486,3 +1486,86 @@ def test_batch_convert_does_not_override_explicit_software_choice(monkeypatch, t
     core.batch_convert([str(src)], str(tmp_path / "out"),
                        encoder=("hevc_nvenc", "h264_nvenc", "NVIDIA"))
     assert seen == [("hevc_nvenc", "h264_nvenc", "NVIDIA")], seen
+
+def _module_const(path, name):
+    """取模块级常量字面量的值（用于比对两端手工同步的参数表）。"""
+    import ast
+
+    with open(path, encoding="utf-8-sig") as f:
+        tree = ast.parse(f.read())
+    for node in tree.body:
+        if isinstance(node, ast.Assign):
+            for target in node.targets:
+                if isinstance(target, ast.Name) and target.id == name:
+                    return ast.literal_eval(node.value)
+    raise AssertionError(f"{path} 里没有模块级常量 {name}")
+
+
+def test_camera_presets_match_android():
+    """机型预设表两端必须一致。
+
+    这份表是「用户手选机型」时的唯一参数来源，没有任何运行时校验能发现
+    两边不一致 —— 症状是桌面端生成的视频相机认、手机端生成的不认。
+    """
+    android_core = os.path.join(os.path.dirname(ROOT), "android", "app",
+                                "src", "main", "python", "insta_core.py")
+    if not os.path.isfile(android_core):
+        pytest.skip("安卓端副本不在（只检出了桌面端）")
+    desktop = _module_const(os.path.join(ROOT, "core.py"), "CAMERA_PRESETS")
+    android = _module_const(android_core, "CAMERA_PRESETS")
+    assert desktop == android, (
+        "CAMERA_PRESETS 在 desktop/core.py 与 android insta_core.py 里已漂移："
+        "改一处必须同时改另一处")
+    assert set(desktop) == {"auto", "ace_pro_2", "go_ultra"}, set(desktop)
+
+
+def test_build_spec_tasks_applies_preset_without_template():
+    """选了机型、卡里又没有原片时，必须按预设出参数。
+
+    这条是 `cb6099a` 的回归守卫：那次提交只把
+    `preset = CAMERA_PRESETS.get(model_override)` 写进函数体，
+    却忘了贴表本体，选任何机型都直接 NameError。
+    """
+    tasks, _extra = core._build_spec_tasks(
+        "a.mp4", "out", 0, "20240101_000000", False, None,
+        model_override="go_ultra")
+    main_t, lrv_t = tasks
+    assert main_t[2] == "libx265" and main_t[3] == "hvc1", main_t[:4]
+    assert main_t[14] == 120, f"GO Ultra 主视频 GOP 应为 120，实际 {main_t[14]}"
+    assert lrv_t[2] == "libx265" and lrv_t[3] == "hvc1", lrv_t[:4]
+    assert lrv_t[14] == 10, f"GO Ultra 预览 GOP 应为 10，实际 {lrv_t[14]}"
+    assert len(main_t[11]) == 1, "GO Ultra 只有一条音轨"
+
+    tasks, _extra = core._build_spec_tasks(
+        "a.mp4", "out", 0, "20240101_000000", False, None,
+        model_override="ace_pro_2")
+    main_t, lrv_t = tasks
+    assert main_t[14] == 16, main_t[14]
+    assert lrv_t[2] == "libx264" and lrv_t[3] == "avc1", lrv_t[:4]
+    assert lrv_t[14] == 16, lrv_t[14]
+    assert len(main_t[11]) == 2, "Ace Pro 2 有 INS.AAC + INS.TimeCode 两条音轨"
+
+
+def test_build_spec_tasks_prefers_real_template_over_preset():
+    """卡里有真机原片时，原片实测值优先于机型预设。
+
+    反过来的话，用户插着 GO Ultra 的卡却选「Ace Pro 2」，就会被静默
+    按 Ace Pro 2 编，而卡里的 AMBA/nail 是按 GO Ultra 写的。
+    """
+    spec = {"video": {"codec": "libx265", "width": 1920, "height": 1080,
+                      "gop": 33, "codec_tag": "hvc1"},
+            "lrv_video": {"codec": "libx264", "gop": 7, "codec_tag": "avc1"}}
+    tasks, _extra = core._build_spec_tasks(
+        "a.mp4", "out", 0, "20240101_000000", False, spec,
+        model_override="go_ultra")
+    assert tasks[0][14] == 33, "原片的 GOP 被预设覆盖了"
+    assert tasks[1][14] == 7, "原片的预览 GOP 被预设覆盖了"
+
+
+def test_build_spec_tasks_auto_keeps_defaults():
+    """「自动」档不能因为加了预设就改变老行为。"""
+    tasks, _extra = core._build_spec_tasks(
+        "a.mp4", "out", 0, "20240101_000000", False, None,
+        model_override="auto")
+    assert tasks[0][4] == core.VID_WIDTH and tasks[0][5] == core.VID_HEIGHT
+    assert tasks[0][14] == 0, "无模板无预设时 GOP 应为 0（跟随模板）"

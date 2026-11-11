@@ -300,6 +300,12 @@ Window {
                         sequenceHint: bridge.nextSequence
                         coverSummary: bridge.coverSummary
                         coverImage: bridge.coverImage
+                        //   机型下拉是「选中即生效」：必须双向接线，否则只有 QML
+                        //   本地 property 变了，bridge 里仍是 auto，预设等于没选。
+                        modelOverride: bridge.modelOverride
+                        onModelOverrideSelected: function (value) {
+                            bridge.setModelOverride(value)
+                        }
                         onBrowseOutput: outputDialog.open()
                         onLocateCard: bridge.locateCard()
                         onPickCover: coverDialog.open()

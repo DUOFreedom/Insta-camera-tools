@@ -877,3 +877,69 @@ def test_input_view_does_not_use_last_error_as_file_state():
     action = open(os.path.join(DESKTOP, "qml", "ActionView.qml"), encoding="utf-8").read()
     assert "signal dismissError()" in action
     assert "onDismissError: bridge.clearError()" in main
+
+def test_set_model_override_accepts_known_presets(bridge):
+    """机型预设只认三个值，非法值要报错而不是静默吞掉。"""
+    bridge.setModelOverride("go_ultra")
+    assert bridge.modelOverride == "go_ultra"
+    bridge.setModelOverride("ace_pro_2")
+    assert bridge.modelOverride == "ace_pro_2"
+    bridge.setModelOverride("nope")
+    assert bridge.modelOverride == "ace_pro_2", "非法值不该改动当前选择"
+    assert "nope" in bridge.lastError
+    bridge.setModelOverride("auto")
+    assert bridge.modelOverride == "auto"
+
+
+def test_run_forwards_model_override_into_core(bridge, tmp_path, monkeypatch):
+    """界面上选的机型必须真的传到 core。
+
+    `cb6099a` 加了 `setModelOverride` 槽，但 QML 里从没接过线、
+    也没有任何测试碰这条路径 —— 选机型等于没选，而 `CAMERA_PRESETS`
+    当时还根本没定义，一选就 NameError。
+    """
+    import bridge as bridge_mod
+    out = tmp_path / "out"
+    out.mkdir()
+    src = tmp_path / "src.mp4"
+    src.write_bytes(b"x")
+
+    seen = []
+    monkeypatch.setattr(bridge_mod.core, "is_camera_card", lambda p: False)
+    monkeypatch.setattr(bridge_mod.core, "set_awake", lambda *a, **kw: None)
+    monkeypatch.setattr(bridge_mod.core, "append_log", lambda *a, **kw: None)
+    monkeypatch.setattr(bridge_mod.core, "save_job", lambda *a, **kw: None)
+
+    def fake_convert(*a, **kw):
+        seen.append(kw.get("model_override"))
+        return (os.path.join(str(out), "VID_x.mp4"), None)
+
+    monkeypatch.setattr(bridge_mod.core, "convert", fake_convert)
+
+    bridge.setModelOverride("go_ultra")
+    bridge._run([str(src)], str(out), False, True, ("", "", "software"))
+    assert seen == ["go_ultra"], f"core.convert 收到 {seen!r}"
+
+    seen.clear()
+    bridge.setModelOverride("auto")
+    bridge._run([str(src)], str(out), False, True, ("", "", "software"))
+    assert seen == ["auto"], seen
+
+
+def test_output_view_model_dropdown_is_wired_to_bridge():
+    """机型下拉必须双向接线。
+
+    只绑 `modelOverride` 不接 `onModelOverrideSelected`，选完只有 QML
+    本地属性变、bridge 仍是 auto；只接 signal 不绑属性，重开界面又跳回
+    「自动」。两个方向都要有。
+    """
+    main = open(os.path.join(DESKTOP, "qml", "main.qml"), encoding="utf-8").read()
+    start = main.index("OutputOptionView {")
+    block = main[start:main.index("onVerifyCard:", start)]
+    assert "modelOverride: bridge.modelOverride" in block, "缺 modelOverride 绑定"
+    assert "onModelOverrideSelected:" in block, "缺 onModelOverrideSelected 处理"
+    assert "bridge.setModelOverride(" in block, "处理函数里没调 setModelOverride"
+
+    view = open(os.path.join(DESKTOP, "qml", "OutputOptionView.qml"),
+                encoding="utf-8").read()
+    assert "root.modelOverrideSelected(modelData)" in view, "下拉点击没有发射信号"
