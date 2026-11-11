@@ -185,12 +185,15 @@ A missing translation falls back to the Chinese original — no crash, and no in
 |--------|---------|-------------|
 | Model preset | `Auto` | `Auto` = measure the spec from the native clip on the card; `Ace Pro 2` / `GO Ultra` = use the built-in preset |
 
-Only needed when the card has no native clip to use as a template: the spec then comes from `CAMERA_PRESETS` in `desktop/core.py` instead of the template. When a native clip is present it always wins, preset or not.
+Only needed when the card has no native clip to use as a template: the spec then comes from `CAMERA_PRESETS` instead of the template. When a native clip is present it always wins, preset or not.
+
+Desktop picks it under "Output & options", Android picks it on the settings screen; the two preset tables hold the same values. The preset only decides encoding parameters: the inst transplant still requires a native pair on the card as a template, so picking a model does not make transplant possible without one.
 
 ### Android Settings
 
 | Option | Default | Description |
 |--------|---------|-------------|
+| Model preset | `Auto` | Same as desktop, uses the built-in preset when the card has no native clip |
 | Encoder | `Auto` | `Auto` = software libx265 + libx264 |
 | Register camera index | On | Writes fileinfo / editinfo under DCIM, required for album appearance |
 

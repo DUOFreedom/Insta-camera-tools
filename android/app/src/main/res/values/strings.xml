@@ -129,6 +129,12 @@
     <string name="settings_encoder_current_hw">Current: Hardware (fast, limited keyframe interval)</string>
     <string name="settings_encoder_current_auto">Current: Auto (software encoding, most reliable recognition)</string>
     <string name="settings_encoder_diff_body">Auto = software encoding (libx265 + libx264, same as the desktop app; the camera recognizes it most reliably).\nHardware = MediaCodec hardware encoding. Much faster, but the system limits the keyframe interval to 1 second (the camera wants 16 frames); if the camera shows no thumbnails or does not recognize the import, switch back to Auto.</string>
+    <string name="settings_model_title">Camera model</string>
+    <string name="settings_model_desc">Auto measures the parameters from a camera-recorded original on the card. Picking a model generates with that model\'s preset instead.</string>
+    <string name="model_auto">Auto</string>
+    <string name="model_ace_pro_2">Ace Pro 2</string>
+    <string name="model_go_ultra">GO Ultra</string>
+    <string name="settings_model_hint">The .inst metadata still needs a pair of camera-recorded originals on the card as a template; the model preset does not change that.</string>
     <string name="settings_register_index">Register camera index</string>
     <string name="settings_register_index_desc">Writes fileinfo / editinfo under DCIM so the clips show up in the album</string>
     <string name="settings_about">About</string>

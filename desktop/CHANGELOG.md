@@ -2,6 +2,31 @@
 
 ## 未发布
 
+### 新增（安卓端补上机型预设）
+
+机型预设在 `cb6099a` 加进来时只接了桌面端的界面，`insta_core.py` 里的预设表和 `model_override` 透传一直都在，但安卓侧既没有入口也没有 UI —— 而 README 与 CHANGELOG 早先把它写成了双端功能。这轮补齐。
+
+- `android_bridge.run_import(...)` 末位加 `model_override="auto"`。白名单校验放在**调用核心之前**：`getattr(_core, "CAMERA_PRESETS", {})` 里没有的值直接返回 `{"ok": False, "error": "未知机型预设: …"}`。不静默回落到 auto —— 回落会让用户以为选了机型，其实没选。校验通过后透传给 `import_with_inst(..., model_override=model)`。
+- `PythonEngine.runImport(...)` 末位加 `modelOverride: String = "auto"`，作为 `callAttr("run_import", ...)` 的第 9 个位置实参。这一层是纯位置传参，顺序必须和 Python 签名严格对齐，多一个少一个都会错位且不报错。
+- `AppState` 加了 `MODEL_AUTO` / `MODEL_ACE_PRO_2` / `MODEL_GO_ULTRA` 三个常量（注释写明必须与 Python 的 `CAMERA_PRESETS` 键一致）与 `modelOverride` 状态。`startImport` 一进来就把 `modelOverride`、`encoder` 快照成本地变量：跑的过程中用户回去改设置，不该让后半批换参数。
+- 设置页在编码器卡片之前加了机型卡片，三个 `RadioButton`，底部提示「inst 移植仍需要卡里有一对真机原片当模板，换机型不影响这一点」。`values/strings.xml` 与 `values-zh/strings.xml` 各 6 条。
+
+**预设不解除模板要求。** `insta_core.import_with_inst()` 在 `template is None` 时仍然抛「卡里找不到真机原片作模板」。机型预设只决定编码参数（分辨率、帧率、编码器、GOP、音轨数），不改变 inst 移植必须有模板这件事。
+
+### 测试（安卓机型预设 5 条，含一处回滚验证）
+
+`desktop/tests/test_bridge_cancel.py` 四条：`go_ultra` 必须传到 `import_with_inst` 的 `model_override`；不传时是 `auto`；`nope` 这类未知值在**调核心之前**就被拒（`seen_model` 仍是 `unset`）；三个合法值都能过。
+
+`PythonI18nTest.modelPresetCodesMatchPython` 一条：跑 Python 读出 `insta_core.CAMERA_PRESETS` 的键，与 Kotlin 的 `MODEL_*` 常量排序后必须相等。这串字符串两端各写一遍，漂了不会编译报错，只会让白名单拒掉用户的合法选择。回滚验证：把 `MODEL_GO_ULTRA` 改成 `"goultra"` → 该条红（`PythonI18nTest > modelPresetCodesMatchPython FAILED`），还原后绿。
+
+顺带被守卫抓到一处新漏译：`android_bridge.py` 里新加的 `i18n.t("未知机型预设: %s")` 一开始没进安卓文案表，`everyTranslatedLiteralHasEnglishText` 直接报该键未译 —— 补进 `android/app/src/main/python/i18n.py` 后转绿。这条守卫的价值在于：只有真跑 Python 才看得见，编译器、lint、aapt2 全都发现不了。
+
+### 产物（安卓机型预设轮）
+
+- 安卓 release APK 75,315,038 B（上一轮 75,311,489 B）。`assets/chaquopy/app.imy` 是嵌套 zip，解出来用 Python 3.11 读 `i18n.pyc` 与 `android_bridge.pyc` 的 `co_consts`，`Unknown camera model preset: %s` 与 `model_override` 都在 —— 改的确实是打进包里的那份，不是源码目录里那份。单元测试 `IndexTest` 7 skipped、`PythonI18nTest` 5、`ConsentLogicTest` 5、`ImportCardStateTest` 6，失败与错误均 0。
+- `values/strings.xml` 与 `values-zh/strings.xml` 各 130 键，双向差集为空 —— 新增的 6 条机型文案两边都有，没有只加一头的漏项。
+- 桌面端 `python -m pytest desktop/tests/ -q` 219 passed, 3 skipped（上一轮 215）；`compileall` 通过。本轮桌面只改了测试与文档，exe 未重建，仍是 80,521,485 B。
+
 ### 修复（机型预设：选了就崩，且选了不生效）
 
 「机型预设」这个功能从 `cb6099a` 加进来那天起就是坏的，两处：

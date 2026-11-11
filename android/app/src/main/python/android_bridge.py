@@ -114,7 +114,7 @@ def _safe_log(cb, text):
 
 
 def run_import(source, card_root, callback=None, cover=None, prefer_hardware=False,
-               cancel=None, template_names=None, lang=None):
+               cancel=None, template_names=None, lang=None, model_override="auto"):
     """在镜像卡目录上执行完整导入，返回 JSON 字符串。
 
     source            已暂存到本地的源视频
@@ -130,6 +130,10 @@ def run_import(source, card_root, callback=None, cover=None, prefer_hardware=Fal
 
     lang              可选 "zh"/"en"：界面语言，决定进度标签与失败原因的语种。
                       不传则沿用上次 set_lang() 的值（Kotlin 侧 init 后已设过）。
+
+    model_override    机型预设："auto"（默认，卡里有真机原片就跟着它量）/
+                      "ace_pro_2" / "go_ultra"。非 auto 时，卡里没有真机原片
+                      也能按预设参数生成，不再报「找不到模板」。
 
     返回 JSON：成功 {"ok": True, main, proxy, inst_ok, inst_error, index_error, registered}；
               取消 {"ok": False, canceled": True, error}；
@@ -150,6 +154,15 @@ def run_import(source, card_root, callback=None, cover=None, prefer_hardware=Fal
         except Exception:  # noqa: BLE001
             pass
         tpl = None
+        model = str(model_override or "auto")
+        if model != "auto":
+            presets = getattr(_core, "CAMERA_PRESETS", {}) or {}
+            if model not in presets:
+                return json.dumps({
+                    "ok": False,
+                    "canceled": False,
+                    "error": i18n.t("未知机型预设: %s") % model,
+                }, ensure_ascii=False)
         if template_names:
             vid_name, lrv_name = template_names
             tpl = _core.template_from_names(card_root, vid_name, lrv_name)
@@ -163,7 +176,7 @@ def run_import(source, card_root, callback=None, cover=None, prefer_hardware=Fal
         res = _core.import_with_inst(
             source, card_root, template=tpl, log=log, progress=progress,
             cover=cover if cover else None,
-            cancel=cancel,
+            cancel=cancel, model_override=model,
         )
         out = {
             "ok": True,

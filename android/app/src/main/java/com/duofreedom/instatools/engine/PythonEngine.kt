@@ -145,7 +145,8 @@ object PythonEngine {
         callback: ImportCallback,
         preferHardware: Boolean = false,
         cancel: PyObject? = null,
-        templateNames: Pair<String, String>? = null
+        templateNames: Pair<String, String>? = null,
+        modelOverride: String = "auto"
     ): JSONObject {
         if (!requireInit(ctx)) {
             throw RuntimeException(ctx.getString(R.string.python_core_init_failed, initError))
@@ -162,7 +163,10 @@ object PythonEngine {
             // Chaquopy 把 Kotlin 数组转成 Python list；Python 侧按二元序列解包，
             //   不要求是 tuple。
             templateNames?.let { arrayOf(it.first, it.second) },  // template_names
-            langTag(ctx)                                         // lang
+            langTag(ctx),                                        // lang
+            // "auto" / "ace_pro_2" / "go_ultra"：非 auto 时按预设参数生成，
+            //   卡里没有真机原片也不影响编码参数（inst 移植仍要模板）。
+            modelOverride                                        // model_override
         )?.toString() ?: throw RuntimeException(ctx.getString(R.string.python_no_result))
         return JSONObject(raw)
     }

@@ -206,6 +206,9 @@ EN_TEXT: dict[str, str] = {
         "%s(%s) vs %s(%s); use a camera-native "
         "VID_YYYYMMDD_HHMMSS_NNN.mp4 as the template.",
 
+    # ---------- 机型预设 ----------
+    "未知机型预设: %s": "Unknown camera model preset: %s",
+
     # ---------- 索引写入失败 ----------
     "无法写入索引 %s：权限被拒。\n"
     "    路径: %s\n"

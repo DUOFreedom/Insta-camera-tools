@@ -32,12 +32,16 @@ class _FakeCore:
 
     __version__ = "test"
     CanceledError = ic.CanceledError
+    # run_import 用它做机型白名单校验，真核心里有这张表。
+    CAMERA_PRESETS = {"auto": {"spec": None}, "ace_pro_2": {"spec": None},
+                      "go_ultra": {"spec": None}}
 
     def __init__(self, behaviour, template_ok=True):
         self._behaviour = behaviour
         self._template_ok = template_ok
         self.seen_cancel = "unset"
         self.seen_template = "unset"
+        self.seen_model = "unset"
         self.seen_template_names = "unset"
 
     def set_prefer_hardware(self, _enabled):
@@ -52,9 +56,11 @@ class _FakeCore:
                 b"\x0a\x0e" + b"0" * 14)
 
     def import_with_inst(self, source, card_root, template=None, log=None,
-                         progress=None, cover=None, cancel=None):
+                         progress=None, cover=None, cancel=None,
+                         model_override="auto"):
         self.seen_cancel = cancel
         self.seen_template = template
+        self.seen_model = model_override
         return self._behaviour(cancel)
 
 
@@ -195,10 +201,64 @@ def test_run_import_rejects_unusable_template_pair(bridge):
     """指定了名字但取不到模板对时，必须直接失败，不能硬着头皮跑。"""
     fake = bridge(lambda _cancel: _ok_result(), template_ok=False)
 
+    # 显式传 lang：android 那份 i18n 的 detect() 没有系统语言探测，兜底英文
+    # （真机上语言由 Kotlin 的 langTag 传下来），不传就断言不到中文文案。
     out = json.loads(br.run_import(
-        "in.mp4", "/card", template_names=("VID_x.mp4", "LRV_x.lrv")))
+        "in.mp4", "/card", template_names=("VID_x.mp4", "LRV_x.lrv"),
+        lang="zh"))
 
     assert out["ok"] is False
     assert out["canceled"] is False
     assert "模板对不可用" in out["error"]
     assert fake.seen_template == "unset", "模板不可用时不应继续调用导入"
+
+
+# ============== 机型预设：run_import → import_with_inst 的透传 ==============
+#
+# 这一层最容易出的错是「参数加了但没往下传」——界面选得动、日志里也看不出，
+# 只有产物参数不对。所以断言落在 import_with_inst 实际收到的 kw 上。
+
+def test_run_import_forwards_model_override(bridge):
+    """选定的机型必须传到 import_with_inst，否则预设等于没选。"""
+    fake = bridge(lambda _cancel: _ok_result())
+
+    out = json.loads(br.run_import("in.mp4", "/card", model_override="go_ultra"))
+
+    assert out["ok"] is True
+    assert fake.seen_model == "go_ultra"
+
+
+def test_run_import_defaults_to_auto(bridge):
+    """不传时保持旧行为：auto（跟着卡里的真机原片量参数）。"""
+    fake = bridge(lambda _cancel: _ok_result())
+
+    br.run_import("in.mp4", "/card")
+
+    assert fake.seen_model == "auto"
+
+
+def test_run_import_rejects_unknown_model(bridge):
+    """未知机型要在调用核心之前就拒掉，并说清是哪个值。
+
+    静默回落到 auto 会让用户以为选了机型、其实没有。
+    """
+    fake = bridge(lambda _cancel: _ok_result())
+    fake.CAMERA_PRESETS = {"auto": {}, "ace_pro_2": {}, "go_ultra": {}}
+
+    out = json.loads(br.run_import("in.mp4", "/card", model_override="nope"))
+
+    assert out["ok"] is False
+    assert out["canceled"] is False
+    assert "nope" in out["error"]
+    assert fake.seen_model == "unset", "未知机型不应继续调用导入"
+
+
+def test_run_import_accepts_known_models(bridge):
+    """白名单里的三个值必须都能过——包括 auto 不查表也不报错。"""
+    fake = bridge(lambda _cancel: _ok_result())
+    fake.CAMERA_PRESETS = {"auto": {}, "ace_pro_2": {}, "go_ultra": {}}
+
+    for code in ("auto", "ace_pro_2", "go_ultra"):
+        out = json.loads(br.run_import("in.mp4", "/card", model_override=code))
+        assert out["ok"] is True, code
+        assert fake.seen_model == code

@@ -129,6 +129,12 @@
     <string name="settings_encoder_current_hw">当前：硬件（快，但关键帧间隔受限）</string>
     <string name="settings_encoder_current_auto">当前：自动（软件编码，识别最稳）</string>
     <string name="settings_encoder_diff_body">自动 = 软件编码（libx265 + libx264，与桌面端一致，相机识别最稳）。\n硬件 = MediaCodec 硬件编码，速度快很多，但关键帧间隔受系统限制只能 1 秒（相机要求 16 帧），若导入后相机不显示缩略图或无法识别，请切回「自动」。</string>
+    <string name="settings_model_title">机型</string>
+    <string name="settings_model_desc">自动 = 从卡里的真机原片量出参数；选定机型则按该机型的预设参数生成。</string>
+    <string name="model_auto">自动</string>
+    <string name="model_ace_pro_2">Ace Pro 2</string>
+    <string name="model_go_ultra">GO Ultra</string>
+    <string name="settings_model_hint">inst 元数据移植仍需要卡里有一对真机原片当模板，换机型不影响这一点。</string>
     <string name="settings_register_index">登记相机索引</string>
     <string name="settings_register_index_desc">写入 DCIM 下的 fileinfo / editinfo，相册才会出现</string>
     <string name="settings_about">关于</string>

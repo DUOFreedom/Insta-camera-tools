@@ -61,6 +61,7 @@ import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedCard
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
@@ -659,6 +660,54 @@ private fun SettingsScreen(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        // 机型预设：与桌面端「输出与选项」里的同名下拉对应。
+        //   auto = 跟随卡里的真机原片（旧行为），选定机型 = 用该机型的预设参数。
+        Card(Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(16.dp)) {
+                Text(
+                    stringResource(R.string.settings_model_title),
+                    style = MaterialTheme.typography.titleSmall
+                )
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    stringResource(R.string.settings_model_desc),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(8.dp))
+                val models = listOf(
+                    AppState.MODEL_AUTO to R.string.model_auto,
+                    AppState.MODEL_ACE_PRO_2 to R.string.model_ace_pro_2,
+                    AppState.MODEL_GO_ULTRA to R.string.model_go_ultra
+                )
+                models.forEach { (code, labelRes) ->
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .clickable { state.modelOverride = code }
+                            .padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // 整行可点，命中区域比单独点圆钮大得多。
+                        RadioButton(
+                            selected = state.modelOverride == code,
+                            onClick = { state.modelOverride = code }
+                        )
+                        Text(
+                            stringResource(labelRes),
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                }
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    stringResource(R.string.settings_model_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
         Card(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(16.dp)) {
                 Text(

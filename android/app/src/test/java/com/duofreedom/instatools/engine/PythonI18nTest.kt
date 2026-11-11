@@ -1,5 +1,6 @@
 package com.duofreedom.instatools.engine
 
+import com.duofreedom.instatools.ui.AppState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -22,6 +23,9 @@ import java.util.concurrent.TimeUnit
  * 能被独立 import），因此可以在 `gradle test` 里几分钟内跑完。
  * 没有解释器时用 Assume 跳过（与 IndexTest 的样本缺失处理一致），
  * 不让干净检出直接红掉。
+ *
+ * 另外还顺手钉了一处 Python→Kotlin 的契约：机型预设的代码值。字符串在两
+ * 端各写一遍，漂了不会编译报错，只会让白名单拒掉用户的合法选择。
  */
 class PythonI18nTest {
 
@@ -136,6 +140,34 @@ class PythonI18nTest {
         assertTrue("没扫到 i18n.t(...) 调用，测试失去意义（$count 处）", count >= 15)
         val missing = lines[1].removePrefix("MISSING|").trim()
         assertEquals("以下文案没有英文译文，英文界面会漏出中文: $missing", "", missing)
+    }
+
+    /**
+     * 机型预设的代码值必须两端一致：Kotlin 的 `MODEL_*` 常量是界面选中的值，
+     * 也是 Python `CAMERA_PRESETS` 白名单的键。任何一端改了字符串（比如把
+     * `go_ultra` 写成 `go-ultra`），用户选了机型就会被白名单拒掉，界面只报
+     * 「未知机型预设」——编译器、lint、aapt2 全都看不见这种漂移。
+     */
+    @Test
+    fun modelPresetCodesMatchPython() {
+        val out = py(
+            """
+            import sys
+            sys.path.insert(0, "$pythonDir")
+            import insta_core
+            print("KEYS|" + "|".join(sorted(insta_core.CAMERA_PRESETS)))
+            """.trimIndent(),
+        )
+        val keys = out.trim().removePrefix("KEYS|").split("|")
+        assertEquals(
+            "Kotlin 的 MODEL_* 常量与 Python CAMERA_PRESETS 的键不一致",
+            listOf(
+                AppState.MODEL_AUTO,
+                AppState.MODEL_ACE_PRO_2,
+                AppState.MODEL_GO_ULTRA,
+            ).sorted(),
+            keys,
+        )
     }
 
     /**

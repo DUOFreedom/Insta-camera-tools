@@ -104,6 +104,17 @@ class AppState(context: Context) {
         /** 编码器选项的稳定标识：与显示文案解耦，切换语言不会改变判断结果。 */
         const val ENCODER_AUTO = "auto"
         const val ENCODER_HW = "hardware"
+
+        /**
+         * 机型预设的稳定标识，必须与 Python 侧 `CAMERA_PRESETS` 的键一致。
+         *
+         * auto      = 卡里有真机原片就按它量出参数（默认，与旧行为完全相同）
+         * ace_pro_2 = 按 Ace Pro 2 的预设参数生成
+         * go_ultra  = 按 GO Ultra 的预设参数生成
+         */
+        const val MODEL_AUTO = "auto"
+        const val MODEL_ACE_PRO_2 = "ace_pro_2"
+        const val MODEL_GO_ULTRA = "go_ultra"
     }
 
     /** 释放内部协程作用域。调用后不应再使用本实例。 */
@@ -143,6 +154,16 @@ class AppState(context: Context) {
 
     /** 编码器选择，取值 [ENCODER_AUTO] 或 [ENCODER_HW]。 */
     var encoder by mutableStateOf(ENCODER_AUTO)
+
+    /**
+     * 机型预设，取值 [MODEL_AUTO] / [MODEL_ACE_PRO_2] / [MODEL_GO_ULTRA]。
+     *
+     * 选 auto 时参数从卡里的真机原片量出来（与旧版本行为完全一致）；
+     * 选定机型则改用该机型的预设参数，不看卡里有什么。
+     * 注意：`.inst` 移植仍然需要一对真机原片当模板，这里只影响编码参数。
+     */
+    var modelOverride by mutableStateOf(MODEL_AUTO)
+
     var registerIndex by mutableStateOf(true)
 
     var progress by mutableStateOf(0f)
@@ -403,6 +424,10 @@ class AppState(context: Context) {
         results.clear()
         outputSummary = ""
 
+        // 机型与编码器在开跑时定下来：跑的过程中改设置不该让后半批换参数。
+        val model = modelOverride
+        val hw = encoder == ENCODER_HW
+
         val jobDir = File(ctx.cacheDir, "job").apply { mkdirs() }
         val stageDir = File(ctx.cacheDir, "stage").apply { mkdirs() }
         val cb = ImportCallback()
@@ -489,7 +514,7 @@ class AppState(context: Context) {
                     withContext(Dispatchers.IO) {
                         PythonEngine.runImport(
                             ctx, staged, mirror.root, cb,
-                            preferHardware = (encoder == ENCODER_HW),
+                            preferHardware = hw,
                             cancel = cancelEvent,
                             // 明确告诉核心用哪一对文件当模板。镜像目录里除了
                             //   刚拷进来的真机原片，还可能躺着上一轮的产物，
@@ -497,7 +522,8 @@ class AppState(context: Context) {
                             //   会选中错的，产出的东西相机不认且不报错。
                             templateNames = card.templateVid.name?.let { vid ->
                                 card.templateLrv.name?.let { lrv -> vid to lrv }
-                            }
+                            },
+                            modelOverride = model
                         )
                     }
                 } finally {
