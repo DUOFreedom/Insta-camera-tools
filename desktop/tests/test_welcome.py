@@ -118,11 +118,10 @@ def test_bridge_mark_welcome_seen_flips_it_and_persists(bridge, state_dir):
     assert bridge_mod.Bridge().welcomeNeeded is False
 
 
-def test_bridge_show_welcome_reopens_it(bridge):
-    bridge.markWelcomeSeen()
-    assert bridge.welcomeNeeded is False
-    bridge.showWelcome()
-    assert bridge.welcomeNeeded is True
+def test_bridge_has_no_orphan_show_welcome(bridge):
+    # showWelcome() 没有生产调用者（欢迎窗只靠 welcomeNeeded + welcomeDemo 打开），
+    # 留着就是一条「看起来能重开、实际没人用」的死路。
+    assert not hasattr(bridge, "showWelcome")
 
 
 def test_bridge_author_url_is_the_repo(bridge):
@@ -165,7 +164,7 @@ def test_last_page_buttons_fit_one_row():
     import i18n
 
     budget = {"zh": 16, "en": 24}
-    for key in ("上一步", "去点个 star", "我真的没有 GitHub 账号"):
+    for key in ("上一步", "去点个 star", "算了"):
         for lang in ("zh", "en"):
             label = i18n.EN_TEXT[key] if lang == "en" else key
             assert len(label) <= budget[lang], (

@@ -550,20 +550,13 @@ EN_TEXT.update({
     # 照字面译成 "I really don't have a GitHub account"——那样三个按钮加起来
     # 比面板还宽，Back 会被挤出左边界。语气的补充放在正文里说了。
     "算了": "Never mind",
-    "我真的没有 GitHub 账号": "I don't have GitHub",
     "下一步": "Next",
     "上一步": "Back",
     "[warn] 记录欢迎页状态失败：%s": "[warn] could not record the welcome state: %s",
 })
 
 EN_TEXT.update({
-    "正在确认…": "Checking\u2026",
-    "已经点亮了，谢谢": "Starred \u2014 thank you",
-    "再去看一眼": "Check again",
     "仓库现在有 %1 颗星": "The repo has %1 stars right now",
-    "点完 star 别急着关窗，我这儿会自动看一眼。": "Once you have starred, give this window a moment \u2014 it looks for itself.",
-    "还没看到星标数变化。要是确实点了，可能只是还没刷新，可以再点一次。": "No change in the star count yet. If you did star it, the number may not have refreshed \u2014 you can try again.",
-    "网络不通，确认不了有没有点上。不影响使用。": "No network, so this cannot be confirmed either way. Nothing else is affected.",
     "[warn] 记录 star 状态失败：%s": "[warn] could not record the star state: %s",
 })
 
@@ -571,11 +564,33 @@ EN_TEXT.update({
     # 星标数改成「进作者页自动读一次」之后新增的几句。
     "正在读星标数…": "Reading the star count…",
     "没读到星标数（大概网络不通）。不影响使用。": "Could not read the star count (probably no network). Nothing else is affected.",
-    "已点亮 · 再去看看": "Starred · visit again",
+    "打开过仓库 · 再去看看": "Opened the repo · visit again",
     "打不开浏览器，请手动复制上面的仓库地址": "Could not open the browser — please copy the repo address above.",
 })
 
 EN_TEXT.update({
     #  只进日志区，但日志也会被英文用户看到。
+    "[warn] 读取星标数失败：%s: %s": "[warn] could not read the star count: %s: %s",
     "[warn] 打开浏览器失败：%s": "[warn] failed to open the browser: %s",
+})
+
+
+# ---------- 作者页：复制仓库地址 ----------
+EN_TEXT.update({
+    "复制地址": "Copy link",
+    "仓库地址已复制": "Repository address copied",
+})
+
+# ---------- 作者页：浏览器打开后收起主界面 ----------
+EN_TEXT.update({
+    "已在浏览器里打开；没看见的话，主界面已经收起来了": "Opened in your browser; the main window has been tucked away in case you didn't see it",
+})
+EN_TEXT.update({
+    "浏览器没起来；点链接旁边的「复制地址」，粘贴到浏览器里就能打开": "The browser did not start; click \u201cCopy link\u201d next to the address and paste it into a browser",
+})
+
+#   欢迎页里那条「浏览器没起来」的提示（状态栏在弹窗后面，用户看不见）
+EN_TEXT.update({
+    "没看到浏览器窗口；点上面的「复制地址」，粘贴到浏览器里就能打开":
+        "No browser window appeared; click “Copy link” above and paste it into a browser",
 })

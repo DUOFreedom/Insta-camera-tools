@@ -1,4 +1,5 @@
 import QtQuick 2.15
+import "Damping.js" as Damping
 
 //  拖过边界时的阻尼：Flickable 用 DragOverBounds 时内容会按 1:1 跟手拖出去，
 //  这里再把「超出量」按阻尼曲线压回来 —— 视觉上越推越推不动，最多让出 slack。
@@ -19,8 +20,9 @@ Item {
     property real shiftX: 0
     property real shiftY: 0
 
+    //  曲线与窗口贴边共用 Damping.js，改一处两边同时生效。
     function damp(over) {
-        return over <= 0 ? 0 : (slack * over) / (over + slack)
+        return Damping.damp(over, slack)
     }
 
     function refresh() {

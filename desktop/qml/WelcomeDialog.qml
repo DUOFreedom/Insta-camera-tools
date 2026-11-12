@@ -11,12 +11,27 @@ Item {
     property bool open: false
     property int page: 0
     readonly property int pageCount: 3
+    // 浏览器起没起来是后台线程探出来的，结果落到这里给界面用。
+    property bool browserMissed: false
     signal closed()
 
     // 每次打开都从第一页开始：关掉再打开不该停在半路。
+    // 同时允许重新读一次星数 —— 上次可能只是网络没通。
     onOpenChanged: {
         if (open) {
             page = 0
+            starRequested = false
+            browserMissed = false
+        }
+    }
+
+    Connections {
+        target: bridge
+        function onBrowserMissed() {
+            // 只在弹窗还开着的时候提示：用户已经关掉对话框就别再弹回来。
+            if (root.open) {
+                root.browserMissed = true
+            }
         }
     }
 
@@ -386,36 +401,30 @@ Item {
                     width: 44
                     height: 44
 
-                    //   头像直接内嵌在 exe 里，不再依赖网络下载。
+                    //   头像图片本身已经裁成圆形（带 alpha），这里只负责摆上去。
+                    //   不要用 ShaderEffect 画圆：Qt 6 的 fragmentShader 必须是
+                    //   预编译的 .qsb，内联 GLSL 会加载失败、且界面不报错——
+                    //   Image 隐藏 + shader 没起来，结果就是一块空白。
+                    Rectangle {
+                        anchors.fill: parent
+                        radius: width / 2
+                        color: Theme.accent
+                    }
+
                     Image {
                         id: avatarImage
                         anchors.fill: parent
-                        source: "assets/avatar.png"
-                        fillMode: Image.PreserveAspectCrop
-                        cache: true
-                        visible: false
+                        //   相对路径按本 QML 所在目录解析，退一级到 desktop/assets。
+                        source: "../assets/avatar.png"
+                        fillMode: Image.PreserveAspectFit
+                        smooth: true
                         mipmap: true
+                        sourceSize.width: width * 3
+                        sourceSize.height: height * 3
+                        visible: status === Image.Ready
                     }
 
-                    //   用片段着色器按距离中心距离裁剪。
-                    ShaderEffect {
-                        anchors.fill: parent
-                        visible: avatarImage.status === Image.Ready
-                        property variant source: avatarImage
-                        fragmentShader: `
-                            uniform lowp sampler2D source;
-                            varying highp vec2 qt_TexCoord0;
-                            void main() {
-                                vec2 center = vec2(0.5, 0.5);
-                                float radius = 0.5;
-                                float dist = distance(qt_TexCoord0, center);
-                                if (dist > radius) discard;
-                                gl_FragColor = texture2D(source, qt_TexCoord0);
-                            }
-                        `
-                    }
-
-                    // 首字母回退
+                    // 图读不到时用首字母顶着，不能是空框。
                     Text {
                         visible: avatarImage.status !== Image.Ready
                         anchors.centerIn: parent
@@ -470,13 +479,29 @@ Item {
                 lineHeight: Theme.fontBodyLine
             }
 
-            Text {
-                width: parent.width
-                text: bridge.authorUrl
-                color: Theme.accent
-                font.family: Theme.fontFamily
-                font.pixelSize: Theme.fontAuxSize
-                elide: Text.ElideMiddle
+            Row {
+                spacing: 8
+
+                Text {
+                    //   有的机器上默认浏览器起不来，地址留在这儿能手动复制。
+                    text: bridge.authorUrl
+                    color: Theme.accent
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.fontAuxSize
+                }
+
+                Text {
+                    text: bridge.tr("复制地址")
+                    color: Theme.textSecondary
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.fontAuxSize
+                    MouseArea {
+                        anchors.fill: parent
+                        anchors.margins: -4
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: bridge.copyAuthorUrl()
+                    }
+                }
             }
 
             Text {
@@ -499,6 +524,19 @@ Item {
                       : bridge.tr("没读到星标数（大概网络不通）。不影响使用。")
                 wrapMode: Text.Wrap
                 color: Theme.textDisabled
+                font.family: Theme.fontFamily
+                font.pixelSize: Theme.fontAuxSize
+                lineHeightMode: Text.FixedHeight
+                lineHeight: Theme.fontAuxLine
+            }
+
+            Text {
+                //   状态栏在弹窗后面，用户看不见；浏览器起不来这件事得说在这儿。
+                width: parent.width
+                visible: root.browserMissed
+                text: bridge.tr("没看到浏览器窗口；点上面的「复制地址」，粘贴到浏览器里就能打开")
+                wrapMode: Text.Wrap
+                color: Theme.warning
                 font.family: Theme.fontFamily
                 font.pixelSize: Theme.fontAuxSize
                 lineHeightMode: Text.FixedHeight
@@ -583,7 +621,8 @@ Item {
                     // 最后一页才出现，前面两页没有可 star 的东西可指。
                     visible: root.page === root.pageCount - 1
                     // 走过一次就不再催：按钮还在，只是换了句更轻的话。
-                    text: bridge.starDone ? bridge.tr("已点亮 · 再去看看")
+                    // 只说「打开过仓库」——星标数没有接口能证实，不替用户下结论。
+                    text: bridge.starDone ? bridge.tr("打开过仓库 · 再去看看")
                                           : bridge.tr("去点个 star")
                     btnHeight: 36
                     Layout.preferredWidth: Math.max(btnHeight * 2.5, implicitWidth)
@@ -598,7 +637,11 @@ Item {
                     btnHeight: 36
                     accent: false
                     Layout.preferredWidth: Math.max(btnHeight * 2.5, implicitWidth)
-                    onClicked: root.close()
+                    // 说「算了」也算答过了：记下来，下次协议版本升级再弹时不再问一遍。
+                    onClicked: {
+                        bridge.markStarred()
+                        root.close()
+                    }
                 }
 
                 AppButton {

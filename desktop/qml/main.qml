@@ -599,6 +599,11 @@ Window {
         function onWelcomeChanged() {
             welcome.open = bridge.welcomeNeeded
         }
+        //   浏览器确实起来了，但窗口落在全屏的主界面后面，看着像没反应。
+        //   把主界面收起来，用户一眼就能看到刚打开的页面。
+        function onBrowserOpened() {
+            win.showMinimized()
+        }
     }
 
     WelcomeDialog {

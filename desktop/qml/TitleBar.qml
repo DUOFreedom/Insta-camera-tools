@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Window
+import "Damping.js" as Damping
 
 Rectangle {
     id: root
@@ -43,8 +44,9 @@ Rectangle {
 
         //   位移越大，能推动的距离越接近 slack 而永不超过：
         //   damp(26) ≈ 13，damp(78) ≈ 19.5，damp(∞) → 26。
+        //   曲线与内容拖拽共用 Damping.js，改一处两边同时生效。
         function damp(over) {
-            return over <= 0 ? 0 : (slack * over) / (over + slack)
+            return Damping.damp(over, slack)
         }
 
         function limitX(value, win) {

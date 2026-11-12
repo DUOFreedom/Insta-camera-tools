@@ -1,5 +1,51 @@
 ## 未发布
 
+### 修复（点了 star 之后主界面白收起）
+
+上一版为了把「浏览器被全屏主界面挡在后面」这件事解决掉，只要 `openAuthorPage()` 返回成功就收起主窗口。但本机实测过 ShellExecute「返回成功、系统里什么窗口都不出现」——那种情况下主界面一收，用户面前只剩桌面，比原来更糟。
+
+现在改成看完再决定：点链接之前先用 `EnumWindows` 记下当时可见的 `Chrome_WidgetWin_1` / `MozillaWindowClass` 窗口句柄，点完起一个后台线程，最多等 3.5 秒（`BROWSER_WATCH_SECONDS`），只有**新出现**的句柄才算浏览器起来了。
+
+- 有新窗口 → 收起主界面，状态栏「已在浏览器里打开；没看见的话，主界面已经收起来了」。
+- 一直没新的 → **不收**主界面，状态栏与欢迎窗第 3 页都提示「浏览器没起来；点「复制地址」粘贴到浏览器里」。
+
+**必须先记快照再比差集**：第一版只判「系统里有没有这个类名的窗口」，点完立刻就把主界面收起来了——因为 Electron 应用（包括本工具自己的前端宿主）同样使用 `Chrome_WidgetWin_1`，而且一直开着，这个检查恒为真。窗口类名认不出「这是我的浏览器还是别人的窗口」，只有前后差集能。
+
+两条路径都有测试：`test_open_author_page_minimizes_only_after_browser_shows_up` 断言信号不是同步发的（同步发就等于没检查），`test_open_author_page_reports_missed_browser` 断言看不到窗口时走的是 `browserMissed` 而不是 `browserOpened`。跨线程信号是排队投递的，测试里必须 `processEvents()` 才收得到——第一版没跑事件循环，两条都空手而归。
+
+### 修复（头像一直显示不出来）
+
+用户报过两次「头像显示不出」，前两轮都没修对，因为两条路同时坏着，而且都静默：
+
+- **图片路径错。** `desktop/qml/WelcomeDialog.qml` 里写的是 `source: "assets/avatar.png"`。QML 的相对路径以**组件自身所在目录**为基准，也就是 `desktop/qml/assets/avatar.png` —— 该目录不存在，图片实际在 `desktop/assets/avatar.png`。改成 `"../assets/avatar.png"`。
+- **圆形遮罩在 Qt 6 上根本不生效。** 原本用 `ShaderEffect` 内联 GLSL 做圆形裁剪。Qt 6 要求 `fragmentShader` 指向预编译的 `.qsb`，内联源码必定失败，而失败只往 stderr 打一行，`--self-test` 的 `QML_OK roots=1` 照样通过（它只证明根对象加载成功）。与此同时 `Image` 的 `visible` 绑在 shader 上，字母回退又被 `status === Ready` 挡掉 —— 屏幕上就是一块空白。
+- 修法是不再需要 shader：把圆形直接烘进 PNG 的 alpha 通道（居中裁方 → 256×256 → 4 倍超采样画椭圆掩膜 → 缩回作 alpha），QML 里只留一个 `Image`，`Rectangle` 打圆底防止半透明边缘泛白。`desktop/assets/avatar.png` 从 1,593 B 变成 16,923 B。
+
+### 新增（仓库地址可复制）
+
+「点 star 打不开浏览器」在本机实测是环境问题，不是代码问题：点完之后 `msedge.exe` 进程出现了一堆，但系统里没有任何 Edge 窗口；换成 `os.startfile('https://example.com')` 独立跑也是只起进程、不出窗口。`os.startfile` / `QDesktopServices` 都只是在调 ShellExecute，应用层既拿不到「窗口有没有起来」，也没法代它修。
+
+所以不假装成功，改成给一条能走的出口：仓库链接旁边加「复制地址」文字按钮，走 `Bridge.copyAuthorUrl()`（`QGuiApplication.clipboard().setText`），状态栏回一句「仓库地址已复制」。
+
+### 修复（审查发现的重复实现与静默失败）
+
+- 新增 `desktop/statefile.py`，把 `consent.py` 与 `star.py` 里逐行同构的「读 JSON + 写 .tmp 再 os.replace」收成 `read_json` / `write_json` 两个函数（后者补了 `flush` + `os.fsync`，断电不留空文件）。
+- 新增 `desktop/qml/Damping.js`（`.pragma library`），`DragDamping.qml` 与 `TitleBar.qml` 里各一份同公式的 `damp()` 改为调它，两个 QML 只留薄壳。
+- `star.fetch_stars()` 增加 `on_error` 回调，`Bridge._star_error()` 把异常类型与内容写进日志。原先两处宽 `except Exception` 什么都不说，「网不通」和「代码写错」在界面上长得一样。
+- `Bridge._open_url()` 的异常从 `except Exception` 收窄为 `OSError` 与 `(ImportError, RuntimeError)`。
+- 删掉 `Bridge.showWelcome()`、`Bridge.authorAvatarUrl`、`star.AVATAR_URL` —— 没有任何生产调用者。
+- 删掉 `EN_TEXT` 里 7 条已经没有引用的死键。
+- `WelcomeDialog.qml` 的 `starRequested` 在重新打开时复位（上次可能只是网络没通，重开应该能再读一次）；「算了」按钮同时调 `bridge.markStarred()`，明说没有账号也算答过了，协议版本升级复弹时不再问一遍。
+- star 按钮文案 `已点亮 · 再去看看` 改为 `打开过仓库 · 再去看看`：点开仓库不等于点了星，没有接口能证实，不替用户下结论。
+
+### 测试（本轮）
+
+- `test_avatar_is_rounded_in_the_png_not_by_a_shader`：断言 PNG 的 IHDR color type 为 6（RGBA）、QML 指向 `../assets/avatar.png`、不再有 `ShaderEffect`，且仍保留首字母 `D` 回退。这条替换掉原来那条「只 grep 路径字符串」的假测试 —— 它当时恰好因为路径写错才通过。
+- `test_bridge_has_no_orphan_show_welcome`：断言删掉的接口没有回来。
+- 阻尼守卫改为断言 `import "Damping.js" as Damping` 与 `Damping.damp(over, slack)`，公式从 `Damping.js` 读。
+- `test_last_page_buttons_fit_one_row` 的键从「我真的没有 GitHub 账号」改为「算了」—— 原来那条在新按钮替换后仍在测一个已经不存在的文案。
+- 全套 `python -m pytest desktop/tests/ -q` → 263 passed, 3 skipped。
+
 ### 修正（上一轮的三个偏差）
 
 上一轮有三处做偏了，这轮改回来。
@@ -30,10 +76,6 @@
 新增阻尼守卫 3 条：`DragDamping.qml` 有 `damp(` 且「超出为零时偏移为零」；三个可拖区域都用了 `DragDamping` + `contentItem.transform` 且不再有 `StopAtBounds`；`main.qml` 里不再有 `ScrollView`。
 
 回滚验证：把 `_open_url` 里的 `os.startfile` 分支删掉 → 对应测试变红；把任一处 `DragOverBounds` 改回 `StopAtBounds` → 守卫变红。
-
-LOG
-
-## 未发布
 
 ### 新增（作者头像与 star 状态检查）
 

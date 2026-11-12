@@ -122,9 +122,13 @@ def test_broken_star_file_is_treated_as_unstarred(state_dir):
 # ---------------------------------------------------------------- 状态机
 
 
-def test_avatar_url_points_at_github(bridge):
-    assert bridge.authorAvatarUrl == star.AVATAR_URL
-    assert "avatars.githubusercontent.com" in bridge.authorAvatarUrl
+def test_avatar_file_is_shipped_with_desktop(bridge):
+    #  头像内嵌进 exe，不再依赖网络；只钉住文件在、且 QML 指的是它。
+    path = os.path.join(os.path.dirname(QML), "assets", "avatar.png")
+    assert os.path.isfile(path), "assets/avatar.png 没跟着 desktop/ 一起提交"
+    assert os.path.getsize(path) > 0
+    #  路径按 QML 文件所在目录解析：qml/../assets 才是 desktop/assets。
+    assert 'source: "../assets/avatar.png"' in _read("WelcomeDialog.qml")
 
 
 def test_initial_state_is_idle(bridge):
@@ -145,7 +149,7 @@ def test_already_starred_reads_from_disk(state_dir):
 
 
 def test_refresh_reads_count(bridge, monkeypatch):
-    monkeypatch.setattr(star, "fetch_stars", lambda timeout=None: 12)
+    monkeypatch.setattr(star, "fetch_stars", lambda timeout=None, on_error=None: 12)
 
     bridge.refreshStars()
     assert _wait_state(bridge, ("ok", "unknown")) == "ok"
@@ -153,7 +157,7 @@ def test_refresh_reads_count(bridge, monkeypatch):
 
 
 def test_refresh_unknown_when_network_is_down(bridge, monkeypatch):
-    monkeypatch.setattr(star, "fetch_stars", lambda timeout=None: None)
+    monkeypatch.setattr(star, "fetch_stars", lambda timeout=None, on_error=None: None)
 
     bridge.refreshStars()
     assert _wait_state(bridge, ("ok", "unknown")) == "unknown"
@@ -164,7 +168,7 @@ def test_refresh_ignores_second_call_while_loading(bridge, monkeypatch):
     calls = []
     release = []
 
-    def slow(timeout=None):
+    def slow(timeout=None, on_error=None):
         calls.append(1)
         #  第一轮卡住不返回，好让第二次调用撞上 loading。
         while not release:
@@ -224,13 +228,27 @@ def _read(name):
         return fh.read()
 
 
-def test_avatar_is_a_network_image_with_fallback():
+def test_avatar_is_rounded_in_the_png_not_by_a_shader():
+    """圆形来自图片自己的 alpha 通道，不来自 ShaderEffect。
+
+    Qt 6 的 fragmentShader 只接受预编译的 .qsb；内联 GLSL 会静默失败，
+    头像整块消失（Image 是 visible:false，字母回退又被 status===Ready 挡掉）。
+    """
+    path = os.path.join(os.path.dirname(QML), "assets", "avatar.png")
+    assert os.path.isfile(path), "assets/avatar.png 没跟着 desktop/ 一起提交"
+    data = open(path, "rb").read()
+    assert data[:8] == b"\x89PNG\r\n\x1a\n", "不是 PNG"
+    # IHDR 的 color type 在偏移 25；6 = RGBA，说明圆形靠 alpha 裁出来。
+    assert data[25] == 6, "头像没有 alpha 通道，圆形裁切会退化成方块"
+
     src = _read("WelcomeDialog.qml")
-    assert "assets/avatar.png" in src
-    # 圆形靠遮罩剪，Item.clip 只按矩形裁。
-    assert "ShaderEffect" in src
-    # 图没回来时用首字母顶着，不能是空框。
+    assert 'source: "../assets/avatar.png"' in src
+    # 带花括号匹配真正的元素，注释里提到名字不算。
+    assert "ShaderEffect {" not in src
+    assert "ShaderEffectSource {" not in src
+    # 图读不到时仍要有首字母顶着。
     assert 'text: "D"' in src
+    assert "avatarImage.status !== Image.Ready" in src
 
 
 def test_star_button_reflects_done_state():
@@ -292,9 +310,12 @@ def _flickables():
 
 def test_drag_damping_component_exists():
     src = _read("DragDamping.qml")
-    assert "function damp(" in src
+    # 曲线只留一份在 Damping.js，窗口贴边与内容拖拽共用。
+    assert 'import "Damping.js" as Damping' in src
+    assert "Damping.damp(over, slack)" in src
     # 只压回「超出量」，超出为零时偏移必须为零，否则内容会一直偏。
-    assert "over <= 0 ? 0 :" in src
+    formula = _read("Damping.js")
+    assert "over <= 0 ? 0 :" in formula
     assert "contentX" in src and "contentY" in src
 
 
@@ -314,3 +335,80 @@ def test_main_content_area_is_a_plain_flickable():
     assert "ScrollView {" not in src
     assert "id: scroll" in src
     assert "contentHeight: pageColumn.height" in src
+
+
+# ------------------------------------------------- 浏览器到底出没出来
+
+
+def _pump(app, seconds):
+    """等后台线程发信号。跨线程的信号是排队投递的，不跑事件循环就永远收不到。"""
+    deadline = time.time() + seconds
+    while time.time() < deadline:
+        app.processEvents()
+        time.sleep(0.01)
+
+
+def test_dialog_surfaces_missed_browser():
+    """浏览器没起来时状态栏在弹窗后面，提示必须出现在弹窗里。"""
+    src = open(os.path.join(QML, "WelcomeDialog.qml"), encoding="utf-8").read()
+
+    assert "property bool browserMissed" in src
+    assert "function onBrowserMissed()" in src
+    assert "root.browserMissed = true" in src
+    assert "visible: root.browserMissed" in src
+
+
+def test_browser_window_probe_returns_handle_set():
+    """探窗口这件事本身绝不许抛：它跑在后台线程里，抛了没人接。"""
+    pytest.importorskip("PySide6.QtCore")
+    import bridge as bridge_mod
+
+    assert isinstance(bridge_mod._browser_windows(), set)
+
+
+def test_open_author_page_minimizes_only_after_browser_shows_up(bridge, monkeypatch):
+    """看到窗口才发 browserOpened。
+
+    这台机器上 ShellExecute 会「成功返回但什么都不发生」，一看返回值就
+    收主界面，会把用户丢在空桌面上。
+    """
+    bridge_mod = sys.modules["bridge"]
+    # 第一次是点之前的快照（只有一个本来就是 Electron 的窗口），之后多出一个，
+    # 只有「新增句柄」才算浏览器真的起来了。
+    seq = [({1},), ({1, 2},)]
+    monkeypatch.setattr(
+        bridge_mod, "_browser_windows",
+        lambda: (seq.pop(0) if seq else ({1, 2},))[0])
+    monkeypatch.setattr(bridge_mod, "BROWSER_WATCH_SECONDS", 0.3)
+
+    from PySide6.QtCore import QCoreApplication
+
+    app = QCoreApplication.instance() or QCoreApplication([])
+    seen = []
+    bridge.browserOpened.connect(lambda: seen.append("opened"))
+    assert bridge.openAuthorPage() is True
+    # 不能同步发：窗口是过一会儿才出来的，同步发就等于没检查。
+    assert seen == []
+
+    _pump(app, 3.0)
+    assert seen == ["opened"]
+
+
+def test_open_author_page_reports_missed_browser(bridge, monkeypatch):
+    """一个浏览器窗口都没有的时候要说清楚，别让主界面自己收起来。"""
+    bridge_mod = sys.modules["bridge"]
+    # 句柄集合一直没变：系统里那些 Chrome_WidgetWin_1 都是别人的 Electron 窗口。
+    monkeypatch.setattr(bridge_mod, "_browser_windows", lambda: {1})
+    monkeypatch.setattr(bridge_mod, "BROWSER_WATCH_SECONDS", 0.2)
+
+    from PySide6.QtCore import QCoreApplication
+
+    app = QCoreApplication.instance() or QCoreApplication([])
+    opened, missed = [], []
+    bridge.browserOpened.connect(lambda: opened.append(1))
+    bridge.browserMissed.connect(lambda: missed.append(1))
+    assert bridge.openAuthorPage() is True
+
+    _pump(app, 3.0)
+    assert missed == [1]
+    assert opened == []

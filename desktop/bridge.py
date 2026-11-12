@@ -1,6 +1,7 @@
 import os
 import sys
 import threading
+import time
 
 from PySide6.QtCore import Property, QObject, QUrl, Signal, Slot
 
@@ -34,6 +35,40 @@ def _tf(fmt: str, *args) -> str:
     return text % args if args else text
 
 
+#   Edge/Chrome 与 Firefox 的主窗口类名，只用来回答「浏览器窗口出没出来」。
+#   注意 Electron 应用（含本工具自己的前端宿主）也用 Chrome_WidgetWin_1，
+#   所以必须比对「点之前」的快照，只认新出现的窗口。
+BROWSER_WINDOW_CLASSES = frozenset({"Chrome_WidgetWin_1", "MozillaWindowClass"})
+#   点完 star 之后等多久看浏览器窗口。测试会把它改小，别写进函数体里。
+BROWSER_WATCH_SECONDS = 3.5
+
+
+def _browser_windows() -> set:
+    """当前桌面上可见的浏览器窗口句柄集合。"""
+    if not sys.platform.startswith("win"):
+        return set()
+    try:
+        import ctypes
+        from ctypes import wintypes
+    except ImportError:
+        return set()
+
+    user32 = ctypes.windll.user32
+    seen = set()
+
+    @ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+    def _visit(hwnd, _param):
+        if user32.IsWindowVisible(hwnd):
+            name = ctypes.create_unicode_buffer(256)
+            user32.GetClassNameW(hwnd, name, 256)
+            if name.value in BROWSER_WINDOW_CLASSES:
+                seen.add(int(hwnd))
+        return True
+
+    user32.EnumWindows(_visit, 0)
+    return seen
+
+
 class Bridge(QObject):
     """QML 与转码核心之间的桥。耗时操作在后台线程，UI 只走信号。"""
 
@@ -54,6 +89,10 @@ class Bridge(QObject):
     seqChanged = Signal()
     welcomeChanged = Signal()
     starChanged = Signal()
+    #   浏览器起来了就把主界面收起来。本机实测：默认浏览器确实打开了页面，
+    #   但窗口落在全屏的主界面后面，用户看到的是「点了没反应」。
+    browserOpened = Signal()
+    browserMissed = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -146,21 +185,10 @@ class Bridge(QObject):
         self._welcome = False
         self.welcomeChanged.emit()
 
-    @Slot()
-    def showWelcome(self) -> None:
-        """手动再打开一次（给「关于」和演示用）。"""
-        self._welcome = True
-        self.welcomeChanged.emit()
-
     @Property(str, constant=True)
     def authorUrl(self) -> str:
         """点 star 就是跳到这个页面。"""
         return AUTHOR_URL
-
-    @Property(str, constant=True)
-    def authorAvatarUrl(self) -> str:
-        """GitHub 头像。拿不到时界面自己退回首字母，不在这里兜。"""
-        return star.AVATAR_URL
 
     @Property(bool, notify=starChanged)
     def starDone(self) -> bool:
@@ -189,6 +217,48 @@ class Bridge(QObject):
             self._set_error(i18n.t("打不开浏览器，请手动复制上面的仓库地址"))
             return False
         self.markStarred()
+        before = _browser_windows()
+        threading.Thread(target=self._watch_browser, args=(before,), daemon=True).start()
+        return True
+
+    def _watch_browser(self, before) -> None:
+        """等一小会儿看浏览器窗口有没有真的出来。
+
+        实测这台机器上 ShellExecute 会「成功返回但什么都没发生」，
+        所以不能一看调用成功就把主界面收起来 —— 那会把用户丢在空桌面上。
+        看到**新出现的**浏览器窗口才收起主界面；看不到就告诉用户去复制地址。
+
+        只认新增的句柄：Electron 应用（包括本工具自己的前端宿主）也用
+        Chrome_WidgetWin_1，按类名一查就永远「找得到」。
+        """
+        deadline = time.monotonic() + BROWSER_WATCH_SECONDS
+        while time.monotonic() < deadline:
+            if _browser_windows() - before:
+                self._set_status(
+                    i18n.t("已在浏览器里打开；没看见的话，主界面已经收起来了")
+                )
+                self.browserOpened.emit()
+                return
+            time.sleep(0.25)
+        self._set_status(
+            i18n.t("浏览器没起来；点链接旁边的「复制地址」，粘贴到浏览器里就能打开")
+        )
+        self.browserMissed.emit()
+
+    @Slot(result=bool)
+    def copyAuthorUrl(self) -> bool:
+        """把仓库地址放进剪贴板。
+
+        默认浏览器起不来的机器（实测有）至少要有个能手动粘贴的出口，
+        不然「打不开浏览器」之后用户什么也做不了。
+        """
+        from PySide6.QtGui import QGuiApplication
+
+        clipboard = QGuiApplication.clipboard()
+        if clipboard is None:
+            return False
+        clipboard.setText(AUTHOR_URL)
+        self._set_status(i18n.t("仓库地址已复制"))
         return True
 
     def _open_url(self, url: str) -> bool:
@@ -205,7 +275,7 @@ class Bridge(QObject):
 
             if QDesktopServices.openUrl(QUrl(url)):
                 return True
-        except Exception as exc:  # noqa: BLE001 - 兜底路径，失败就算了
+        except (ImportError, RuntimeError) as exc:
             self.append_log(_tf("[warn] 打开浏览器失败：%s", exc))
         return False
 
@@ -236,8 +306,13 @@ class Bridge(QObject):
 
     def _star_worker(self, epoch: int) -> None:
         """后台读一次，不占界面线程；网络再慢也只影响这一行小字。"""
-        count = star.fetch_stars()
+        count = star.fetch_stars(on_error=self._star_error)
         self._finish_star(epoch, "ok" if count is not None else "unknown", count or 0)
+
+    def _star_error(self, exc: BaseException) -> None:
+        """读星数失败时留一行日志 —— 否则「网不通」和「代码写错」在界面上长得一样。"""
+        self.append_log(_tf("[warn] 读取星标数失败：%s: %s",
+                            type(exc).__name__, exc))
 
     def _finish_star(self, epoch: int, state: str, count: int) -> None:
         if self._star_epoch != epoch:
