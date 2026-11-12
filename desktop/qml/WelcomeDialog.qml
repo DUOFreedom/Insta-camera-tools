@@ -441,7 +441,7 @@ Item {
                     }
 
                     Text {
-                        text: bridge.tr("桌面端和安卓端都是一个人写的")
+                        text: bridge.tr("一个普通高中生")
                         color: Theme.textSecondary
                         font.family: Theme.fontFamily
                         font.pixelSize: Theme.fontAuxSize

@@ -537,7 +537,7 @@ EN_TEXT.update({
     "• 机型不在列表里就选「自动」，程序会从卡里的原片把参数量出来。":
         "• If your model is not in the list, pick Automatic — the parameters are "
         "measured from the camera originals on the card.",
-    "桌面端和安卓端都是一个人写的": "The desktop and Android apps are written by one person",
+    "一个普通高中生": "A regular high school student",
     "这个工具最初只是不想每次手动折腾视频元数据。后来越补越多，桌面端、安卓端，还有现在这个欢迎页。":
         "This started as a way to stop hand-editing video metadata every time. It "
         "grew: a desktop app, an Android app, and now this welcome screen.",
