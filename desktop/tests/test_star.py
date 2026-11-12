@@ -226,7 +226,7 @@ def _read(name):
 
 def test_avatar_is_a_network_image_with_fallback():
     src = _read("WelcomeDialog.qml")
-    assert "bridge.authorAvatarUrl" in src
+    assert "assets/avatar.png" in src
     # 圆形靠遮罩剪，Item.clip 只按矩形裁。
     assert "ShaderEffect" in src
     # 图没回来时用首字母顶着，不能是空框。

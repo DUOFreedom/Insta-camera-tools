@@ -19,6 +19,7 @@ Item {
         case "more-horizontal": return "M6 12 L6 13 M12 12 L12 13 M18 12 L18 13"
         case "sidebar-toggle": return "M4 6 L20 6 M4 12 L14 12 M4 18 L20 18"
         case "theme-toggle": return "M12 3 A9 9 0 1 0 12 21 A9 9 0 1 0 12 3 M12 8 A4 4 0 1 0 12 16 A4 4 0 1 0 12 8"
+        case "window-minimize": return "M6 10 L18 10"
         default: return ""
         }
     }

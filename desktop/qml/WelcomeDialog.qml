@@ -386,16 +386,15 @@ Item {
                     width: 44
                     height: 44
 
-                    //   头像走 GitHub 的公开地址：离线、被墙、图挂了都只
-                    //   让首字母顶上，不留空白方块。
+                    //   头像直接内嵌在 exe 里，不再依赖网络下载。
                     Image {
                         id: avatarImage
                         anchors.fill: parent
-                        source: bridge.authorAvatarUrl
+                        source: "assets/avatar.png"
                         fillMode: Image.PreserveAspectCrop
-                        asynchronous: true
                         cache: true
                         visible: false
+                        mipmap: true
                     }
 
                     //   用片段着色器按距离中心距离裁剪。
@@ -595,7 +594,7 @@ Item {
 
                 AppButton {
                     visible: root.page === root.pageCount - 1
-                    text: bridge.tr("我真的没有 GitHub 账号")
+                    text: bridge.tr("算了")
                     btnHeight: 36
                     accent: false
                     Layout.preferredWidth: Math.max(btnHeight * 2.5, implicitWidth)

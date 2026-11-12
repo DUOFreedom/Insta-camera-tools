@@ -152,7 +152,7 @@ def test_welcome_dialog_has_three_pages():
         assert src.count("visible: root.page === %d\n" % index) == 1
     # 最后一页的两个按钮：点 star 与「我真的没有账号」，少一个就没法关。
     assert "去点个 star" in src
-    assert "我真的没有 GitHub 账号" in src
+    assert "算了" in src
 
 
 def test_last_page_buttons_fit_one_row():

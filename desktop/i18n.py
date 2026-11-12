@@ -549,6 +549,7 @@ EN_TEXT.update({
     # 按钮要在 412 DIP 的页脚里和「上一步」「去点个 star」并排，英文不能
     # 照字面译成 "I really don't have a GitHub account"——那样三个按钮加起来
     # 比面板还宽，Back 会被挤出左边界。语气的补充放在正文里说了。
+    "算了": "Never mind",
     "我真的没有 GitHub 账号": "I don't have GitHub",
     "下一步": "Next",
     "上一步": "Back",
