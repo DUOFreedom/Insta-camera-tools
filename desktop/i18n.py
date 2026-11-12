@@ -545,6 +545,10 @@ EN_TEXT.update({
         "Bugs and ideas belong in the repo's issues. If it saved you some work, a "
         "star is the most concrete way to say thanks — and if you would rather not, "
         "that changes nothing about the app.",
+    "由于作者是高中生，开发时间可能不多，有 bug 请去 GitHub 提 Issue，感谢。":
+        "Since the author is a high school student, development time is limited. Please file issues on GitHub if you find bugs — thanks.",
+    "高中生开发者，时间有限，Bug 欢迎去 GitHub 提 Issue":
+        "A high school developer with limited time — bugs welcome on GitHub.",
     "去点个 star": "Give it a star",
     # 按钮要在 412 DIP 的页脚里和「上一步」「去点个 star」并排，英文不能
     # 照字面译成 "I really don't have a GitHub account"——那样三个按钮加起来
@@ -593,4 +597,13 @@ EN_TEXT.update({
 EN_TEXT.update({
     "没看到浏览器窗口；点上面的「复制地址」，粘贴到浏览器里就能打开":
         "No browser window appeared; click “Copy link” above and paste it into a browser",
+})
+
+EN_TEXT.update({
+    "来都来了，关注一下我的哔哩哔哩账号再走吧：https://m.bilibili.com/space/2140206381":
+        "Since you're here, check out my Bilibili: https://m.bilibili.com/space/2140206381",
+    "QQ 交流群：440319270":
+        "QQ group: 440319270",
+    "作者后续会增加更多机型的适配和更多功能，你的 Star 和关注就是我更新下去的动力。":
+        "More camera models and features coming — your star and follow keep me going.",
 })

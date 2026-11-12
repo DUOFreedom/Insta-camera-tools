@@ -449,7 +449,7 @@ Item {
                     }
 
                     Text {
-                        text: bridge.tr("一个普通高中生")
+                        text: bridge.tr("高中生开发者，时间有限，Bug 欢迎去 GitHub 提 Issue")
                         color: Theme.textSecondary
                         font.family: Theme.fontFamily
                         font.pixelSize: Theme.fontAuxSize
@@ -459,7 +459,7 @@ Item {
 
             Text {
                 width: parent.width
-                text: bridge.tr("这个工具最初只是不想每次手动折腾视频元数据。后来越补越多，桌面端、安卓端，还有现在这个欢迎页。")
+                text: bridge.tr("由于作者是高中生，开发时间可能不多，有 bug 请去 GitHub 提 Issue，感谢。")
                 wrapMode: Text.Wrap
                 color: Theme.textSecondary
                 font.family: Theme.fontFamily
@@ -470,7 +470,29 @@ Item {
 
             Text {
                 width: parent.width
-                text: bridge.tr("有问题、有想法，去仓库开 issue。如果它帮你省了事，点个 star 就是最实在的支持 —— 不点也完全没关系，功能一样不少。")
+                text: bridge.tr("来都来了，关注一下我的哔哩哔哩账号再走吧：https://m.bilibili.com/space/2140206381")
+                wrapMode: Text.Wrap
+                color: Theme.textSecondary
+                font.family: Theme.fontFamily
+                font.pixelSize: Theme.fontBodySize
+                lineHeightMode: Text.FixedHeight
+                lineHeight: Theme.fontBodyLine
+            }
+
+            Text {
+                width: parent.width
+                text: bridge.tr("QQ 交流群：440319270")
+                wrapMode: Text.Wrap
+                color: Theme.textSecondary
+                font.family: Theme.fontFamily
+                font.pixelSize: Theme.fontBodySize
+                lineHeightMode: Text.FixedHeight
+                lineHeight: Theme.fontBodyLine
+            }
+
+            Text {
+                width: parent.width
+                text: bridge.tr("作者后续会增加更多机型的适配和更多功能，你的 Star 和关注就是我更新下去的动力。")
                 wrapMode: Text.Wrap
                 color: Theme.textSecondary
                 font.family: Theme.fontFamily
