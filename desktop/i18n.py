@@ -554,3 +554,14 @@ EN_TEXT.update({
     "上一步": "Back",
     "[warn] 记录欢迎页状态失败：%s": "[warn] could not record the welcome state: %s",
 })
+
+EN_TEXT.update({
+    "正在确认…": "Checking\u2026",
+    "已经点亮了，谢谢": "Starred \u2014 thank you",
+    "再去看一眼": "Check again",
+    "仓库现在有 %1 颗星": "The repo has %1 stars right now",
+    "点完 star 别急着关窗，我这儿会自动看一眼。": "Once you have starred, give this window a moment \u2014 it looks for itself.",
+    "还没看到星标数变化。要是确实点了，可能只是还没刷新，可以再点一次。": "No change in the star count yet. If you did star it, the number may not have refreshed \u2014 you can try again.",
+    "网络不通，确认不了有没有点上。不影响使用。": "No network, so this cannot be confirmed either way. Nothing else is affected.",
+    "[warn] 记录 star 状态失败：%s": "[warn] could not record the star state: %s",
+})

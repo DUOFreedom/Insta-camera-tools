@@ -1,4 +1,5 @@
 import QtQuick
+import Qt5Compat.GraphicalEffects
 
 // 首次进软件时的欢迎窗：使用协议 / 使用须知 / 作者主页，三页。
 // 刻意不复用 Modal.qml —— 那个面板高度按内容自适应，三页文字长短不一会让
@@ -357,8 +358,38 @@ Item {
                     height: 44
                     radius: 22
                     color: Theme.accent
+                    clip: true
+
+                    //   头像走 GitHub 的公开地址：离线、被墙、图挂了都只
+                    //   让首字母顶上，不留空白方块。
+                    Image {
+                        id: avatarImage
+                        anchors.fill: parent
+                        source: bridge.authorAvatarUrl
+                        fillMode: Image.PreserveAspectCrop
+                        asynchronous: true
+                        cache: true
+                        visible: false
+                    }
+
+                    //   圆形头像得靠遮罩：Item.clip 只按矩形裁，半径裁不出来。
+                    OpacityMask {
+                        anchors.fill: parent
+                        visible: avatarImage.status === Image.Ready
+                        source: avatarImage
+                        maskSource: avatarMask
+                    }
+
+                    Rectangle {
+                        id: avatarMask
+                        anchors.fill: parent
+                        radius: 22
+                        visible: false
+                        layer.enabled: true
+                    }
 
                     Text {
+                        visible: avatarImage.status !== Image.Ready
                         anchors.centerIn: parent
                         text: "D"
                         color: "#FFFFFF"
@@ -418,6 +449,36 @@ Item {
                 font.family: Theme.fontFamily
                 font.pixelSize: Theme.fontAuxSize
                 elide: Text.ElideMiddle
+            }
+
+            Text {
+                //   星标数只在真读到过的时候出现：读不到就不提，免得像个坏掉的读数。
+                width: parent.width
+                visible: bridge.starCount > 0
+                text: bridge.tr("仓库现在有 %1 颗星").arg(bridge.starCount)
+                color: Theme.textDisabled
+                font.family: Theme.fontFamily
+                font.pixelSize: Theme.fontAuxSize
+            }
+
+            Text {
+                //   点开仓库之后的状态说明。checking 时提醒别急着关窗，
+                //   其余两种都只是说明为什么不给结论，不影响任何功能。
+                width: parent.width
+                visible: bridge.starState === "checking"
+                         || bridge.starState === "unchanged"
+                         || bridge.starState === "unknown"
+                text: bridge.starState === "checking"
+                      ? bridge.tr("点完 star 别急着关窗，我这儿会自动看一眼。")
+                      : bridge.starState === "unchanged"
+                        ? bridge.tr("还没看到星标数变化。要是确实点了，可能只是还没刷新，可以再点一次。")
+                        : bridge.tr("网络不通，确认不了有没有点上。不影响使用。")
+                wrapMode: Text.Wrap
+                color: Theme.textDisabled
+                font.family: Theme.fontFamily
+                font.pixelSize: Theme.fontAuxSize
+                lineHeightMode: Text.FixedHeight
+                lineHeight: Theme.fontAuxLine
             }
         }
 
@@ -496,9 +557,18 @@ Item {
                 AppButton {
                     // 最后一页才出现，前面两页没有可 star 的东西可指。
                     visible: root.page === root.pageCount - 1
-                    text: bridge.tr("去点个 star")
+                    // 检查期间不给连点，其余状态都能再点一次。
+                    enabled: bridge.starState !== "checking"
+                    text: bridge.starState === "checking" ? bridge.tr("正在确认…")
+                          : bridge.starState === "thanked" ? bridge.tr("已经点亮了，谢谢")
+                          : bridge.starState === "unchanged" ? bridge.tr("再去看一眼")
+                          : bridge.tr("去点个 star")
                     btnHeight: 36
-                    onClicked: Qt.openUrlExternally(bridge.authorUrl)
+                    onClicked: {
+                        // 先开页面再起检查：检查要拿「点之前」的星数当基线。
+                        Qt.openUrlExternally(bridge.authorUrl)
+                        bridge.startStarCheck()
+                    }
                 }
 
                 AppButton {

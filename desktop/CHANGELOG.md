@@ -2,6 +2,51 @@
 
 ## 未发布
 
+### 新增（作者头像与 star 状态检查）
+
+欢迎窗第三页的头像换成 GitHub 真实头像，并加了一条「点了 star 之后能不能确认」的检查。
+
+- 头像：`Image` 加载 `https://avatars.githubusercontent.com/u/338660054?v=4&s=160`，外层 44×44 `radius: 22` 的 `Rectangle` + `OpacityMask` 裁圆——`Item.clip` 只按矩形裁，半径裁不出来。图没到或网络不通时显示首字母 `D`，不留空框。用 `Qt5Compat.GraphicalEffects`，打包后已实测能加载。
+- `desktop/star.py`：GitHub 公开接口只给星标总数、不给「谁点了」，所以只能做点开前后对比。`fetch_stars()` 取 `stargazers_count`，`Timeout`/`HTTPError`/非 JSON 一律返回 `None` 而不是抛——查不到星数不该影响用户使用软件。
+- `desktop/bridge.py`：`starState` 五态（`idle` / `checking` / `thanked` / `unchanged` / `unknown`），`startStarCheck()` 起后台线程，每 12 秒取一次，最多 8 次；数变多就 `mark_starred()` 落盘，下次启动直接是 `thanked`。`_star_epoch` 防止连点两次时旧线程覆盖新结果。
+- 按钮顺序不能反：先 `Qt.openUrlExternally()` 再 `startStarCheck()`。检查要拿「点之前」的星数当基线，反过来会把用户自己那一颗算进基线。
+- 第三页链接下方有一行状态说明，`starCount > 0` 时显示当前星数。
+
+### 新增（窗口拖动贴边阻尼）
+
+主窗口是无边框的，标题栏原来一行 `startSystemMove()` 交给系统。系统移动期间位置由系统写，应用层插不进阻尼，所以要自己接管。
+
+- 自己算位移：按下时记 `pressWinX` 与 `pressScreenX = win.x + mouse.x`，移动时用 `win.x + mouse.x - pressScreenX` 反算。这个和式在窗口移动时不变，等价于鼠标在屏幕上的真实位移。
+- 阻尼 `damp(over) = slack * over / (over + slack)`，`slack = 26`：超 26px 让 13px，超 78px 让 19.5px，趋近但永不超过 26px。就是「越推越推不动」。
+- 松手用 `clampX/clampY` 硬夹回边界，**不能再用 `limitX/limitY`**——那会在阻尼位置上再加一次阻尼，停在离边缘 20px 处，看着像没对上。
+- 收敛靠 16ms 的 `Timer`，每帧走剩余距离的 40%；剩 1px 时直接落位。`Window.x/y` 不能挂 `Behavior`，所以只能自己写。
+- 贴顶最大化改看**光标**：`pointerY <= area.y + 1`。原来按位移阈值判（往上拖过 60 逻辑像素），在窗口高度等于屏幕高度时永远够不到——能拖出的位移等于按点离窗口上沿的距离，按在中间只有 20px。
+- 最大化状态下按标题栏先 `showNormal()` 再 `Qt.callLater(startSystemMove)`，这一次拖拽仍交给系统（不受阻尼约束），因为自己算一个还原后的目标位置会跳。
+
+### 修复（拖动时窗口被钉死在 (0,0)）
+
+`desktop/qml/TitleBar.qml` 原来写 `area = win.screen.availableGeometry`。`Window.screen` 是 `QQuickScreenInfo`，**没有** `availableGeometry` 这个属性（那是 `ScreenInfo` 的），读出来是 `undefined`，赋给 `property rect area` 静默失败，`area` 停在 `Qt.rect(0,0,0,0)`。于是 `minX` 与 `maxX` 都是 0，任何位移都被夹成 0——表现为窗口根本拖不动，日志里每次按下一条 `Cannot assign [undefined] to QRectF`。
+
+改用 `virtualX` / `virtualY` / `desktopAvailableWidth` / `desktopAvailableHeight` 自己拼 rect，并判空、判零尺寸再赋值。
+
+### 测试（本轮 19 条）
+
+`desktop/tests/test_star.py`。接口解析 5 条：正常计数；`stargazers_count: true` 必须返回 `None`（`bool` 是 `int` 的子类，不判会当成 1）；缺键、非 dict、字符串数字都返回 `None`；`OSError` 与 `TimeoutError` 同样返回 `None`。
+
+落盘 3 条：`mark_starred` 往返且 `seen_at` 格式对；不留 `.tmp`；坏 JSON 当未 star 且能覆盖重写。
+
+状态机 5 条：`authorAvatarUrl` 含 `avatars.githubusercontent.com`；初始 `idle`；已 star 时新建 `Bridge()` 直接是 `thanked`；星数从 7 变 8 → `thanked` 且落盘；星数恒为 9 → `unchanged` 且**不落盘**；`fetch_stars()` 返回 `None` → `unknown`；检查中再调一次仍停在 `checking`。
+
+QML 守卫 4 条：头像用了 `bridge.authorAvatarUrl` + `OpacityMask` + 首字母回退；页脚读了 `bridge.starState` 并调 `bridge.startStarCheck()`；拖动源码里没有 `availableGeometry`、有 `desktopAvailableWidth`、松手用 `Math.round(clampX(`、有 `<= 1` 的落位判据与 `pointerY <= area.y + 1`。
+
+回滚验证做了两处：把 `clampX` 改回 `limitX`、`<= 1` 改回 `< 1`，拖动守卫变红；把 `CAMERA_PRESETS` 那类整块删掉的验证在上一轮已做。
+
+### 产物（本轮）
+
+`desktop/dist/instatools.exe` 80,541,787 B（上一轮 80,533,513 B）。`INSTA_LANG=zh` / `INSTA_LANG=en` 下 `--self-test` 均 `QML_OK roots=1`。桌面测试 253 passed, 3 skipped。
+
+实机拖拽实测（屏幕 3840×2160、DPR 3，主窗口 3072×2160）：右拖松手停在 `(768,0,3840,2160)` 贴右边；左拖停在 `(0,0,3072,2160)`；上顶最大化。阻尼过程中最多让出 26 逻辑像素。
+
 ### 新增（启动时的三页欢迎窗）
 
 桌面端首次启动会弹一个悬浮窗，三页：使用协议、使用须知、作者主页。第三页两个按钮——「去点个 star」打开仓库，「我真的没有 GitHub 账号」直接关掉，不点也能照常用。

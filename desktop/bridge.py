@@ -1,11 +1,13 @@
 import os
 import threading
+import time
 
 from PySide6.QtCore import Property, QObject, QUrl, Signal, Slot
 
 import consent
 import core
 import i18n
+import star
 
 #   作者页「去点个 star」的目标。仓库地址统一在这里，免得 QML 里散落一份。
 AUTHOR_URL = "https://github.com/DUOFreedom/Insta-camera-tools"
@@ -51,6 +53,7 @@ class Bridge(QObject):
     specChanged = Signal()
     seqChanged = Signal()
     welcomeChanged = Signal()
+    starChanged = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -96,6 +99,13 @@ class Bridge(QObject):
         #   启动时只读一次 `consent` 的记录：看完这一版就不该再弹，
         #   所以不看文件就判断的事（比如界面刷新）不能重新读盘。
         self._welcome = consent.should_show()
+        #   star 只做「点开前后对比星标总数」：GitHub 的公开接口不给匿名查
+        #   「谁点了」。已经确认过的直接进 thanked，不再发网络请求。
+        self._star_state = "thanked" if star.is_starred() else "idle"
+        self._star_count = 0
+        #   每次点 star 自增；旧线程醒来发现代次不对就自行收工，避免两次
+        #   点击的轮询互相覆盖状态。
+        self._star_epoch = 0
 
     @Property(bool, notify=busyChanged)
     def busy(self) -> bool:
@@ -145,6 +155,72 @@ class Bridge(QObject):
     def authorUrl(self) -> str:
         """点 star 就是跳到这个页面。"""
         return AUTHOR_URL
+
+    @Property(str, constant=True)
+    def authorAvatarUrl(self) -> str:
+        """GitHub 头像。拿不到时界面自己退回首字母，不在这里兜。"""
+        return star.AVATAR_URL
+
+    #   idle / checking / thanked / unchanged / unknown 五种状态。
+    #   unchanged 允许再点一次（可能点了但还没生效、或者点的是别的仓库），
+    #   unknown 是网络不通，两种都不影响任何功能。
+    @Property(str, notify=starChanged)
+    def starState(self) -> str:
+        return self._star_state
+
+    @Property(int, notify=starChanged)
+    def starCount(self) -> int:
+        """最近一次读到的星标总数；0 表示还没读到。"""
+        return self._star_count
+
+    @Slot()
+    def startStarCheck(self) -> None:
+        """在用户点开仓库页之后调：隔一会儿回来看看星标数涨没涨。
+
+        GitHub 不给匿名查「谁点过 star」，只能看总数。所以这里记下点开前
+        的数量，等一会儿再读一次——涨了就当点上了，记进本地状态，以后不再问。
+        """
+        if self._star_state in ("checking", "thanked"):
+            return
+        self._star_state = "checking"
+        self.starChanged.emit()
+        self._star_epoch += 1
+        threading.Thread(
+            target=self._star_worker, args=(self._star_epoch,), daemon=True
+        ).start()
+
+    def _star_worker(self, epoch: int) -> None:
+        """后台轮询：不占界面线程，网络再慢也只影响这个提示。"""
+        before = star.fetch_stars()
+        if before is None:
+            self._finish_star(epoch, "unknown", 0)
+            return
+        latest = before
+        #   间隔与次数在模块常量里，测试把它改成 0 就能立刻跑完。
+        for _ in range(max(1, star.POLL_ATTEMPTS)):
+            time.sleep(max(0.0, star.POLL_INTERVAL))
+            if self._star_epoch != epoch:
+                return  # 这期间又点了一次，交给新的那轮
+            now = star.fetch_stars()
+            if now is None:
+                continue
+            latest = now
+            if now > before:
+                try:
+                    star.mark_starred()
+                except OSError as exc:
+                    #   记不下来最坏就是下次再问一遍，不值得打断任何流程。
+                    self.append_log(_tf("[warn] 记录 star 状态失败：%s", exc))
+                self._finish_star(epoch, "thanked", now)
+                return
+        self._finish_star(epoch, "unchanged", latest)
+
+    def _finish_star(self, epoch: int, state: str, count: int) -> None:
+        if self._star_epoch != epoch:
+            return
+        self._star_state = state
+        self._star_count = count
+        self.starChanged.emit()
 
     @Property(str, notify=statusChanged)
     def status(self) -> str:
