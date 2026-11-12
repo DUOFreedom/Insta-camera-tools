@@ -3,8 +3,12 @@ import threading
 
 from PySide6.QtCore import Property, QObject, QUrl, Signal, Slot
 
+import consent
 import core
 import i18n
+
+#   作者页「去点个 star」的目标。仓库地址统一在这里，免得 QML 里散落一份。
+AUTHOR_URL = "https://github.com/DUOFreedom/Insta-camera-tools"
 
 VIDEO_EXTS = (".mp4", ".mov", ".mkv", ".avi", ".ts", ".flv", ".wmv", ".m4v")
 #   自动找样本时比「可选输入」多认几种：真机原片是 VID_*.mp4 + LRV_*.lrv，
@@ -46,6 +50,7 @@ class Bridge(QObject):
     hwChanged = Signal()
     specChanged = Signal()
     seqChanged = Signal()
+    welcomeChanged = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -88,6 +93,9 @@ class Bridge(QObject):
         self._hw_checked = False
         self._seq_text = ""
         self._model_override = "auto"  # "auto" / "ace_pro_2" / "go_ultra"
+        #   启动时只读一次 `consent` 的记录：看完这一版就不该再弹，
+        #   所以不看文件就判断的事（比如界面刷新）不能重新读盘。
+        self._welcome = consent.should_show()
 
     @Property(bool, notify=busyChanged)
     def busy(self) -> bool:
@@ -108,6 +116,35 @@ class Bridge(QObject):
     def tr(self, text: str) -> str:
         """QML 里的界面文案统一走这里。中文原样返回，英文查表。"""
         return i18n.t(text)
+
+    #   首次进软件的欢迎窗（使用协议 / 使用须知 / 作者主页）。
+    #   记在 consent 的文件里而不是 QSettings：换个版本、换台机器只影响
+    #   这一份 JSON，测试也能用 INSTA_STATE_DIR 顶到临时目录去。
+    @Property(bool, notify=welcomeChanged)
+    def welcomeNeeded(self) -> bool:
+        return self._welcome
+
+    @Slot()
+    def markWelcomeSeen(self) -> None:
+        """任何关闭动作都调它 —— 不逼用户点 star，也不让他每次开机都看一遍。"""
+        try:
+            consent.mark_seen()
+        except OSError as exc:
+            #   写不进状态文件最坏也只是下次再弹一次，不值得把关闭流程卡住。
+            self.append_log(_tf("[warn] 记录欢迎页状态失败：%s", exc))
+        self._welcome = False
+        self.welcomeChanged.emit()
+
+    @Slot()
+    def showWelcome(self) -> None:
+        """手动再打开一次（给「关于」和演示用）。"""
+        self._welcome = True
+        self.welcomeChanged.emit()
+
+    @Property(str, constant=True)
+    def authorUrl(self) -> str:
+        """点 star 就是跳到这个页面。"""
+        return AUTHOR_URL
 
     @Property(str, notify=statusChanged)
     def status(self) -> str:

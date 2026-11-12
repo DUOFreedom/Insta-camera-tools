@@ -2,6 +2,30 @@
 
 ## 未发布
 
+### 新增（启动时的三页欢迎窗）
+
+桌面端首次启动会弹一个悬浮窗，三页：使用协议、使用须知、作者主页。第三页两个按钮——「去点个 star」打开仓库，「我真的没有 GitHub 账号」直接关掉，不点也能照常用。
+
+- 新建 `desktop/consent.py`：状态存在 `INSTA_STATE_DIR` > `%LOCALAPPDATA%/instatools` > `~/.instatools` 下的 `welcome.json`，记 `{"version": N, "seen_at": …}`。写入先落 `welcome.json.tmp` 再 `os.replace`，断电不会留半个 JSON。`CONSENT_VERSION` 加一，老用户会再看一次——只有协议文字有实质变化时才该加。
+- 新建 `desktop/qml/WelcomeDialog.qml`：固定 460×430，不复用 `Modal.qml`。`Modal` 按内容高度自适应，三页长短不一会让面板每翻一页跳一次高度。点遮罩**不关窗**——协议得翻完或按右上角 ×。
+- `desktop/bridge.py` 加 `welcomeNeeded` / `markWelcomeSeen()` / `showWelcome()` / `authorUrl`。任何关闭路径都调 `markWelcomeSeen()`，包括 ×、最后一页两个按钮：不强迫点 star，也不让弹窗反复骚扰。
+- `desktop/qml/main.qml` 里 `open` 是赋值不是绑定，`markWelcomeSeen()` 后靠 `welcomeChanged` 信号再同步。绑成表达式的话，关窗时那次赋值会把绑定打断，`showWelcome()` 就再也叫不起来了。
+- `INSTA_WELCOME_DEMO=1` 强制每次都弹，方便改文案时反复看，不用去清状态文件。
+
+正文比可视高度长时，下边界会把最后一行拦腰切断，看着像内容丢了。在正文与页脚之间垫了一层 18px 同底色渐变（`transparent` → `Theme.card`），切断处就留出了还能往下滚的意思。
+
+### 测试（欢迎窗 15 条）
+
+`desktop/tests/test_welcome.py`。`consent` 8 条：空目录要弹；`mark_seen` 后不再弹且 JSON 里 version/seen_at 都对；`CONSENT_VERSION` 提高后重新弹；文件被写成坏 JSON 当没看过处理且之后能覆盖；`{"version": "wat"}` 这种脏值不崩；写完不留 `.tmp` 残文件；`reset()` 后重新弹、连调两次不抛。
+
+`Bridge` 4 条：首启 `welcomeNeeded` 为真；`markWelcomeSeen()` 翻转，且**新起一个 `Bridge()` 读盘也是假**（证明真落盘了，不是只改了内存）；`showWelcome()` 能把它叫回来；`authorUrl` 指向仓库。
+
+QML 源码守卫 3 条：`WelcomeDialog.qml` 存在；`main.qml` 里挂了 `WelcomeDialog {`、调了 `bridge.markWelcomeSeen()`、读过 `bridge.welcomeNeeded`；三页各有且只有一个 `visible: root.page === N`，两个 star 按钮都在。最后这条一开始写成 `src.count("visible: root.page ===") == 3`，实测 5——两个按钮的 `visible` 也是 `=== root.pageCount - 1`，改成按页号精确计数。
+
+### 产物（欢迎窗轮）
+
+`desktop/dist/instatools.exe` 80,533,513 B（上一轮 80,521,485 B）。`INSTA_LANG=zh` / `INSTA_LANG=en` 下 `--self-test` 均 `QML_OK roots=1`。桌面测试 234 passed, 3 skipped。
+
 ### 新增（安卓端补上机型预设）
 
 机型预设在 `cb6099a` 加进来时只接了桌面端的界面，`insta_core.py` 里的预设表和 `model_override` 透传一直都在，但安卓侧既没有入口也没有 UI —— 而 README 与 CHANGELOG 早先把它写成了双端功能。这轮补齐。

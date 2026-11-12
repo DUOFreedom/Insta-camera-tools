@@ -30,6 +30,10 @@ Window {
         bridge.refreshSequence(outputView.outputDir, outputView.autoSequence)
         if (updateDemo)
             updateModal.open = true
+        //   首次进软件、或者协议改版之后，先看三页说明。selfTest 上面已经
+        //   返回了，打包自检不会卡在一个等人点的窗口上。
+        if (bridge.welcomeNeeded || welcomeDemo)
+            welcome.open = true
     }
 
     Connections {
@@ -566,6 +570,25 @@ Window {
                     }
                 }
             }
+        }
+    }
+
+    //   showWelcome() 可以在运行期间把欢迎页叫回来（留给「关于」用），
+    //   所以 open 不能绑成 bridge.welcomeNeeded 的表达式 —— 关窗时一旦
+    //   open = false 就会把绑定打断，之后 showWelcome 再也叫不出来。
+    Connections {
+        target: bridge
+        function onWelcomeChanged() {
+            welcome.open = bridge.welcomeNeeded
+        }
+    }
+
+    WelcomeDialog {
+        id: welcome
+        anchors.fill: parent
+        onClosed: {
+            welcome.open = false
+            bridge.markWelcomeSeen()
         }
     }
 }

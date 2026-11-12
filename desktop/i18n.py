@@ -487,3 +487,70 @@ EN_TEXT.update({
     #   ffmpeg 探测超时（新增的 10 秒上限）后返回的说明。
     "%s 无响应（>10s）": "%s is not responding (>10s)",
 })
+
+EN_TEXT.update({
+    #   首次启动的欢迎窗（使用协议 / 使用须知 / 作者主页）。
+    #   免责声明这块宁可译得笨一点也不能省：英文用户看到的必须是同一份意思。
+    "使用协议": "Terms of use",
+    "使用须知": "Before you start",
+    "作者主页": "About the author",
+    "第 1 页 / 共 3 页 · 用之前请先看完": "Page 1 of 3 · please read before you start",
+    "第 2 页 / 共 3 页 · 几条容易踩的坑": "Page 2 of 3 · a few traps worth knowing",
+    "第 3 页 / 共 3 页 · 关于这颗 star": "Page 3 of 3 · about that star",
+    "本程序按 GPL-3.0-or-later 发布：源码公开，可以自由使用、修改、再分发；再分发时要保留同一许可证，并说明源码从哪拿。":
+        "Released under GPL-3.0-or-later: the source is public, and you may use, "
+        "modify and redistribute it. If you redistribute it, keep the same licence "
+        "and say where the source can be obtained.",
+    "只拿它处理你本人拍的、或者已经取得授权的素材。把别人的片子包装成自己相机拍的，不在授权范围内，后果自负。":
+        "Use it only on footage you shot yourself, or that you are authorised to "
+        "use. Passing someone else's footage off as shot on your own camera is "
+        "outside that permission, and the responsibility is yours.",
+    "导入会改写视频容器的元数据，并在相机卡里写索引文件。写卡有风险，动手之前请自己备份原片。":
+        "Importing rewrites the video container's metadata and writes index files "
+        "onto the camera card. Writing to a card carries risk — back up your "
+        "originals before you start.",
+    "软件按「现状」提供，不附带任何担保。素材损坏、相机不识别、数据丢失这类后果，作者不承担责任。":
+        "The software is provided as is, without any warranty. Damage to footage, "
+        "a camera that refuses to recognise it, or data loss are not the author's "
+        "responsibility.",
+    "程序完全在本机跑，不上传视频、路径或任何个人信息。只有检查更新的时候会访问 GitHub 的公开接口。":
+        "Everything runs on your machine: no video, path or personal information is "
+        "uploaded. The only network call is to GitHub's public API, when checking "
+        "for updates.",
+    "• 移植 inst box 要求卡里已经有一对真机原片（VID_*.mp4 和 LRV_*.lrv）当模板。没有模板只能纯转码，相机不会认。":
+        "• Transplanting the inst box needs a pair of camera-recorded files on the "
+        "card (VID_*.mp4 and LRV_*.lrv) to use as a template. Without one you only "
+        "get plain transcodes, and the camera will not recognise them.",
+    "• 机型预设只决定编码参数（分辨率、帧率、编码器、关键帧间隔、音轨数），不会解除上面那条。":
+        "• A model preset only sets the encoding parameters (resolution, frame rate, "
+        "encoder, keyframe interval, track count). It does not lift that requirement.",
+    "• 第一次用，先拿一段短片走一遍：导入，插回相机，看相册能不能播、能不能下载到手机。":
+        "• On your first run, take one short clip all the way through: import it, put "
+        "the card back in the camera, then check that the album plays it and that it "
+        "downloads to your phone.",
+    "• 转换期间不要拔卡、不要拔读卡器。中途关窗程序会先问你要不要中止。":
+        "• Do not unplug the card or the reader while converting. Closing the window "
+        "mid-run asks you first whether to abort.",
+    "• 需要 ffmpeg。没装的话程序会在顶部提示，可以一键装到系统目录或程序目录。":
+        "• ffmpeg is required. If it is missing, a banner at the top offers a "
+        "one-click install into the system folder or the program folder.",
+    "• 机型不在列表里就选「自动」，程序会从卡里的原片把参数量出来。":
+        "• If your model is not in the list, pick Automatic — the parameters are "
+        "measured from the camera originals on the card.",
+    "桌面端和安卓端都是一个人写的": "The desktop and Android apps are written by one person",
+    "这个工具最初只是不想每次手动折腾视频元数据。后来越补越多，桌面端、安卓端，还有现在这个欢迎页。":
+        "This started as a way to stop hand-editing video metadata every time. It "
+        "grew: a desktop app, an Android app, and now this welcome screen.",
+    "有问题、有想法，去仓库开 issue。如果它帮你省了事，点个 star 就是最实在的支持 —— 不点也完全没关系，功能一样不少。":
+        "Bugs and ideas belong in the repo's issues. If it saved you some work, a "
+        "star is the most concrete way to say thanks — and if you would rather not, "
+        "that changes nothing about the app.",
+    "去点个 star": "Give it a star",
+    # 按钮要在 412 DIP 的页脚里和「上一步」「去点个 star」并排，英文不能
+    # 照字面译成 "I really don't have a GitHub account"——那样三个按钮加起来
+    # 比面板还宽，Back 会被挤出左边界。语气的补充放在正文里说了。
+    "我真的没有 GitHub 账号": "I don't have GitHub",
+    "下一步": "Next",
+    "上一步": "Back",
+    "[warn] 记录欢迎页状态失败：%s": "[warn] could not record the welcome state: %s",
+})

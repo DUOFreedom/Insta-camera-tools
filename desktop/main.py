@@ -85,6 +85,8 @@ def main() -> int:
     context.setContextProperty("tray", tray)
     context.setContextProperty("updater", Updater(engine))
     context.setContextProperty("updateDemo", os.environ.get("INSTA_UPDATE_DEMO") == "1")
+    #   强制弹欢迎页：看过一次之后再想看，不用去删状态文件。
+    context.setContextProperty("welcomeDemo", os.environ.get("INSTA_WELCOME_DEMO") == "1")
 
     engine.load(QUrl.fromLocalFile(entry))
 
