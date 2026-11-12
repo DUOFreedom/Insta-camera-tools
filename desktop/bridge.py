@@ -1,6 +1,6 @@
 import os
+import sys
 import threading
-import time
 
 from PySide6.QtCore import Property, QObject, QUrl, Signal, Slot
 
@@ -99,12 +99,13 @@ class Bridge(QObject):
         #   启动时只读一次 `consent` 的记录：看完这一版就不该再弹，
         #   所以不看文件就判断的事（比如界面刷新）不能重新读盘。
         self._welcome = consent.should_show()
-        #   star 只做「点开前后对比星标总数」：GitHub 的公开接口不给匿名查
-        #   「谁点了」。已经确认过的直接进 thanked，不再发网络请求。
-        self._star_state = "thanked" if star.is_starred() else "idle"
+        #   star 不再靠「点开仓库前后对星数」：那要让用户先跳浏览器、再等一分钟，
+        #   还得替他猜。改成进作者页就自己读一次星数，读到就显示，读不到就不提。
+        #   「已经走过一次」记在 star 的文件里，下次不再提。
+        self._starred = star.is_starred()
+        self._star_state = "idle"  # idle / loading / ok / unknown
         self._star_count = 0
-        #   每次点 star 自增；旧线程醒来发现代次不对就自行收工，避免两次
-        #   点击的轮询互相覆盖状态。
+        #   每发起一次读数自增；旧线程回来发现代次不对就丢掉结果。
         self._star_epoch = 0
 
     @Property(bool, notify=busyChanged)
@@ -161,9 +162,13 @@ class Bridge(QObject):
         """GitHub 头像。拿不到时界面自己退回首字母，不在这里兜。"""
         return star.AVATAR_URL
 
-    #   idle / checking / thanked / unchanged / unknown 五种状态。
-    #   unchanged 允许再点一次（可能点了但还没生效、或者点的是别的仓库），
-    #   unknown 是网络不通，两种都不影响任何功能。
+    @Property(bool, notify=starChanged)
+    def starDone(self) -> bool:
+        """走过一次了（点开过仓库，或者明说没有账号）—— 界面不再反复提。"""
+        return self._starred
+
+    #   idle / loading / ok / unknown。
+    #   ok 表示读到了星数，unknown 表示没读到（多半是网络不通）；两种都不拦功能。
     @Property(str, notify=starChanged)
     def starState(self) -> str:
         return self._star_state
@@ -173,16 +178,56 @@ class Bridge(QObject):
         """最近一次读到的星标总数；0 表示还没读到。"""
         return self._star_count
 
-    @Slot()
-    def startStarCheck(self) -> None:
-        """在用户点开仓库页之后调：隔一会儿回来看看星标数涨没涨。
+    @Slot(result=bool)
+    def openAuthorPage(self) -> bool:
+        """点「去点个 star」：用系统默认浏览器打开仓库页，成功即记一笔。
 
-        GitHub 不给匿名查「谁点过 star」，只能看总数。所以这里记下点开前
-        的数量，等一会儿再读一次——涨了就当点上了，记进本地状态，以后不再问。
+        不在这儿调 QML 的 Qt.openUrlExternally —— 打包后的 exe 里它点了没反应，
+        实测系统默认浏览器根本没起来。改从 Python 侧走 ShellExecute。
         """
-        if self._star_state in ("checking", "thanked"):
+        if not self._open_url(AUTHOR_URL):
+            self._set_error(i18n.t("打不开浏览器，请手动复制上面的仓库地址"))
+            return False
+        self.markStarred()
+        return True
+
+    def _open_url(self, url: str) -> bool:
+        """交给系统默认程序打开；两条路都失败才返回 False。"""
+        try:
+            if sys.platform.startswith("win"):
+                os.startfile(url)  # 等价于双击链接，走系统默认浏览器
+                return True
+        except OSError as exc:
+            self.append_log(_tf("[warn] 打开浏览器失败：%s", exc))
+        try:
+            from PySide6.QtCore import QUrl
+            from PySide6.QtGui import QDesktopServices
+
+            if QDesktopServices.openUrl(QUrl(url)):
+                return True
+        except Exception as exc:  # noqa: BLE001 - 兜底路径，失败就算了
+            self.append_log(_tf("[warn] 打开浏览器失败：%s", exc))
+        return False
+
+    @Slot()
+    def markStarred(self) -> None:
+        """记下「这份人情还过了」，下次开机不再提。"""
+        if self._starred:
             return
-        self._star_state = "checking"
+        try:
+            star.mark_starred()
+        except OSError as exc:
+            #   记不下来最坏就是下次再提一次，不值得打断流程。
+            self.append_log(_tf("[warn] 记录 star 状态失败：%s", exc))
+        self._starred = True
+        self.starChanged.emit()
+
+    @Slot()
+    def refreshStars(self) -> None:
+        """读一次星标总数。不需要用户先打开仓库，也不等他配合。"""
+        if self._star_state == "loading":
+            return
+        self._star_state = "loading"
         self.starChanged.emit()
         self._star_epoch += 1
         threading.Thread(
@@ -190,30 +235,9 @@ class Bridge(QObject):
         ).start()
 
     def _star_worker(self, epoch: int) -> None:
-        """后台轮询：不占界面线程，网络再慢也只影响这个提示。"""
-        before = star.fetch_stars()
-        if before is None:
-            self._finish_star(epoch, "unknown", 0)
-            return
-        latest = before
-        #   间隔与次数在模块常量里，测试把它改成 0 就能立刻跑完。
-        for _ in range(max(1, star.POLL_ATTEMPTS)):
-            time.sleep(max(0.0, star.POLL_INTERVAL))
-            if self._star_epoch != epoch:
-                return  # 这期间又点了一次，交给新的那轮
-            now = star.fetch_stars()
-            if now is None:
-                continue
-            latest = now
-            if now > before:
-                try:
-                    star.mark_starred()
-                except OSError as exc:
-                    #   记不下来最坏就是下次再问一遍，不值得打断任何流程。
-                    self.append_log(_tf("[warn] 记录 star 状态失败：%s", exc))
-                self._finish_star(epoch, "thanked", now)
-                return
-        self._finish_star(epoch, "unchanged", latest)
+        """后台读一次，不占界面线程；网络再慢也只影响这一行小字。"""
+        count = star.fetch_stars()
+        self._finish_star(epoch, "ok" if count is not None else "unknown", count or 0)
 
     def _finish_star(self, epoch: int, state: str, count: int) -> None:
         if self._star_epoch != epoch:

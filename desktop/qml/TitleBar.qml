@@ -224,6 +224,11 @@ Rectangle {
         }
 
         IconButton {
+            iconName: "window-minimize"
+            onClicked: if (root.targetWindow) root.targetWindow.showMinimized()
+        }
+
+        IconButton {
             iconName: "close"
             onClicked: if (root.targetWindow) root.targetWindow.close()
         }

@@ -177,18 +177,36 @@ Window {
                 title: bridge.appName
             }
 
-            ScrollView {
+            //  内容区自己就是 Flickable：ScrollView 把滚动交给内部
+            //  Flickable，外面拿不到 contentY，也就没法做阻尼。
+            Flickable {
                 id: scroll
                 width: parent.width
                 height: parent.height - 40
                 clip: true
-                ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
-                ScrollBar.vertical.policy: ScrollBar.AsNeeded
+                contentWidth: width
+                contentHeight: pageColumn.height + 48
+                boundsBehavior: Flickable.DragOverBounds
+                ScrollBar.vertical: ScrollBar {
+                    policy: ScrollBar.AsNeeded
+                }
+
+                //  拖过边界时把超出量按阻尼压回来，越推越推不动。
+                contentItem.transform: Translate {
+                    x: pageDamping.shiftX
+                    y: pageDamping.shiftY
+                }
+
+                DragDamping {
+                    id: pageDamping
+                    flick: scroll
+                }
 
                 Column {
+                    id: pageColumn
                     x: 24
                     y: 24
-                    width: scroll.availableWidth - 48
+                    width: scroll.width - 48
                     spacing: 12
 
                     Text {

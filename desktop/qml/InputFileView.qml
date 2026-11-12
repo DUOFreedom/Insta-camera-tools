@@ -60,7 +60,17 @@ Rectangle {
             clip: true
             model: root.files
             spacing: 4
-            boundsBehavior: Flickable.StopAtBounds
+            //  拖到列表两端后继续拖会有阻尼，越推越推不动。
+            boundsBehavior: Flickable.DragOverBounds
+            contentItem.transform: Translate {
+                x: fileDamping.shiftX
+                y: fileDamping.shiftY
+            }
+
+            DragDamping {
+                id: fileDamping
+                flick: fileList
+            }
 
             delegate: Rectangle {
                 width: fileList.width

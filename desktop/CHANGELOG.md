@@ -1,4 +1,37 @@
-# CHANGELOG
+## 未发布
+
+### 修正（上一轮的三个偏差）
+
+上一轮有三处做偏了，这轮改回来。
+
+- **阻尼做在窗口上了，其实说的是界面里。** 用户要的是应用内内容拖到两端时的阻尼，不是拖动窗口到屏幕边缘。窗口那套保留（拖窗口到屏幕边也确实该有阻尼），但真正要的是下面这条「应用内拖动阻尼」。
+- **点「去点个 star」打不开浏览器。** QML 里 `Qt.openUrlExternally()` 那条路径在打包后的 exe 上不生效。实测 `QDesktopServices.openUrl` 在没有 `QGuiApplication` 时返回 `False`，有之后返回 `True`，说明是走 QML 这条路拿不到可用的平台服务。改成 Python 侧 `os.startfile(url)`（Windows 上等价双击链接、走系统默认浏览器）优先，回落 `QDesktopServices`，两条都失败就 `_set_error` 提示手动复制地址——不再假装成功。
+- **star 检查要求用户先点开仓库、再等一分钟。** 这是把「怎么确认」的成本转嫁给用户。改成进作者页就自动读一次星数：读到就显示，读不到就不提。按钮点过一次后落盘，下次显示「已点亮 · 再去看看」。
+
+### 新增（应用内拖动阻尼）
+
+内容区、文件列表、欢迎窗正文三处，拖过边界后继续拖会越推越推不动，松手回弹归位。
+
+- 新增 `desktop/qml/DragDamping.qml`：`damp(over) = slack * over / (over + slack)`，`slack = 26`。超 26px 只让 13px，超 78px 让 19.5px，趋近但永不超过 26px。
+- 做法是 `boundsBehavior: Flickable.DragOverBounds`（允许按 1:1 拖过界）**加** 一份反向 `Translate` 挂在 `contentItem.transform` 上，只把「超出量减阻尼后」的那部分挪回去。这样内部 `contentX/contentY` 仍跟手，松手回弹时超出量归零、偏移自然消失，不需要另写回弹动画。
+- `desktop/qml/main.qml` 的 `ScrollView` 换成 `Flickable`：`ScrollView` 把滚动交给内部 `Flickable`，外面拿不到 `contentY`，做不了阻尼。滚动条改用 `ScrollBar.vertical`。
+- `desktop/qml/InputFileView.qml` 的 `ListView`、`desktop/qml/WelcomeDialog.qml` 的两个 `Flickable` 同样处理。三处原来的 `Flickable.StopAtBounds` 全部去掉——停在边界就拖不动，也就没有阻尼可言。
+
+### 修复（star 状态与协议同意没有真正持久化）
+
+- star 侧新增 `desktop/star.py` 的 `load()`，`is_starred()` 读它；`mark_starred()` 仍走 `target + ".tmp"` 再 `os.replace`，断电不留半个 JSON。`Bridge.starDone` 直接反映它，按钮文案跟着变。
+- 协议同意本来就是落盘到 `%LOCALAPPDATA%\instatools\welcome.json`（`CONSENT_VERSION` 控制），这轮只补了测试把它钉住：写过之后新建 `Bridge()` 必须不再弹。
+- 状态目录可用 `INSTA_STATE_DIR` 覆盖，测试靠它隔离，不写真实用户目录。
+
+### 测试（本轮 6 条，含两处回滚验证）
+
+`desktop/tests/test_star.py` 的旧断言全换成新接口：初始 `idle` 且 `starDone` 为假；`mark_starred()` 之后新建 `Bridge()` `starDone` 为真而 `starState` 仍是 `idle`；`refreshStars()` 读到 12 就 `ok`；`fetch_stars()` 返回 `None` 就 `unknown`；`loading` 期间再调一次不起第二个线程；`openAuthorPage()` 成功时落盘、失败时报错且不落盘；`_open_url` 在 Windows 上先走 `startfile`。
+
+新增阻尼守卫 3 条：`DragDamping.qml` 有 `damp(` 且「超出为零时偏移为零」；三个可拖区域都用了 `DragDamping` + `contentItem.transform` 且不再有 `StopAtBounds`；`main.qml` 里不再有 `ScrollView`。
+
+回滚验证：把 `_open_url` 里的 `os.startfile` 分支删掉 → 对应测试变红；把任一处 `DragOverBounds` 改回 `StopAtBounds` → 守卫变红。
+
+LOG
 
 ## 未发布
 

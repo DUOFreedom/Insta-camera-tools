@@ -1,5 +1,5 @@
 import QtQuick
-import Qt5Compat.GraphicalEffects
+import QtQuick.Layouts
 
 // 首次进软件时的欢迎窗：使用协议 / 使用须知 / 作者主页，三页。
 // 刻意不复用 Modal.qml —— 那个面板高度按内容自适应，三页文字长短不一会让
@@ -47,6 +47,15 @@ Item {
     function prev() {
         if (page > 0) {
             page -= 1
+        }
+    }
+
+    //   翻到作者页就去读一次星数：不需要用户先点开仓库，一辈子只自动读一次。
+    property bool starRequested: false
+    onPageChanged: {
+        if (open && page === pageCount - 1 && !starRequested) {
+            starRequested = true
+            bridge.refreshStars()
         }
     }
 
@@ -182,7 +191,17 @@ Item {
             clip: true
             contentWidth: width
             contentHeight: termsColumn.implicitHeight
-            boundsBehavior: Flickable.StopAtBounds
+            //  拖过边界时按阻尼压回，越推越推不动；松手回弹自动归位。
+            boundsBehavior: Flickable.DragOverBounds
+            contentItem.transform: Translate {
+                x: damping.shiftX
+                y: damping.shiftY
+            }
+
+            DragDamping {
+                id: damping
+                flick: pageTerms
+            }
 
             Column {
                 id: termsColumn
@@ -261,7 +280,17 @@ Item {
             clip: true
             contentWidth: width
             contentHeight: notesColumn.implicitHeight
-            boundsBehavior: Flickable.StopAtBounds
+            //  拖过边界时按阻尼压回，越推越推不动；松手回弹自动归位。
+            boundsBehavior: Flickable.DragOverBounds
+            contentItem.transform: Translate {
+                x: notesDamping.shiftX
+                y: notesDamping.shiftY
+            }
+
+            DragDamping {
+                id: notesDamping
+                flick: pageNotes
+            }
 
             Column {
                 id: notesColumn
@@ -353,12 +382,9 @@ Item {
             Row {
                 spacing: 12
 
-                Rectangle {
+                Item {
                     width: 44
                     height: 44
-                    radius: 22
-                    color: Theme.accent
-                    clip: true
 
                     //   头像走 GitHub 的公开地址：离线、被墙、图挂了都只
                     //   让首字母顶上，不留空白方块。
@@ -372,22 +398,25 @@ Item {
                         visible: false
                     }
 
-                    //   圆形头像得靠遮罩：Item.clip 只按矩形裁，半径裁不出来。
-                    OpacityMask {
+                    //   用片段着色器按距离中心距离裁剪。
+                    ShaderEffect {
                         anchors.fill: parent
                         visible: avatarImage.status === Image.Ready
-                        source: avatarImage
-                        maskSource: avatarMask
+                        property variant source: avatarImage
+                        fragmentShader: `
+                            uniform lowp sampler2D source;
+                            varying highp vec2 qt_TexCoord0;
+                            void main() {
+                                vec2 center = vec2(0.5, 0.5);
+                                float radius = 0.5;
+                                float dist = distance(qt_TexCoord0, center);
+                                if (dist > radius) discard;
+                                gl_FragColor = texture2D(source, qt_TexCoord0);
+                            }
+                        `
                     }
 
-                    Rectangle {
-                        id: avatarMask
-                        anchors.fill: parent
-                        radius: 22
-                        visible: false
-                        layer.enabled: true
-                    }
-
+                    // 首字母回退
                     Text {
                         visible: avatarImage.status !== Image.Ready
                         anchors.centerIn: parent
@@ -454,7 +483,7 @@ Item {
             Text {
                 //   星标数只在真读到过的时候出现：读不到就不提，免得像个坏掉的读数。
                 width: parent.width
-                visible: bridge.starCount > 0
+                visible: bridge.starState === "ok" && bridge.starCount > 0
                 text: bridge.tr("仓库现在有 %1 颗星").arg(bridge.starCount)
                 color: Theme.textDisabled
                 font.family: Theme.fontFamily
@@ -462,17 +491,13 @@ Item {
             }
 
             Text {
-                //   点开仓库之后的状态说明。checking 时提醒别急着关窗，
-                //   其余两种都只是说明为什么不给结论，不影响任何功能。
+                //   读星数不需要用户先点开仓库，所以这里只说明读数本身的状态。
+                //   读不到也不提要求，功能一样不少。
                 width: parent.width
-                visible: bridge.starState === "checking"
-                         || bridge.starState === "unchanged"
-                         || bridge.starState === "unknown"
-                text: bridge.starState === "checking"
-                      ? bridge.tr("点完 star 别急着关窗，我这儿会自动看一眼。")
-                      : bridge.starState === "unchanged"
-                        ? bridge.tr("还没看到星标数变化。要是确实点了，可能只是还没刷新，可以再点一次。")
-                        : bridge.tr("网络不通，确认不了有没有点上。不影响使用。")
+                visible: bridge.starState === "loading" || bridge.starState === "unknown"
+                text: bridge.starState === "loading"
+                      ? bridge.tr("正在读星标数…")
+                      : bridge.tr("没读到星标数（大概网络不通）。不影响使用。")
                 wrapMode: Text.Wrap
                 color: Theme.textDisabled
                 font.family: Theme.fontFamily
@@ -548,26 +573,23 @@ Item {
                 }
             }
 
-            Row {
+            RowLayout {
                 anchors.right: parent.right
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: 8
                 layoutDirection: Qt.RightToLeft
 
+                // RowLayout 让按钮按内容自适应宽度，避免长文本重叠
                 AppButton {
                     // 最后一页才出现，前面两页没有可 star 的东西可指。
                     visible: root.page === root.pageCount - 1
-                    // 检查期间不给连点，其余状态都能再点一次。
-                    enabled: bridge.starState !== "checking"
-                    text: bridge.starState === "checking" ? bridge.tr("正在确认…")
-                          : bridge.starState === "thanked" ? bridge.tr("已经点亮了，谢谢")
-                          : bridge.starState === "unchanged" ? bridge.tr("再去看一眼")
-                          : bridge.tr("去点个 star")
+                    // 走过一次就不再催：按钮还在，只是换了句更轻的话。
+                    text: bridge.starDone ? bridge.tr("已点亮 · 再去看看")
+                                          : bridge.tr("去点个 star")
                     btnHeight: 36
+                    Layout.preferredWidth: Math.max(btnHeight * 2.5, implicitWidth)
                     onClicked: {
-                        // 先开页面再起检查：检查要拿「点之前」的星数当基线。
-                        Qt.openUrlExternally(bridge.authorUrl)
-                        bridge.startStarCheck()
+                        bridge.openAuthorPage()
                     }
                 }
 
@@ -576,6 +598,7 @@ Item {
                     text: bridge.tr("我真的没有 GitHub 账号")
                     btnHeight: 36
                     accent: false
+                    Layout.preferredWidth: Math.max(btnHeight * 2.5, implicitWidth)
                     onClicked: root.close()
                 }
 
@@ -583,6 +606,7 @@ Item {
                     visible: root.page < root.pageCount - 1
                     text: bridge.tr("下一步")
                     btnHeight: 36
+                    Layout.preferredWidth: Math.max(btnHeight * 2.5, implicitWidth)
                     onClicked: root.next()
                 }
 
@@ -591,6 +615,7 @@ Item {
                     text: bridge.tr("上一步")
                     btnHeight: 36
                     accent: false
+                    Layout.preferredWidth: Math.max(btnHeight * 2.5, implicitWidth)
                     onClicked: root.prev()
                 }
             }

@@ -565,3 +565,16 @@ EN_TEXT.update({
     "网络不通，确认不了有没有点上。不影响使用。": "No network, so this cannot be confirmed either way. Nothing else is affected.",
     "[warn] 记录 star 状态失败：%s": "[warn] could not record the star state: %s",
 })
+
+EN_TEXT.update({
+    # 星标数改成「进作者页自动读一次」之后新增的几句。
+    "正在读星标数…": "Reading the star count…",
+    "没读到星标数（大概网络不通）。不影响使用。": "Could not read the star count (probably no network). Nothing else is affected.",
+    "已点亮 · 再去看看": "Starred · visit again",
+    "打不开浏览器，请手动复制上面的仓库地址": "Could not open the browser — please copy the repo address above.",
+})
+
+EN_TEXT.update({
+    #  只进日志区，但日志也会被英文用户看到。
+    "[warn] 打开浏览器失败：%s": "[warn] failed to open the browser: %s",
+})

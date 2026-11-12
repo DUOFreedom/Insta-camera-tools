@@ -130,65 +130,88 @@ def test_avatar_url_points_at_github(bridge):
 def test_initial_state_is_idle(bridge):
     assert bridge.starState == "idle"
     assert bridge.starCount == 0
+    assert bridge.starDone is False
 
 
-def test_already_starred_starts_thanked(state_dir):
+def test_already_starred_reads_from_disk(state_dir):
     star.mark_starred()
     pytest.importorskip("PySide6.QtCore")
     import bridge as bridge_mod
 
     fresh = bridge_mod.Bridge()
-    assert fresh.starState == "thanked"
+    #  记住的是「他已经点过」，不是「现在正在读」——所以状态仍是 idle。
+    assert fresh.starDone is True
+    assert fresh.starState == "idle"
 
 
-def test_check_turns_thanked_when_count_grows(bridge, monkeypatch):
-    counts = iter([7, 8])
-    monkeypatch.setattr(star, "POLL_INTERVAL", 0)
-    monkeypatch.setattr(star, "POLL_ATTEMPTS", 1)
-    monkeypatch.setattr(star, "fetch_stars", lambda timeout=None: next(counts))
+def test_refresh_reads_count(bridge, monkeypatch):
+    monkeypatch.setattr(star, "fetch_stars", lambda timeout=None: 12)
 
-    bridge.startStarCheck()
-    assert _wait_state(bridge, ("thanked", "unchanged", "unknown")) == "thanked"
-    assert bridge.starCount == 8
-    assert star.is_starred() is True
+    bridge.refreshStars()
+    assert _wait_state(bridge, ("ok", "unknown")) == "ok"
+    assert bridge.starCount == 12
 
 
-def test_check_turns_unchanged_when_count_stays(bridge, monkeypatch):
-    monkeypatch.setattr(star, "POLL_INTERVAL", 0)
-    monkeypatch.setattr(star, "POLL_ATTEMPTS", 2)
-    monkeypatch.setattr(star, "fetch_stars", lambda timeout=None: 9)
-
-    bridge.startStarCheck()
-    assert _wait_state(bridge, ("thanked", "unchanged", "unknown")) == "unchanged"
-    # 没确认就不该写本地记录，下次还能再点一次。
-    assert star.is_starred() is False
-
-
-def test_check_turns_unknown_when_network_is_down(bridge, monkeypatch):
-    monkeypatch.setattr(star, "POLL_INTERVAL", 0)
-    monkeypatch.setattr(star, "POLL_ATTEMPTS", 1)
+def test_refresh_unknown_when_network_is_down(bridge, monkeypatch):
     monkeypatch.setattr(star, "fetch_stars", lambda timeout=None: None)
 
-    bridge.startStarCheck()
-    assert _wait_state(bridge, ("thanked", "unchanged", "unknown")) == "unknown"
+    bridge.refreshStars()
+    assert _wait_state(bridge, ("ok", "unknown")) == "unknown"
+    assert bridge.starCount == 0
 
 
-def test_start_check_ignores_double_click_while_checking(bridge, monkeypatch):
+def test_refresh_ignores_second_call_while_loading(bridge, monkeypatch):
     calls = []
+    release = []
 
     def slow(timeout=None):
         calls.append(1)
+        #  第一轮卡住不返回，好让第二次调用撞上 loading。
+        while not release:
+            time.sleep(0.01)
         return 5
 
-    monkeypatch.setattr(star, "POLL_INTERVAL", 0.05)
-    monkeypatch.setattr(star, "POLL_ATTEMPTS", 3)
     monkeypatch.setattr(star, "fetch_stars", slow)
 
-    bridge.startStarCheck()
-    state_after_first = bridge.starState
-    bridge.startStarCheck()  # 检查中再点，不该再起一轮
-    assert state_after_first == "checking"
-    assert bridge.starState == "checking"
+    bridge.refreshStars()
+    assert bridge.starState == "loading"
+    bridge.refreshStars()
+    assert bridge.starState == "loading"
+    assert len(calls) == 1
+
+    release.append(1)
+    assert _wait_state(bridge, ("ok", "unknown")) == "ok"
+
+
+def test_open_author_page_opens_and_marks(bridge, monkeypatch):
+    seen = []
+    monkeypatch.setattr(bridge, "_open_url", lambda url: seen.append(url) or True)
+
+    assert bridge.openAuthorPage() is True
+    assert seen == [bridge.authorUrl]
+    assert bridge.starDone is True
+    #  点过就落盘，下次启动不再问。
+    assert star.is_starred() is True
+
+
+def test_open_author_page_reports_failure(bridge, monkeypatch):
+    monkeypatch.setattr(bridge, "_open_url", lambda url: False)
+
+    assert bridge.openAuthorPage() is False
+    assert bridge.starDone is False
+    assert star.is_starred() is False
+    assert bridge.lastError
+
+
+def test_open_url_prefers_startfile_on_windows(bridge, monkeypatch):
+    opened = []
+    #  bridge 是实例，模块要从 sys.modules 取。
+    mod = sys.modules["bridge"]
+    monkeypatch.setattr(mod.os, "startfile", opened.append, raising=False)
+    monkeypatch.setattr(mod.sys, "platform", "win32")
+
+    assert bridge._open_url(bridge.authorUrl) is True
+    assert opened == [bridge.authorUrl]
 
 
 # ---------------------------------------------------------------- QML 守卫
@@ -205,18 +228,30 @@ def test_avatar_is_a_network_image_with_fallback():
     src = _read("WelcomeDialog.qml")
     assert "bridge.authorAvatarUrl" in src
     # 圆形靠遮罩剪，Item.clip 只按矩形裁。
-    assert "OpacityMask" in src
+    assert "ShaderEffect" in src
     # 图没回来时用首字母顶着，不能是空框。
     assert 'text: "D"' in src
 
 
-def test_star_button_reflects_state():
+def test_star_button_reflects_done_state():
     src = _read("WelcomeDialog.qml")
-    for token in ("bridge.starState", "bridge.startStarCheck()",
-                  "bridge.starCount"):
+    for token in ("bridge.starDone", "bridge.openAuthorPage()",
+                  "bridge.refreshStars()", "bridge.starCount"):
         assert token in src, token
-    # 检查中禁止连点。
-    assert 'enabled: bridge.starState !== "checking"' in src
+    # 旧的「点完盯着星数看一分钟」那套是死代码，别留回来。
+    #  注释里提到这两个名字是在解释为什么不用，所以先剥掉注释再查。
+    code = chr(10).join(line.split("//")[0] for line in src.splitlines())
+    assert "startStarCheck" not in code
+    assert "Qt.openUrlExternally" not in code
+    assert "bridge.openAuthorPage()" in code
+
+
+def test_star_count_is_read_once_on_author_page():
+    src = _read("WelcomeDialog.qml")
+    # 翻到最后一页就自动读一次，不需要用户先点开仓库。
+    assert "onPageChanged" in src
+    assert "page === pageCount - 1" in src
+    assert "starRequested" in src
 
 
 def test_titlebar_drag_is_hand_rolled_with_damping():
@@ -246,3 +281,36 @@ def test_titlebar_drag_limits_and_settles():
     # 贴顶最大化看光标是否顶到屏幕上沿，不看位移阈值：
     # 窗口本身占满高度时能拖出的位移取决于按在标题栏哪个位置。
     assert "pointerY <= area.y + 1" in src
+
+
+# ---------------------------------------------------------------- 应用内阻尼
+
+
+def _flickables():
+    return ("main.qml", "InputFileView.qml", "WelcomeDialog.qml")
+
+
+def test_drag_damping_component_exists():
+    src = _read("DragDamping.qml")
+    assert "function damp(" in src
+    # 只压回「超出量」，超出为零时偏移必须为零，否则内容会一直偏。
+    assert "over <= 0 ? 0 :" in src
+    assert "contentX" in src and "contentY" in src
+
+
+def test_every_scroll_area_uses_drag_over_bounds():
+    for name in _flickables():
+        src = _read(name)
+        assert "DragDamping {" in src, name
+        assert "contentItem.transform" in src, name
+        assert "DragOverBounds" in src, name
+        # 停在边界就拖不动，也就没有阻尼可言。
+        assert "StopAtBounds" not in src, name
+
+
+def test_main_content_area_is_a_plain_flickable():
+    src = _read("main.qml")
+    # ScrollView 把滚动交给内部 Flickable，外面拿不到 contentY，做不了阻尼。
+    assert "ScrollView {" not in src
+    assert "id: scroll" in src
+    assert "contentHeight: pageColumn.height" in src
