@@ -18,6 +18,7 @@
     <meta name="description" content="影石相机工具 v1.3.0 的主要变更：GO Ultra 适配、机型预设、ffmpeg 查找与安装重写、桌面端界面合并、安卓端硬化与测试建设。" />
     <meta name="color-scheme" content="light" />
     <meta name="theme-color" content="#FFFFFF" />
+    <script>(function(){try{var t=localStorage.getItem("instatools-theme");if(t!=="dark"&&t!=="light"){t=(window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches)?"dark":"light";}document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
     <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="../assets/apple-touch-icon.png" />
     <link rel="canonical" href="https://duofreedom.github.io/Insta-camera-tools/changelog/" />
@@ -80,310 +81,248 @@
       }
     </script>
   </head>
-
   <body id="top">
-    <a class="sr-only skip-link" href="#main">跳到主要内容</a>
-
-    <header class="nav">
-      <div class="container nav__inner">
-        <a class="brand" href="../" aria-label="影石相机工具，回到首页">
-          <svg
-            class="brand__mark"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.7"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            aria-hidden="true"
-            focusable="false"
-          >
-            <rect x="2.5" y="6.5" width="19" height="13" rx="3.5" />
-            <path d="M8.5 6.5l1.2-2.2h4.6l1.2 2.2" />
-            <circle cx="12" cy="13" r="3.6" />
-          </svg>
-          <span>影石相机工具</span>
-          <span class="brand__sub">桌面端 + 安卓端</span>
-        </a>
-
-        <nav class="nav__links" aria-label="主导航">
-          <a class="nav__link" href="../">双端</a>
-          <a class="nav__link" href="../features/">功能</a>
-          <a class="nav__link" href="../how-it-works/">技术原理</a>
-          <a class="nav__link" href="../guide/">使用指南</a>
-          <a class="nav__link" href="../faq/">常见问题</a>
-        </nav>
-
-        <div class="nav__actions">
-          <a
-            class="icon-btn nav__gh"
-            href="https://github.com/DUOFreedom/Insta-camera-tools"
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label="GitHub 仓库（在新标签页打开）"
-          >
-            <svg class="icon-btn__icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false">
-              <path d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48l-.01-1.7c-2.78.6-3.37-1.34-3.37-1.34-.45-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.61.07-.61 1 .07 1.53 1.03 1.53 1.03.89 1.53 2.34 1.09 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.56-1.11-4.56-4.95 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02a9.5 9.5 0 0 1 5 0c1.91-1.29 2.75-1.02 2.75-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.59 1.03 2.68 0 3.85-2.35 4.7-4.57 4.94.36.31.68.92.68 1.86l-.01 2.75c0 .27.18.58.69.48A10 10 0 0 0 12 2z" />
-            </svg>
-          </a>
-          <a class="btn btn--filled" href="../download/">下载</a>
-          <button
-            class="icon-btn"
-            id="menu-btn"
-            type="button"
-            aria-expanded="false"
-            aria-controls="mobile-nav"
-            aria-label="打开导航菜单"
-          >
-            <svg class="icon-btn__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true" focusable="false">
-              <path d="M4 7h16M4 12h16M4 17h16" />
-            </svg>
-          </button>
-        </div>
-      </div>
-
-      <div class="mobile-nav" id="mobile-nav" hidden>
-        <nav aria-label="移动端导航">
-          <ul class="mobile-nav__list">
-            <li><a class="mobile-nav__link" href="../">双端</a></li>
-            <li><a class="mobile-nav__link" href="../features/">功能</a></li>
-            <li><a class="mobile-nav__link" href="../how-it-works/">技术原理</a></li>
-            <li><a class="mobile-nav__link" href="../guide/">使用指南</a></li>
-            <li><a class="mobile-nav__link" href="../faq/">常见问题</a></li>
-            <li><a class="mobile-nav__link" href="../download/">下载</a></li>
-            <li><a class="mobile-nav__link" href="../changelog/">更新日志</a></li>
-            <li><a class="mobile-nav__link" href="../licenses/">开源声明</a></li>
-          </ul>
-        </nav>
-      </div>
-    </header>
-
-    <div class="page-head">
-      <div class="container">
-        <nav class="crumbs" aria-label="面包屑导航">
-          <ol class="crumbs__list">
-            <li class="crumbs__item"><a class="crumbs__link" href="../">首页</a></li>
-            <li class="crumbs__item" aria-current="page">更新日志</li>
-          </ol>
-        </nav>
-        <h1 class="page-head__title" id="page-title">更新日志</h1>
-        <p class="page-head__lead">v1.2.0 到 v1.3.0 的主要变更，按新增、修复、界面、测试分组；末尾是仍然存在的限制。</p>
+  <a class="skip-link" href="#main">跳到正文</a>
+  <header class="vp-nav">
+    <div class="vp-nav__inner">
+      <a class="vp-nav__brand" href="../" aria-label="影石相机工具，回到首页">
+        <span class="vp-nav__mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="2.5" y="6.5" width="19" height="13" rx="3.5" /><path d="M8.5 6.5l1.2-2.2h4.6l1.2 2.2" /><circle cx="12" cy="13" r="3.6" /></svg></span>
+        <span class="vp-nav__title">影石相机工具</span>
+        <span class="vp-nav__badge">v1.2.0</span>
+      </a>
+      <nav class="vp-nav__menus" aria-label="主导航">
+      <a class="vp-menu__link" href="../">首页</a>
+      <a class="vp-menu__link" href="../features/">功能</a>
+      <a class="vp-menu__link" href="../guide/">指南</a>
+      <a class="vp-menu__link" href="../faq/">问答</a>
+      <a class="vp-menu__link" href="../download/">下载</a>
+      </nav>
+      <div class="vp-nav__actions">
+        <button class="vp-search" type="button" aria-label="搜索文档">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="6.5" /><path d="M16 16l4.5 4.5" /></svg><span class="vp-search__label">搜索文档</span><span class="vp-search__key">K</span>
+        </button>
+        <button class="vp-appearance" type="button" role="switch" aria-checked="false" aria-label="深色模式">
+          <span class="vp-appearance__track"><span class="vp-appearance__thumb"></span></span>
+        </button>
+        <a class="vp-social" href="https://github.com/DUOFreedom/Insta-camera-tools" target="_blank" rel="noopener noreferrer" aria-label="GitHub 仓库（新标签页打开）"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48l-.01-1.7c-2.78.6-3.37-1.34-3.37-1.34-.45-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.61.07-.61 1 .07 1.53 1.03 1.53 1.03.89 1.53 2.34 1.09 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.56-1.11-4.56-4.95 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02a9.5 9.5 0 0 1 5 0c1.91-1.29 2.75-1.02 2.75-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.59 1.03 2.68 0 3.85-2.35 4.7-4.57 4.94.36.31.68.92.68 1.86l-.01 2.75c0 .27.18.58.69.48A10 10 0 0 0 12 2z" /></svg></a>
+        <button class="vp-hamburger" type="button" aria-expanded="false" aria-controls="vp-drawer" aria-label="打开导航菜单">
+          <span></span><span></span><span></span>
+        </button>
       </div>
     </div>
-
-    <main id="main">
-      <section class="section" id="notes">
-        <div class="container">
-          <div class="prose">
-            <p>
-              这一页只列主要变更；逐条提交见
-              <a class="link" href="https://github.com/DUOFreedom/Insta-camera-tools/commits/main" target="_blank" rel="noopener noreferrer">GitHub 提交历史</a>。
-              这组改动已作为 v1.3.0 发布。
-            </p>
+  </header>
+  <div class="vp-layout">
+  <aside class="vp-sidebar" aria-label="文档目录">
+    <div class="vp-sidebar__group">
+      <p class="vp-sidebar__title">开始</p>
+      <ul class="vp-sidebar__list">
+        <li><a class="vp-sidebar__link" href="../">概览</a></li>
+        <li><a class="vp-sidebar__link" href="../features/">功能特性</a></li>
+        <li><a class="vp-sidebar__link" href="../how-it-works/">工作原理</a></li>
+        <li><a class="vp-sidebar__link" href="../guide/">使用指南</a></li>
+      </ul>
+    </div>
+    <div class="vp-sidebar__group">
+      <p class="vp-sidebar__title">参考</p>
+      <ul class="vp-sidebar__list">
+        <li><a class="vp-sidebar__link" href="../faq/">常见问题</a></li>
+        <li><a class="vp-sidebar__link" href="../download/">下载与安装</a></li>
+        <li><a class="vp-sidebar__link" href="../changelog/" aria-current="page">更新日志</a></li>
+      </ul>
+    </div>
+    <div class="vp-sidebar__group">
+      <p class="vp-sidebar__title">关于</p>
+      <ul class="vp-sidebar__list">
+        <li><a class="vp-sidebar__link" href="../licenses/">开源与许可</a></li>
+        <li><a class="vp-sidebar__link" href="../sitemap/">站点地图</a></li>
+      </ul>
+    </div>
+  </aside>
+  <div class="vp-content">
+    <main id="main" class="vp-doc">
+      <div class="page-head">
+            <div class="container">
+              <nav class="crumbs" aria-label="面包屑导航">
+                <ol class="crumbs__list">
+                  <li class="crumbs__item"><a class="crumbs__link" href="../">首页</a></li>
+                  <li class="crumbs__item" aria-current="page">更新日志</li>
+                </ol>
+              </nav>
+              <h1 class="page-head__title" id="page-title">更新日志</h1>
+              <p class="page-head__lead">v1.2.0 到 v1.3.0 的主要变更，按新增、修复、界面、测试分组；末尾是仍然存在的限制。</p>
+            </div>
           </div>
 
-          <h2 class="subhead">v1.3.0</h2>
 
-          <h3 class="subhead subhead--sm">新增</h3>
-          <div class="prose">
-            <ul>
-              <li><strong>GO Ultra 适配。</strong>规格不再按 Ace Pro 2 的假设写死，改为按卡里原片量出：GOP 从原片的
-                <code class="code code--inline">stss</code> 表实测（主视频 120、代理 10，Ace Pro 2 是 16），
-                inst box 里记录的 GOP 也写真实值；代理轨的编码与元数据跟主视频一致。</li>
-              <li><strong>机型预设。</strong>界面最上方可选「自动 / Ace Pro 2 / GO Ultra」。选预设后按写死的编码、GOP、分辨率、帧率、音轨数生成；
-                「自动」仍然优先用卡里原片的实测值。</li>
-              <li><strong>ffmpeg 查找与安装重写。</strong>查找顺序改为环境变量 → 注册表 App Paths → 系统目录 → PATH → 程序目录；
-                下载与安装分离，可选装到系统目录（一次管理员确认）或程序目录（无需提权）。</li>
-            </ul>
-          </div>
+            <section class="section" id="notes">
+              <div class="container">
+                <div class="prose">
+                  <p>
+                    这一页只列主要变更；逐条提交见
+                    <a class="link" href="https://github.com/DUOFreedom/Insta-camera-tools/commits/main" target="_blank" rel="noopener noreferrer">GitHub 提交历史</a>。
+                    这组改动已作为 v1.3.0 发布。
+                  </p>
+                </div>
 
-          <h3 class="subhead subhead--sm">修复</h3>
-          <div class="prose">
-            <ul>
-              <li>「自动从存储卡分析」卡住界面：改到后台线程执行，结果回主线程。</li>
-              <li>模板选择：卡里放着上一轮的产物时，按字典序会挑到旧文件，改成由调用方显式指定样本对并校验配对。</li>
-              <li>安卓端四处硬化：任务文件原子写入、索引校验不再漏文件句柄、封面渲染校验输入并支持取消、转换线程的并发错误不再被吞掉。</li>
-              <li>端到端跑通时发现的两处关键帧缺陷：<code class="code code--inline">video_gop()</code> 接字符串参数、
-                QSV/AMF 分支漏了 <code class="code code--inline">-g</code> 与 <code class="code code--inline">-keyint_min</code>。</li>
-              <li>MCRC 校验和改为按产物自己的 <code class="code code--inline">mdat</code> 重算；安卓副本补齐 <code class="code code--inline">co64</code> 支持。</li>
-              <li>序列号定位改用「14 字节序列号紧跟机型名」的强特征，减少误判。</li>
-            </ul>
-          </div>
+                <h2 class="subhead" id="v130">v1.3.0</h2>
 
-          <h3 class="subhead subhead--sm">界面与体验</h3>
-          <div class="prose">
-            <ul>
-              <li>桌面端只保留 QML 界面，删掉并行的另一套界面，避免同一个缺陷修两遍。</li>
-              <li>补齐缺少的入口：封面选择、断点续跑、卡校验、定位卡、单条移除、硬件编码探测、拖拽添加。</li>
-              <li>转换中关闭窗口改为二选一：停止并退出，或最小化到托盘继续跑——直接退出会留下写了一半的文件。</li>
-              <li>封面预览改用本地文件 URL；错误提示不再粘在界面上关不掉。</li>
-            </ul>
-          </div>
+                <h3 class="subhead subhead--sm" id="新增">新增</h3>
+                <div class="prose">
+                  <ul>
+                    <li><strong>GO Ultra 适配。</strong>规格不再按 Ace Pro 2 的假设写死，改为按卡里原片量出：GOP 从原片的
+                      <code class="code code--inline">stss</code> 表实测（主视频 120、代理 10，Ace Pro 2 是 16），
+                      inst box 里记录的 GOP 也写真实值；代理轨的编码与元数据跟主视频一致。</li>
+                    <li><strong>机型预设。</strong>界面最上方可选「自动 / Ace Pro 2 / GO Ultra」。选预设后按写死的编码、GOP、分辨率、帧率、音轨数生成；
+                      「自动」仍然优先用卡里原片的实测值。</li>
+                    <li><strong>ffmpeg 查找与安装重写。</strong>查找顺序改为环境变量 → 注册表 App Paths → 系统目录 → PATH → 程序目录；
+                      下载与安装分离，可选装到系统目录（一次管理员确认）或程序目录（无需提权）。</li>
+                  </ul>
+                </div>
 
-          <h3 class="subhead subhead--sm">测试与构建</h3>
-          <div class="prose">
-            <ul>
-              <li>桌面端测试 177 通过、3 跳过；关键修复都做过「改回缺陷版本 → 测试变红 → 恢复 → 变绿」的回滚验证。</li>
-              <li>两处需要证明确实生效的地方，从「grep 源码」改成行为测试：造真实的 box 喂进去、真调一次、断言实际参数。</li>
-              <li>桌面端与安卓端的共享模块加 AST 比对守卫，防止一边改了另一边忘改。</li>
-            </ul>
-          </div>
+                <h3 class="subhead subhead--sm" id="修复">修复</h3>
+                <div class="prose">
+                  <ul>
+                    <li>「自动从存储卡分析」卡住界面：改到后台线程执行，结果回主线程。</li>
+                    <li>模板选择：卡里放着上一轮的产物时，按字典序会挑到旧文件，改成由调用方显式指定样本对并校验配对。</li>
+                    <li>安卓端四处硬化：任务文件原子写入、索引校验不再漏文件句柄、封面渲染校验输入并支持取消、转换线程的并发错误不再被吞掉。</li>
+                    <li>端到端跑通时发现的两处关键帧缺陷：<code class="code code--inline">video_gop()</code> 接字符串参数、
+                      QSV/AMF 分支漏了 <code class="code code--inline">-g</code> 与 <code class="code code--inline">-keyint_min</code>。</li>
+                    <li>MCRC 校验和改为按产物自己的 <code class="code code--inline">mdat</code> 重算；安卓副本补齐 <code class="code code--inline">co64</code> 支持。</li>
+                    <li>序列号定位改用「14 字节序列号紧跟机型名」的强特征，减少误判。</li>
+                  </ul>
+                </div>
 
-          <h2 class="subhead">v1.2.0（2026-11-08）</h2>
-          <div class="prose">
-            <ul>
-              <li>修 AMBA 段的音频帧偏移（<code class="code code--inline">+0x20</code> → <code class="code code--inline">+0x54</code>），此前生成的缩略图位置偏移。</li>
-              <li>修 inst 模块的动态加载路径，打包后不再找不到 <code class="code code--inline">instbox</code>。</li>
-              <li>去掉索引模块里写死的一台真机序列号；安卓端更新检查改用正确的版本号来源。</li>
-              <li>自动续接序号接上「从卡里最大序号 + 1 开始」。</li>
-            </ul>
-          </div>
+                <h3 class="subhead subhead--sm" id="界面与体验">界面与体验</h3>
+                <div class="prose">
+                  <ul>
+                    <li>桌面端只保留 QML 界面，删掉并行的另一套界面，避免同一个缺陷修两遍。</li>
+                    <li>补齐缺少的入口：封面选择、断点续跑、卡校验、定位卡、单条移除、硬件编码探测、拖拽添加。</li>
+                    <li>转换中关闭窗口改为二选一：停止并退出，或最小化到托盘继续跑——直接退出会留下写了一半的文件。</li>
+                    <li>封面预览改用本地文件 URL；错误提示不再粘在界面上关不掉。</li>
+                  </ul>
+                </div>
 
-          <h2 class="subhead">产物</h2>
-          <div class="table-wrap">
-            <table class="table">
-              <caption class="sr-only">两个平台的构建产物与验证方式</caption>
-              <thead>
-                <tr>
-                  <th scope="col">平台</th>
-                  <th scope="col">产物</th>
-                  <th scope="col">大小</th>
-                  <th scope="col">验证</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>Windows</td>
-                  <td><code>instatools.exe</code></td>
-                  <td>80.5 MB（80,519,132 字节）</td>
-                  <td><code>--self-test</code> 输出 <code>QML_OK roots=1</code></td>
-                </tr>
-                <tr>
-                  <td>Android</td>
-                  <td><code>app-release.apk</code></td>
-                  <td>约 75 MB</td>
-                  <td>单元测试 18 项通过（索引用例因无真机跳过）</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+                <h3 class="subhead subhead--sm" id="测试与构建">测试与构建</h3>
+                <div class="prose">
+                  <ul>
+                    <li>桌面端测试 177 通过、3 跳过；关键修复都做过「改回缺陷版本 → 测试变红 → 恢复 → 变绿」的回滚验证。</li>
+                    <li>两处需要证明确实生效的地方，从「grep 源码」改成行为测试：造真实的 box 喂进去、真调一次、断言实际参数。</li>
+                    <li>桌面端与安卓端的共享模块加 AST 比对守卫，防止一边改了另一边忘改。</li>
+                  </ul>
+                </div>
 
-          <h2 class="subhead">已知限制</h2>
-          <div class="prose">
-            <ul>
-              <li>真机链路未端到端验证：AMBA 字段只做了合成模板的偏移级验证，安卓的硬件编解码带自动回退但没在真机上确认。</li>
-              <li>安卓端 APK 不随 Release 分发，需自行构建。</li>
-              <li>安卓端默认回退到调试证书签名，正式分发前必须配置自己的签名。</li>
-            </ul>
-          </div>
-        </div>
-      </section>
+                <h2 class="subhead" id="v1202026-11-08">v1.2.0（2026-11-08）</h2>
+                <div class="prose">
+                  <ul>
+                    <li>修 AMBA 段的音频帧偏移（<code class="code code--inline">+0x20</code> → <code class="code code--inline">+0x54</code>），此前生成的缩略图位置偏移。</li>
+                    <li>修 inst 模块的动态加载路径，打包后不再找不到 <code class="code code--inline">instbox</code>。</li>
+                    <li>去掉索引模块里写死的一台真机序列号；安卓端更新检查改用正确的版本号来源。</li>
+                    <li>自动续接序号接上「从卡里最大序号 + 1 开始」。</li>
+                  </ul>
+                </div>
+
+                <h2 class="subhead" id="产物">产物</h2>
+                <div class="table-wrap">
+                  <table class="table">
+                    <caption class="sr-only">两个平台的构建产物与验证方式</caption>
+                    <thead>
+                      <tr>
+                        <th scope="col">平台</th>
+                        <th scope="col">产物</th>
+                        <th scope="col">大小</th>
+                        <th scope="col">验证</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td>Windows</td>
+                        <td><code>instatools.exe</code></td>
+                        <td>80.5 MB（80,519,132 字节）</td>
+                        <td><code>--self-test</code> 输出 <code>QML_OK roots=1</code></td>
+                      </tr>
+                      <tr>
+                        <td>Android</td>
+                        <td><code>app-release.apk</code></td>
+                        <td>约 75 MB</td>
+                        <td>单元测试 18 项通过（索引用例因无真机跳过）</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                <h2 class="subhead" id="已知限制">已知限制</h2>
+                <div class="prose">
+                  <ul>
+                    <li>真机链路未端到端验证：AMBA 字段只做了合成模板的偏移级验证，安卓的硬件编解码带自动回退但没在真机上确认。</li>
+                    <li>安卓端 APK 不随 Release 分发，需自行构建。</li>
+                    <li>安卓端默认回退到调试证书签名，正式分发前必须配置自己的签名。</li>
+                  </ul>
+                </div>
+              </div>
+            </section>
     </main>
-
-    <footer class="footer" aria-label="页脚">
-      <div class="container">
-        <div class="footer__inner">
-          <div class="footer__brand">
-            <p class="footer__name">影石相机工具</p>
-            <p class="footer__meta">桌面端 v1.3.0 · GPL-3.0 · Windows 10 / 11 · 安卓端源码可构建</p>
-          </div>
-          <div class="footer__links">
-            <a class="btn btn--ghost" href="https://github.com/DUOFreedom/Insta-camera-tools" target="_blank" rel="noopener noreferrer">
-              <svg class="btn__icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false">
-                <path d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48l-.01-1.7c-2.78.6-3.37-1.34-3.37-1.34-.45-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.61.07-.61 1 .07 1.53 1.03 1.53 1.03.89 1.53 2.34 1.09 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.56-1.11-4.56-4.95 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02a9.5 9.5 0 0 1 5 0c1.91-1.29 2.75-1.02 2.75-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.59 1.03 2.68 0 3.85-2.35 4.7-4.57 4.94.36.31.68.92.68 1.86l-.01 2.75c0 .27.18.58.69.48A10 10 0 0 0 12 2z" />
-              </svg>
-              GitHub 仓库
-            </a>
-            <a class="btn btn--ghost" href="../">
-              <svg class="btn__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
-                <path d="M12 19V5" /><path d="M6 11l6-6 6 6" />
-              </svg>
-              回到顶部
-            </a>
-          </div>
+    <nav class="vp-pager" aria-label="上下页导航">
+      <a class="vp-pager__link" href="../download/">
+        <span class="vp-pager__label">上一篇</span>
+        <span class="vp-pager__title">下载与安装</span>
+      </a>
+      <a class="vp-pager__link vp-pager__link--next" href="../licenses/">
+        <span class="vp-pager__label">下一篇</span>
+        <span class="vp-pager__title">开源与许可</span>
+      </a>
+    </nav>
+    <footer class="vp-footer">
+      <div class="footer__inner">
+        <div class="footer__brand">
+          <p class="footer__name">影石相机工具</p>
+          <p class="footer__meta">桌面端 v1.3.0 · GPL-3.0 · Windows 10 / 11 · 安卓端源码可构建</p>
+        </div>
+        <div class="footer__links">
+          <a class="btn btn--ghost" href="https://github.com/DUOFreedom/Insta-camera-tools" target="_blank" rel="noopener noreferrer"><svg class="btn__icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48l-.01-1.7c-2.78.6-3.37-1.34-3.37-1.34-.45-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.61.07-.61 1 .07 1.53 1.03 1.53 1.03.89 1.53 2.34 1.09 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.56-1.11-4.56-4.95 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02a9.5 9.5 0 0 1 5 0c1.91-1.29 2.75-1.02 2.75-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.59 1.03 2.68 0 3.85-2.35 4.7-4.57 4.94.36.31.68.92.68 1.86l-.01 2.75c0 .27.18.58.69.48A10 10 0 0 0 12 2z" /></svg>GitHub 仓库</a>
+          <a class="btn btn--ghost" href="../download/">下载与安装</a>
         </div>
         <nav class="footer__nav" aria-label="页脚导航">
-          <a class="footer__link" href="../features/">功能</a>
-          <a class="footer__link" href="../how-it-works/">技术原理</a>
+          <a class="footer__link" href="../sitemap/">站点地图</a>
+          <a class="footer__link" href="../changelog/">更新日志</a>
+          <a class="footer__link" href="../licenses/">开源许可</a>
           <a class="footer__link" href="../guide/">使用指南</a>
           <a class="footer__link" href="../faq/">常见问题</a>
-          <a class="footer__link" href="../download/">下载</a>
-          <a class="footer__link" href="../changelog/">更新日志</a>
-          <a class="footer__link" href="../licenses/">开源声明</a>
-          <a class="footer__link" href="../sitemap/">站点地图</a>
+          <a class="footer__link" href="../">回到首页</a>
         </nav>
         <p class="footer__note">第三方工具，与影石创新科技股份有限公司无任何关联，未获其授权或认可。</p>
       </div>
     </footer>
-
-    <script>
-      (function () {
-        "use strict";
-
-        var menuBtn = document.getElementById("menu-btn");
-        var menuPanel = document.getElementById("mobile-nav");
-
-        function setMenu(open) {
-          menuBtn.setAttribute("aria-expanded", String(open));
-          menuBtn.setAttribute("aria-label", open ? "关闭导航菜单" : "打开导航菜单");
-          if (open) menuPanel.removeAttribute("hidden");
-          else menuPanel.setAttribute("hidden", "");
-        }
-
-        menuBtn.addEventListener("click", function () {
-          setMenu(menuBtn.getAttribute("aria-expanded") !== "true");
-        });
-
-        menuPanel.addEventListener("click", function (event) {
-          if (event.target.closest("a")) setMenu(false);
-        });
-
-        document.addEventListener("keydown", function (event) {
-          if (event.key === "Escape" && menuBtn.getAttribute("aria-expanded") === "true") {
-            setMenu(false);
-            menuBtn.focus();
-          }
-        });
-
-        /* FAQ：<details> 自带状态，这里同步 aria-expanded */
-        Array.prototype.forEach.call(document.querySelectorAll(".faq__item"), function (item) {
-          var summary = item.querySelector("summary");
-          summary.setAttribute("aria-expanded", String(item.open));
-          summary.addEventListener("click", function () {
-            summary.setAttribute("aria-expanded", String(!item.open));
-          });
-          item.addEventListener("toggle", function () {
-            summary.setAttribute("aria-expanded", String(item.open));
-          });
-        });
-
-        /* 复制 SHA256：每个按钮通过 data-copy 指向自己的 <code> 元素 */
-        Array.prototype.forEach.call(document.querySelectorAll(".copy-btn[data-copy]"), function (btn) {
-          var target = document.getElementById(btn.getAttribute("data-copy"));
-          var label = document.getElementById(btn.getAttribute("data-label"));
-          if (!target) return;
-          if (!navigator.clipboard) {
-            btn.hidden = true;
-            return;
-          }
-          btn.addEventListener("click", function () {
-            navigator.clipboard.writeText(target.textContent.trim()).then(
-              function () {
-                label.textContent = "已复制";
-                window.setTimeout(function () {
-                  label.textContent = "复制";
-                }, 2000);
-              },
-              function () {
-                label.textContent = "复制失败";
-                window.setTimeout(function () {
-                  label.textContent = "复制";
-                }, 2000);
-              }
-            );
-          });
-        });
-      })();
-    </script>
-  </body>
+  </div>
+  <aside class="vp-aside" aria-label="本页目录">
+    <nav class="vp-toc">
+      <p class="vp-toc__title">本页目录</p>
+      <ul class="vp-toc__list"></ul>
+    </nav>
+  </aside>
+  </div>
+  <aside class="vp-drawer" id="vp-drawer" aria-label="导航菜单">
+      <p class="vp-sidebar__title">开始</p>
+      <a class="vp-sidebar__link" href="../">概览</a>
+      <a class="vp-sidebar__link" href="../features/">功能特性</a>
+      <a class="vp-sidebar__link" href="../how-it-works/">工作原理</a>
+      <a class="vp-sidebar__link" href="../guide/">使用指南</a>
+      <p class="vp-sidebar__title">参考</p>
+      <a class="vp-sidebar__link" href="../faq/">常见问题</a>
+      <a class="vp-sidebar__link" href="../download/">下载与安装</a>
+      <a class="vp-sidebar__link" href="../changelog/" aria-current="page">更新日志</a>
+      <p class="vp-sidebar__title">关于</p>
+      <a class="vp-sidebar__link" href="../licenses/">开源与许可</a>
+      <a class="vp-sidebar__link" href="../sitemap/">站点地图</a>
+  </aside>
+  <dialog class="vp-search-modal" aria-label="搜索文档">
+    <div class="vp-search__panel">
+      <div class="vp-search__field">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="6.5" /><path d="M16 16l4.5 4.5" /></svg>
+        <input type="search" placeholder="搜索标题与小节名，例如 GOP、索引、ffmpeg" aria-label="搜索关键词" autocomplete="off" />
+      </div>
+      <div class="vp-search__results"></div>
+    </div>
+  </dialog>
+  <script src="../assets/app.js" data-search-index="../assets/search-index.json" defer></script>
+</body>
 </html>

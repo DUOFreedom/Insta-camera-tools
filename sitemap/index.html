@@ -18,6 +18,7 @@
     <meta name="description" content="影石相机工具站点的全部页面索引：功能、技术原理、使用指南、常见问题、下载、开源声明、更新日志。" />
     <meta name="color-scheme" content="light" />
     <meta name="theme-color" content="#FFFFFF" />
+    <script>(function(){try{var t=localStorage.getItem("instatools-theme");if(t!=="dark"&&t!=="light"){t=(window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches)?"dark":"light";}document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
     <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="../assets/apple-touch-icon.png" />
     <link rel="canonical" href="https://duofreedom.github.io/Insta-camera-tools/sitemap/" />
@@ -80,253 +81,187 @@
       }
     </script>
   </head>
-
   <body id="top">
-    <a class="sr-only skip-link" href="#main">跳到主要内容</a>
-
-    <header class="nav">
-      <div class="container nav__inner">
-        <a class="brand" href="../" aria-label="影石相机工具，回到首页">
-          <svg
-            class="brand__mark"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.7"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            aria-hidden="true"
-            focusable="false"
-          >
-            <rect x="2.5" y="6.5" width="19" height="13" rx="3.5" />
-            <path d="M8.5 6.5l1.2-2.2h4.6l1.2 2.2" />
-            <circle cx="12" cy="13" r="3.6" />
-          </svg>
-          <span>影石相机工具</span>
-          <span class="brand__sub">桌面端 + 安卓端</span>
-        </a>
-
-        <nav class="nav__links" aria-label="主导航">
-          <a class="nav__link" href="../">双端</a>
-          <a class="nav__link" href="../features/">功能</a>
-          <a class="nav__link" href="../how-it-works/">技术原理</a>
-          <a class="nav__link" href="../guide/">使用指南</a>
-          <a class="nav__link" href="../faq/">常见问题</a>
-        </nav>
-
-        <div class="nav__actions">
-          <a
-            class="icon-btn nav__gh"
-            href="https://github.com/DUOFreedom/Insta-camera-tools"
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label="GitHub 仓库（在新标签页打开）"
-          >
-            <svg class="icon-btn__icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false">
-              <path d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48l-.01-1.7c-2.78.6-3.37-1.34-3.37-1.34-.45-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.61.07-.61 1 .07 1.53 1.03 1.53 1.03.89 1.53 2.34 1.09 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.56-1.11-4.56-4.95 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02a9.5 9.5 0 0 1 5 0c1.91-1.29 2.75-1.02 2.75-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.59 1.03 2.68 0 3.85-2.35 4.7-4.57 4.94.36.31.68.92.68 1.86l-.01 2.75c0 .27.18.58.69.48A10 10 0 0 0 12 2z" />
-            </svg>
-          </a>
-          <a class="btn btn--filled" href="../download/">下载</a>
-          <button
-            class="icon-btn"
-            id="menu-btn"
-            type="button"
-            aria-expanded="false"
-            aria-controls="mobile-nav"
-            aria-label="打开导航菜单"
-          >
-            <svg class="icon-btn__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true" focusable="false">
-              <path d="M4 7h16M4 12h16M4 17h16" />
-            </svg>
-          </button>
-        </div>
-      </div>
-
-      <div class="mobile-nav" id="mobile-nav" hidden>
-        <nav aria-label="移动端导航">
-          <ul class="mobile-nav__list">
-            <li><a class="mobile-nav__link" href="../">双端</a></li>
-            <li><a class="mobile-nav__link" href="../features/">功能</a></li>
-            <li><a class="mobile-nav__link" href="../how-it-works/">技术原理</a></li>
-            <li><a class="mobile-nav__link" href="../guide/">使用指南</a></li>
-            <li><a class="mobile-nav__link" href="../faq/">常见问题</a></li>
-            <li><a class="mobile-nav__link" href="../download/">下载</a></li>
-            <li><a class="mobile-nav__link" href="../changelog/">更新日志</a></li>
-            <li><a class="mobile-nav__link" href="../licenses/">开源声明</a></li>
-          </ul>
-        </nav>
-      </div>
-    </header>
-
-    <div class="page-head">
-      <div class="container">
-        <nav class="crumbs" aria-label="面包屑导航">
-          <ol class="crumbs__list">
-            <li class="crumbs__item"><a class="crumbs__link" href="../">首页</a></li>
-            <li class="crumbs__item" aria-current="page">站点地图</li>
-          </ol>
-        </nav>
-        <h1 class="page-head__title" id="page-title">站点地图</h1>
-        <p class="page-head__lead">全部页面索引。爬虫请直接读 XML 站点地图，人读这一页更直观。</p>
+  <a class="skip-link" href="#main">跳到正文</a>
+  <header class="vp-nav">
+    <div class="vp-nav__inner">
+      <a class="vp-nav__brand" href="../" aria-label="影石相机工具，回到首页">
+        <span class="vp-nav__mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="2.5" y="6.5" width="19" height="13" rx="3.5" /><path d="M8.5 6.5l1.2-2.2h4.6l1.2 2.2" /><circle cx="12" cy="13" r="3.6" /></svg></span>
+        <span class="vp-nav__title">影石相机工具</span>
+        <span class="vp-nav__badge">v1.3.0</span>
+      </a>
+      <nav class="vp-nav__menus" aria-label="主导航">
+      <a class="vp-menu__link" href="../">首页</a>
+      <a class="vp-menu__link" href="../features/">功能</a>
+      <a class="vp-menu__link" href="../guide/">指南</a>
+      <a class="vp-menu__link" href="../faq/">问答</a>
+      <a class="vp-menu__link" href="../download/">下载</a>
+      </nav>
+      <div class="vp-nav__actions">
+        <button class="vp-search" type="button" aria-label="搜索文档">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="6.5" /><path d="M16 16l4.5 4.5" /></svg><span class="vp-search__label">搜索文档</span><span class="vp-search__key">K</span>
+        </button>
+        <button class="vp-appearance" type="button" role="switch" aria-checked="false" aria-label="深色模式">
+          <span class="vp-appearance__track"><span class="vp-appearance__thumb"></span></span>
+        </button>
+        <a class="vp-social" href="https://github.com/DUOFreedom/Insta-camera-tools" target="_blank" rel="noopener noreferrer" aria-label="GitHub 仓库（新标签页打开）"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48l-.01-1.7c-2.78.6-3.37-1.34-3.37-1.34-.45-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.61.07-.61 1 .07 1.53 1.03 1.53 1.03.89 1.53 2.34 1.09 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.56-1.11-4.56-4.95 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02a9.5 9.5 0 0 1 5 0c1.91-1.29 2.75-1.02 2.75-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.59 1.03 2.68 0 3.85-2.35 4.7-4.57 4.94.36.31.68.92.68 1.86l-.01 2.75c0 .27.18.58.69.48A10 10 0 0 0 12 2z" /></svg></a>
+        <button class="vp-hamburger" type="button" aria-expanded="false" aria-controls="vp-drawer" aria-label="打开导航菜单">
+          <span></span><span></span><span></span>
+        </button>
       </div>
     </div>
-
-    <main id="main">
-      <section class="section" id="sitemap">
-        <div class="container">
-          <div class="prose">
-            <p>全部页面共九页，每页只讲一件事，互相链接。爬虫请优先用
-              <a class="link" href="../sitemap.xml">sitemap.xml</a>。</p>
+  </header>
+  <div class="vp-layout">
+  <aside class="vp-sidebar" aria-label="文档目录">
+    <div class="vp-sidebar__group">
+      <p class="vp-sidebar__title">开始</p>
+      <ul class="vp-sidebar__list">
+        <li><a class="vp-sidebar__link" href="../">概览</a></li>
+        <li><a class="vp-sidebar__link" href="../features/">功能特性</a></li>
+        <li><a class="vp-sidebar__link" href="../how-it-works/">工作原理</a></li>
+        <li><a class="vp-sidebar__link" href="../guide/">使用指南</a></li>
+      </ul>
+    </div>
+    <div class="vp-sidebar__group">
+      <p class="vp-sidebar__title">参考</p>
+      <ul class="vp-sidebar__list">
+        <li><a class="vp-sidebar__link" href="../faq/">常见问题</a></li>
+        <li><a class="vp-sidebar__link" href="../download/">下载与安装</a></li>
+        <li><a class="vp-sidebar__link" href="../changelog/">更新日志</a></li>
+      </ul>
+    </div>
+    <div class="vp-sidebar__group">
+      <p class="vp-sidebar__title">关于</p>
+      <ul class="vp-sidebar__list">
+        <li><a class="vp-sidebar__link" href="../licenses/">开源与许可</a></li>
+        <li><a class="vp-sidebar__link" href="../sitemap/" aria-current="page">站点地图</a></li>
+      </ul>
+    </div>
+  </aside>
+  <div class="vp-content">
+    <main id="main" class="vp-doc">
+      <div class="page-head">
+            <div class="container">
+              <nav class="crumbs" aria-label="面包屑导航">
+                <ol class="crumbs__list">
+                  <li class="crumbs__item"><a class="crumbs__link" href="../">首页</a></li>
+                  <li class="crumbs__item" aria-current="page">站点地图</li>
+                </ol>
+              </nav>
+              <h1 class="page-head__title" id="page-title">站点地图</h1>
+              <p class="page-head__lead">全部页面索引。爬虫请直接读 XML 站点地图，人读这一页更直观。</p>
+            </div>
           </div>
-          <ul class="linklist">
-            <li class="linklist__item">
-              <a class="link" href="../">首页</a>
-              <span class="linklist__desc">项目概览：两端架构、三个必做步骤、机型与下载入口。</span>
-            </li>
-            <li class="linklist__item">
-              <a class="link" href="../features/">功能详解</a>
-              <span class="linklist__desc">导入与转码、批量排队、断点续跑、机型预设、硬件编码、封面与卡校验。</span>
-            </li>
-            <li class="linklist__item">
-              <a class="link" href="../how-it-works/">技术原理</a>
-              <span class="linklist__desc">三重校验的技术细节，以及 Ace Pro 2 与 GO Ultra 的参数差异。</span>
-            </li>
-            <li class="linklist__item">
-              <a class="link" href="../guide/">使用指南</a>
-              <span class="linklist__desc">桌面端四步上手、安卓端构建后导入、开始前的准备清单。</span>
-            </li>
-            <li class="linklist__item">
-              <a class="link" href="../faq/">常见问题</a>
-              <span class="linklist__desc">相机不认、ffmpeg 缺失、机型选择、是否会改动原片等十三条问答。</span>
-            </li>
-            <li class="linklist__item">
-              <a class="link" href="../download/">下载与安装</a>
-              <span class="linklist__desc">instatools.exe 下载、SHA256 校验、ffmpeg 安装、源码构建。</span>
-            </li>
-            <li class="linklist__item">
-              <a class="link" href="../licenses/">开源声明</a>
-              <span class="linklist__desc">GPL-3.0、第三方依赖、商标与免责声明。</span>
-            </li>
-            <li class="linklist__item">
-              <a class="link" href="../changelog/">更新日志</a>
-              <span class="linklist__desc">v1.3.0 的变更与已知限制。</span>
-            </li>
-            <li class="linklist__item">
-              <a class="link" href="../sitemap/">站点地图</a>
-              <span class="linklist__desc">全部页面索引，以及 XML 站点地图与爬虫说明。</span>
-            </li>
-          </ul>
-          <p class="steps__note">
-            这个页面给人和爬虫各提供一条快速通道：XML 站点地图列出全部 URL 与更新时间，这里补一句每页讲什么。
-          </p>
-        </div>
-      </section>
+
+
+            <section class="section" id="sitemap">
+              <div class="container">
+                <div class="prose">
+                  <p>全部页面共九页，每页只讲一件事，互相链接。爬虫请优先用
+                    <a class="link" href="../sitemap.xml">sitemap.xml</a>。</p>
+                </div>
+                <ul class="linklist">
+                  <li class="linklist__item">
+                    <a class="link" href="../">首页</a>
+                    <span class="linklist__desc">项目概览：两端架构、三个必做步骤、机型与下载入口。</span>
+                  </li>
+                  <li class="linklist__item">
+                    <a class="link" href="../features/">功能详解</a>
+                    <span class="linklist__desc">导入与转码、批量排队、断点续跑、机型预设、硬件编码、封面与卡校验。</span>
+                  </li>
+                  <li class="linklist__item">
+                    <a class="link" href="../how-it-works/">技术原理</a>
+                    <span class="linklist__desc">三重校验的技术细节，以及 Ace Pro 2 与 GO Ultra 的参数差异。</span>
+                  </li>
+                  <li class="linklist__item">
+                    <a class="link" href="../guide/">使用指南</a>
+                    <span class="linklist__desc">桌面端四步上手、安卓端构建后导入、开始前的准备清单。</span>
+                  </li>
+                  <li class="linklist__item">
+                    <a class="link" href="../faq/">常见问题</a>
+                    <span class="linklist__desc">相机不认、ffmpeg 缺失、机型选择、是否会改动原片等十三条问答。</span>
+                  </li>
+                  <li class="linklist__item">
+                    <a class="link" href="../download/">下载与安装</a>
+                    <span class="linklist__desc">instatools.exe 下载、SHA256 校验、ffmpeg 安装、源码构建。</span>
+                  </li>
+                  <li class="linklist__item">
+                    <a class="link" href="../licenses/">开源声明</a>
+                    <span class="linklist__desc">GPL-3.0、第三方依赖、商标与免责声明。</span>
+                  </li>
+                  <li class="linklist__item">
+                    <a class="link" href="../changelog/">更新日志</a>
+                    <span class="linklist__desc">v1.3.0 的变更与已知限制。</span>
+                  </li>
+                  <li class="linklist__item">
+                    <a class="link" href="../sitemap/">站点地图</a>
+                    <span class="linklist__desc">全部页面索引，以及 XML 站点地图与爬虫说明。</span>
+                  </li>
+                </ul>
+                <p class="steps__note">
+                  这个页面给人和爬虫各提供一条快速通道：XML 站点地图列出全部 URL 与更新时间，这里补一句每页讲什么。
+                </p>
+              </div>
+            </section>
     </main>
-
-    <footer class="footer" aria-label="页脚">
-      <div class="container">
-        <div class="footer__inner">
-          <div class="footer__brand">
-            <p class="footer__name">影石相机工具</p>
-            <p class="footer__meta">桌面端 v1.3.0 · GPL-3.0 · Windows 10 / 11 · 安卓端源码可构建</p>
-          </div>
-          <div class="footer__links">
-            <a class="btn btn--ghost" href="https://github.com/DUOFreedom/Insta-camera-tools" target="_blank" rel="noopener noreferrer">
-              <svg class="btn__icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false">
-                <path d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48l-.01-1.7c-2.78.6-3.37-1.34-3.37-1.34-.45-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.61.07-.61 1 .07 1.53 1.03 1.53 1.03.89 1.53 2.34 1.09 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.56-1.11-4.56-4.95 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02a9.5 9.5 0 0 1 5 0c1.91-1.29 2.75-1.02 2.75-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.59 1.03 2.68 0 3.85-2.35 4.7-4.57 4.94.36.31.68.92.68 1.86l-.01 2.75c0 .27.18.58.69.48A10 10 0 0 0 12 2z" />
-              </svg>
-              GitHub 仓库
-            </a>
-            <a class="btn btn--ghost" href="../">
-              <svg class="btn__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
-                <path d="M12 19V5" /><path d="M6 11l6-6 6 6" />
-              </svg>
-              回到顶部
-            </a>
-          </div>
+    <nav class="vp-pager" aria-label="上下页导航">
+      <a class="vp-pager__link" href="../licenses/">
+        <span class="vp-pager__label">上一篇</span>
+        <span class="vp-pager__title">开源与许可</span>
+      </a>
+    </nav>
+    <footer class="vp-footer">
+      <div class="footer__inner">
+        <div class="footer__brand">
+          <p class="footer__name">影石相机工具</p>
+          <p class="footer__meta">桌面端 v1.3.0 · GPL-3.0 · Windows 10 / 11 · 安卓端源码可构建</p>
+        </div>
+        <div class="footer__links">
+          <a class="btn btn--ghost" href="https://github.com/DUOFreedom/Insta-camera-tools" target="_blank" rel="noopener noreferrer"><svg class="btn__icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48l-.01-1.7c-2.78.6-3.37-1.34-3.37-1.34-.45-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.61.07-.61 1 .07 1.53 1.03 1.53 1.03.89 1.53 2.34 1.09 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.56-1.11-4.56-4.95 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02a9.5 9.5 0 0 1 5 0c1.91-1.29 2.75-1.02 2.75-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.59 1.03 2.68 0 3.85-2.35 4.7-4.57 4.94.36.31.68.92.68 1.86l-.01 2.75c0 .27.18.58.69.48A10 10 0 0 0 12 2z" /></svg>GitHub 仓库</a>
+          <a class="btn btn--ghost" href="../download/">下载与安装</a>
         </div>
         <nav class="footer__nav" aria-label="页脚导航">
-          <a class="footer__link" href="../features/">功能</a>
-          <a class="footer__link" href="../how-it-works/">技术原理</a>
+          <a class="footer__link" href="../sitemap/">站点地图</a>
+          <a class="footer__link" href="../changelog/">更新日志</a>
+          <a class="footer__link" href="../licenses/">开源许可</a>
           <a class="footer__link" href="../guide/">使用指南</a>
           <a class="footer__link" href="../faq/">常见问题</a>
-          <a class="footer__link" href="../download/">下载</a>
-          <a class="footer__link" href="../changelog/">更新日志</a>
-          <a class="footer__link" href="../licenses/">开源声明</a>
-          <a class="footer__link" href="../sitemap/">站点地图</a>
+          <a class="footer__link" href="../">回到首页</a>
         </nav>
         <p class="footer__note">第三方工具，与影石创新科技股份有限公司无任何关联，未获其授权或认可。</p>
       </div>
     </footer>
-
-    <script>
-      (function () {
-        "use strict";
-
-        var menuBtn = document.getElementById("menu-btn");
-        var menuPanel = document.getElementById("mobile-nav");
-
-        function setMenu(open) {
-          menuBtn.setAttribute("aria-expanded", String(open));
-          menuBtn.setAttribute("aria-label", open ? "关闭导航菜单" : "打开导航菜单");
-          if (open) menuPanel.removeAttribute("hidden");
-          else menuPanel.setAttribute("hidden", "");
-        }
-
-        menuBtn.addEventListener("click", function () {
-          setMenu(menuBtn.getAttribute("aria-expanded") !== "true");
-        });
-
-        menuPanel.addEventListener("click", function (event) {
-          if (event.target.closest("a")) setMenu(false);
-        });
-
-        document.addEventListener("keydown", function (event) {
-          if (event.key === "Escape" && menuBtn.getAttribute("aria-expanded") === "true") {
-            setMenu(false);
-            menuBtn.focus();
-          }
-        });
-
-        /* FAQ：<details> 自带状态，这里同步 aria-expanded */
-        Array.prototype.forEach.call(document.querySelectorAll(".faq__item"), function (item) {
-          var summary = item.querySelector("summary");
-          summary.setAttribute("aria-expanded", String(item.open));
-          summary.addEventListener("click", function () {
-            summary.setAttribute("aria-expanded", String(!item.open));
-          });
-          item.addEventListener("toggle", function () {
-            summary.setAttribute("aria-expanded", String(item.open));
-          });
-        });
-
-        /* 复制 SHA256：每个按钮通过 data-copy 指向自己的 <code> 元素 */
-        Array.prototype.forEach.call(document.querySelectorAll(".copy-btn[data-copy]"), function (btn) {
-          var target = document.getElementById(btn.getAttribute("data-copy"));
-          var label = document.getElementById(btn.getAttribute("data-label"));
-          if (!target) return;
-          if (!navigator.clipboard) {
-            btn.hidden = true;
-            return;
-          }
-          btn.addEventListener("click", function () {
-            navigator.clipboard.writeText(target.textContent.trim()).then(
-              function () {
-                label.textContent = "已复制";
-                window.setTimeout(function () {
-                  label.textContent = "复制";
-                }, 2000);
-              },
-              function () {
-                label.textContent = "复制失败";
-                window.setTimeout(function () {
-                  label.textContent = "复制";
-                }, 2000);
-              }
-            );
-          });
-        });
-      })();
-    </script>
-  </body>
+  </div>
+  <aside class="vp-aside" aria-label="本页目录">
+    <nav class="vp-toc">
+      <p class="vp-toc__title">本页目录</p>
+      <ul class="vp-toc__list"></ul>
+    </nav>
+  </aside>
+  </div>
+  <aside class="vp-drawer" id="vp-drawer" aria-label="导航菜单">
+      <p class="vp-sidebar__title">开始</p>
+      <a class="vp-sidebar__link" href="../">概览</a>
+      <a class="vp-sidebar__link" href="../features/">功能特性</a>
+      <a class="vp-sidebar__link" href="../how-it-works/">工作原理</a>
+      <a class="vp-sidebar__link" href="../guide/">使用指南</a>
+      <p class="vp-sidebar__title">参考</p>
+      <a class="vp-sidebar__link" href="../faq/">常见问题</a>
+      <a class="vp-sidebar__link" href="../download/">下载与安装</a>
+      <a class="vp-sidebar__link" href="../changelog/">更新日志</a>
+      <p class="vp-sidebar__title">关于</p>
+      <a class="vp-sidebar__link" href="../licenses/">开源与许可</a>
+      <a class="vp-sidebar__link" href="../sitemap/" aria-current="page">站点地图</a>
+  </aside>
+  <dialog class="vp-search-modal" aria-label="搜索文档">
+    <div class="vp-search__panel">
+      <div class="vp-search__field">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="6.5" /><path d="M16 16l4.5 4.5" /></svg>
+        <input type="search" placeholder="搜索标题与小节名，例如 GOP、索引、ffmpeg" aria-label="搜索关键词" autocomplete="off" />
+      </div>
+      <div class="vp-search__results"></div>
+    </div>
+  </dialog>
+  <script src="../assets/app.js" data-search-index="../assets/search-index.json" defer></script>
+</body>
 </html>

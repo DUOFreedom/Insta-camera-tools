@@ -18,6 +18,7 @@
     <meta name="description" content="下载影石相机工具桌面端 instatools.exe（v1.3.0，80.5 MB，单文件免安装）、核对 SHA256、安装 ffmpeg，以及安卓端源码构建说明。" />
     <meta name="color-scheme" content="light" />
     <meta name="theme-color" content="#FFFFFF" />
+    <script>(function(){try{var t=localStorage.getItem("instatools-theme");if(t!=="dark"&&t!=="light"){t=(window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches)?"dark":"light";}document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
     <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="../assets/apple-touch-icon.png" />
     <link rel="canonical" href="https://duofreedom.github.io/Insta-camera-tools/download/" />
@@ -100,361 +101,299 @@
       }
     </script>
   </head>
-
   <body id="top">
-    <a class="sr-only skip-link" href="#main">跳到主要内容</a>
-
-    <header class="nav">
-      <div class="container nav__inner">
-        <a class="brand" href="../" aria-label="影石相机工具，回到首页">
-          <svg
-            class="brand__mark"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.7"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            aria-hidden="true"
-            focusable="false"
-          >
-            <rect x="2.5" y="6.5" width="19" height="13" rx="3.5" />
-            <path d="M8.5 6.5l1.2-2.2h4.6l1.2 2.2" />
-            <circle cx="12" cy="13" r="3.6" />
-          </svg>
-          <span>影石相机工具</span>
-          <span class="brand__sub">桌面端 + 安卓端</span>
-        </a>
-
-        <nav class="nav__links" aria-label="主导航">
-          <a class="nav__link" href="../">双端</a>
-          <a class="nav__link" href="../features/">功能</a>
-          <a class="nav__link" href="../how-it-works/">技术原理</a>
-          <a class="nav__link" href="../guide/">使用指南</a>
-          <a class="nav__link" href="../faq/">常见问题</a>
-        </nav>
-
-        <div class="nav__actions">
-          <a
-            class="icon-btn nav__gh"
-            href="https://github.com/DUOFreedom/Insta-camera-tools"
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label="GitHub 仓库（在新标签页打开）"
-          >
-            <svg class="icon-btn__icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false">
-              <path d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48l-.01-1.7c-2.78.6-3.37-1.34-3.37-1.34-.45-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.61.07-.61 1 .07 1.53 1.03 1.53 1.03.89 1.53 2.34 1.09 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.56-1.11-4.56-4.95 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02a9.5 9.5 0 0 1 5 0c1.91-1.29 2.75-1.02 2.75-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.59 1.03 2.68 0 3.85-2.35 4.7-4.57 4.94.36.31.68.92.68 1.86l-.01 2.75c0 .27.18.58.69.48A10 10 0 0 0 12 2z" />
-            </svg>
-          </a>
-          <a class="btn btn--filled" href="../download/" aria-current="page">下载</a>
-          <button
-            class="icon-btn"
-            id="menu-btn"
-            type="button"
-            aria-expanded="false"
-            aria-controls="mobile-nav"
-            aria-label="打开导航菜单"
-          >
-            <svg class="icon-btn__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true" focusable="false">
-              <path d="M4 7h16M4 12h16M4 17h16" />
-            </svg>
-          </button>
-        </div>
-      </div>
-
-      <div class="mobile-nav" id="mobile-nav" hidden>
-        <nav aria-label="移动端导航">
-          <ul class="mobile-nav__list">
-            <li><a class="mobile-nav__link" href="../">双端</a></li>
-            <li><a class="mobile-nav__link" href="../features/">功能</a></li>
-            <li><a class="mobile-nav__link" href="../how-it-works/">技术原理</a></li>
-            <li><a class="mobile-nav__link" href="../guide/">使用指南</a></li>
-            <li><a class="mobile-nav__link" href="../faq/">常见问题</a></li>
-            <li><a class="mobile-nav__link" href="../download/">下载</a></li>
-            <li><a class="mobile-nav__link" href="../changelog/">更新日志</a></li>
-            <li><a class="mobile-nav__link" href="../licenses/">开源声明</a></li>
-          </ul>
-        </nav>
-      </div>
-    </header>
-
-    <div class="page-head">
-      <div class="container">
-        <nav class="crumbs" aria-label="面包屑导航">
-          <ol class="crumbs__list">
-            <li class="crumbs__item"><a class="crumbs__link" href="../">首页</a></li>
-            <li class="crumbs__item" aria-current="page">下载与安装</li>
-          </ol>
-        </nav>
-        <h1 class="page-head__title" id="page-title">下载与安装</h1>
-        <p class="page-head__lead">桌面端是单文件 exe，双击运行、无需安装、无需 Python。安卓端开发中，暂不提供安装包，源码可自行构建。</p>
+  <a class="skip-link" href="#main">跳到正文</a>
+  <header class="vp-nav">
+    <div class="vp-nav__inner">
+      <a class="vp-nav__brand" href="../" aria-label="影石相机工具，回到首页">
+        <span class="vp-nav__mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="2.5" y="6.5" width="19" height="13" rx="3.5" /><path d="M8.5 6.5l1.2-2.2h4.6l1.2 2.2" /><circle cx="12" cy="13" r="3.6" /></svg></span>
+        <span class="vp-nav__title">影石相机工具</span>
+        <span class="vp-nav__badge">v1.3.0</span>
+      </a>
+      <nav class="vp-nav__menus" aria-label="主导航">
+      <a class="vp-menu__link" href="../">首页</a>
+      <a class="vp-menu__link" href="../features/">功能</a>
+      <a class="vp-menu__link" href="../guide/">指南</a>
+      <a class="vp-menu__link" href="../faq/">问答</a>
+      <a class="vp-menu__link" href="../download/" aria-current="page">下载</a>
+      </nav>
+      <div class="vp-nav__actions">
+        <button class="vp-search" type="button" aria-label="搜索文档">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="6.5" /><path d="M16 16l4.5 4.5" /></svg><span class="vp-search__label">搜索文档</span><span class="vp-search__key">K</span>
+        </button>
+        <button class="vp-appearance" type="button" role="switch" aria-checked="false" aria-label="深色模式">
+          <span class="vp-appearance__track"><span class="vp-appearance__thumb"></span></span>
+        </button>
+        <a class="vp-social" href="https://github.com/DUOFreedom/Insta-camera-tools" target="_blank" rel="noopener noreferrer" aria-label="GitHub 仓库（新标签页打开）"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48l-.01-1.7c-2.78.6-3.37-1.34-3.37-1.34-.45-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.61.07-.61 1 .07 1.53 1.03 1.53 1.03.89 1.53 2.34 1.09 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.56-1.11-4.56-4.95 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02a9.5 9.5 0 0 1 5 0c1.91-1.29 2.75-1.02 2.75-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.59 1.03 2.68 0 3.85-2.35 4.7-4.57 4.94.36.31.68.92.68 1.86l-.01 2.75c0 .27.18.58.69.48A10 10 0 0 0 12 2z" /></svg></a>
+        <button class="vp-hamburger" type="button" aria-expanded="false" aria-controls="vp-drawer" aria-label="打开导航菜单">
+          <span></span><span></span><span></span>
+        </button>
       </div>
     </div>
-
-    <main id="main">
-      <section class="section" id="download">
-        <div class="container">
-
-          <div class="platform-grid">
-            <article class="release">
-              <div class="release__head">
-                <p class="release__name">Windows 桌面端</p>
-                <span class="tag tag--soft">v1.3.0</span>
-              </div>
-
-              <dl class="meta">
-                <div>
-                  <dt class="meta__key">文件</dt>
-                  <dd class="meta__value">instatools.exe</dd>
-                </div>
-                <div>
-                  <dt class="meta__key">平台</dt>
-                  <dd class="meta__value">Windows 10 / 11（64 位）</dd>
-                </div>
-                <div>
-                  <dt class="meta__key">大小</dt>
-                  <dd class="meta__value">80.5 MB（80,567,564 字节）</dd>
-                </div>
-                <div>
-                  <dt class="meta__key">运行方式</dt>
-                  <dd class="meta__value">单文件，无需安装，无需 Python</dd>
-                </div>
-              </dl>
-
-              <div class="actions">
-                <a
-                  class="btn btn--filled"
-                  href="https://github.com/DUOFreedom/Insta-camera-tools/releases/latest"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <svg class="btn__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
-                    <path d="M12 4v11" /><path d="M7 11l5 5 5-5" /><path d="M4 19h16" />
-                  </svg>
-                  前往 Releases 下载
-                </a>
-              </div>
-
-              <div>
-                <span class="code-label" id="sha-win-label">SHA256</span>
-                <div class="sha-row">
-                  <code class="code code--wrap" id="sha-win"
-                    >66A8F8D4A5326CFF2BB7B9852CF2059B664E5436344B52BF7DD8BAD1EEDB8EC3</code
-                  >
-                  <button class="copy-btn" data-copy="sha-win" data-label="copy-win-label" type="button">
-                    <svg class="copy-btn__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
-                      <rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15V5a1 1 0 0 1 1-1h10" />
-                    </svg>
-                    <span id="copy-win-label">复制</span>
-                  </button>
-                </div>
-              </div>
-            </article>
-
-            <article class="release">
-              <div class="release__head">
-                <p class="release__name">Android 安卓端</p>
-                <span class="tag">暂未发布</span>
-              </div>
-
-              <dl class="meta">
-                <div>
-                  <dt class="meta__key">状态</dt>
-                  <dd class="meta__value">开发中，暂不提供安装包</dd>
-                </div>
-                <div>
-                  <dt class="meta__key">平台</dt>
-                  <dd class="meta__value">Android 8.0+（arm64-v8a / armeabi-v7a）</dd>
-                </div>
-                <div>
-                  <dt class="meta__key">源码</dt>
-                  <dd class="meta__value">已在仓库中，可自行构建</dd>
-                </div>
-                <div>
-                  <dt class="meta__key">依赖</dt>
-                  <dd class="meta__value">需自备 jniLibs 下的 ffmpeg</dd>
-                </div>
-              </dl>
-
-              <div class="actions">
-                <a
-                  class="btn btn--alt"
-                  href="https://github.com/DUOFreedom/Insta-camera-tools/blob/main/docs/BUILD.md"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <svg class="btn__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
-                    <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H19v18H6.5A2.5 2.5 0 0 1 4 18.5z" />
-                    <path d="M8 7h7" /><path d="M8 11h7" />
-                  </svg>
-                  查看构建说明
-                </a>
-              </div>
-
-              <p class="section__lead">
-                安卓端仍在打磨，真机导入链路与部分机型兼容性尚未验证完毕，因此暂不随 Release 分发 APK。
-                仓库内的 Kotlin、Chaquopy Python 与 Gradle 配置是完整可构建的，愿意自己编译的话见构建说明。
-              </p>
-            </article>
-          </div>
-
-          <div class="notice mt-24">
-            <svg class="notice__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
-              <circle cx="12" cy="12" r="9" /><path d="M12 8v4.5" /><path d="M12 16h.01" />
-            </svg>
-            <div>
-              <p class="notice__title">桌面端需要 ffmpeg（可自动安装）</p>
-              <p class="notice__body">
-                启动时若找不到 ffmpeg，界面上会出现一条提示，点按钮可自动下载安装：装到系统目录（需要管理员确认）或装到程序目录。也可以自己放 —— 把 ffmpeg.exe 与 ffprobe.exe 放进 exe 同目录的 bin\ 文件夹。程序按「环境变量 → 注册表登记 → 系统安装目录 → 系统 PATH → exe 目录 → 用户目录」顺序查找，都找不到才提示安装。
-              </p>
-              <p class="notice__body">
-                两个文件都要：只放 ffmpeg.exe 不够，程序需要用 ffprobe.exe 读取源文件信息。
-              </p>
+  </header>
+  <div class="vp-layout">
+  <aside class="vp-sidebar" aria-label="文档目录">
+    <div class="vp-sidebar__group">
+      <p class="vp-sidebar__title">开始</p>
+      <ul class="vp-sidebar__list">
+        <li><a class="vp-sidebar__link" href="../">概览</a></li>
+        <li><a class="vp-sidebar__link" href="../features/">功能特性</a></li>
+        <li><a class="vp-sidebar__link" href="../how-it-works/">工作原理</a></li>
+        <li><a class="vp-sidebar__link" href="../guide/">使用指南</a></li>
+      </ul>
+    </div>
+    <div class="vp-sidebar__group">
+      <p class="vp-sidebar__title">参考</p>
+      <ul class="vp-sidebar__list">
+        <li><a class="vp-sidebar__link" href="../faq/">常见问题</a></li>
+        <li><a class="vp-sidebar__link" href="../download/" aria-current="page">下载与安装</a></li>
+        <li><a class="vp-sidebar__link" href="../changelog/">更新日志</a></li>
+      </ul>
+    </div>
+    <div class="vp-sidebar__group">
+      <p class="vp-sidebar__title">关于</p>
+      <ul class="vp-sidebar__list">
+        <li><a class="vp-sidebar__link" href="../licenses/">开源与许可</a></li>
+        <li><a class="vp-sidebar__link" href="../sitemap/">站点地图</a></li>
+      </ul>
+    </div>
+  </aside>
+  <div class="vp-content">
+    <main id="main" class="vp-doc">
+      <div class="page-head">
+            <div class="container">
+              <nav class="crumbs" aria-label="面包屑导航">
+                <ol class="crumbs__list">
+                  <li class="crumbs__item"><a class="crumbs__link" href="../">首页</a></li>
+                  <li class="crumbs__item" aria-current="page">下载与安装</li>
+                </ol>
+              </nav>
+              <h1 class="page-head__title" id="page-title">下载与安装</h1>
+              <p class="page-head__lead">桌面端是单文件 exe，双击运行、无需安装、无需 Python。安卓端开发中，暂不提供安装包，源码可自行构建。</p>
             </div>
           </div>
 
-          <p class="section__lead mt-24">
-            从源码自行打包得到的哈希会与此不同——PyInstaller 与 Gradle 都会把构建时间写进产物，同样的代码每次构建结果都不一致。请以本页面公布的哈希为准核对 Release 下载的文件。
-          </p>
-        <h2 class="subhead">安装 ffmpeg</h2>
-        <div class="prose">
-          <p>程序自己不打包 ffmpeg（体积与许可都不合适），第一次运行会在界面上提示。两种装法：</p>
-          <ol>
-            <li>点界面上的按钮让程序下载安装。装到系统目录需要一次管理员确认；也可以选「装到程序目录」，不需要提权。</li>
-            <li>手动把 <code class="code code--inline">ffmpeg.exe</code> 与 <code class="code code--inline">ffprobe.exe</code> 放进 exe 同目录的
-              <code class="code code--inline">bin\</code>，或者装进系统 PATH。</li>
-          </ol>
-          <p>两个文件都要：读源文件信息用的是 <code class="code code--inline">ffprobe.exe</code>，只放 ffmpeg 会在分析样本那一步就失败。</p>
-        </div>
 
-        <h2 class="subhead">校验下载</h2>
-        <div class="prose">
-          <p>PowerShell 里算一次哈希，与页面上给出的 SHA256 逐字符比对：</p>
-        </div>
-        <div class="code code--wrap mt-16"><span class="code-label">PowerShell</span><pre><code>Get-FileHash .\instatools.exe -Algorithm SHA256</code></pre></div>
-        <p class="steps__note">
-          注意：同一份源码连编两次，exe 的哈希也会不同（嵌入时间戳与签名信息），所以校验值只在同一次发布的文件之间通用，以 Release 页标注为准。
-        </p>
+            <section class="section" id="download">
+              <div class="container">
 
-        <h2 class="subhead">从源码构建</h2>
-        <div class="prose">
-          <p>
-            桌面端：Python 3.10+ 与 <code class="code code--inline">desktop/requirements.txt</code>（只有 PySide6），
-            打包脚本是 <code class="code code--inline">desktop/build_qml.bat</code>。
-            安卓端：JDK 21 + Android SDK，Chaquopy 指向本地 Python 3.11，
-            完整环境变量与离线构建命令见
-            <a class="link" href="https://github.com/DUOFreedom/Insta-camera-tools/blob/main/docs/BUILD.md" target="_blank" rel="noopener noreferrer">docs/BUILD.md</a>。
-          </p>
-          <p>版本演进见<a class="link" href="../changelog/">更新日志</a>，第三方依赖与许可证见<a class="link" href="../licenses/">开源声明</a>。</p>
-        </div>
-        </div>
-      </section>
+                <div class="platform-grid">
+                  <article class="release">
+                    <div class="release__head">
+                      <p class="release__name">Windows 桌面端</p>
+                      <span class="tag tag--soft">v1.3.0</span>
+                    </div>
+
+                    <dl class="meta">
+                      <div>
+                        <dt class="meta__key">文件</dt>
+                        <dd class="meta__value">instatools.exe</dd>
+                      </div>
+                      <div>
+                        <dt class="meta__key">平台</dt>
+                        <dd class="meta__value">Windows 10 / 11（64 位）</dd>
+                      </div>
+                      <div>
+                        <dt class="meta__key">大小</dt>
+                        <dd class="meta__value">80.5 MB（80,567,564 字节）</dd>
+                      </div>
+                      <div>
+                        <dt class="meta__key">运行方式</dt>
+                        <dd class="meta__value">单文件，无需安装，无需 Python</dd>
+                      </div>
+                    </dl>
+
+                    <div class="actions">
+                      <a
+                        class="btn btn--filled"
+                        href="https://github.com/DUOFreedom/Insta-camera-tools/releases/latest"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        <svg class="btn__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                          <path d="M12 4v11" /><path d="M7 11l5 5 5-5" /><path d="M4 19h16" />
+                        </svg>
+                        前往 Releases 下载
+                      </a>
+                    </div>
+
+                    <div>
+                      <span class="code-label" id="sha-win-label">SHA256</span>
+                      <div class="sha-row">
+                        <code class="code code--wrap" id="sha-win"
+                          >66A8F8D4A5326CFF2BB7B9852CF2059B664E5436344B52BF7DD8BAD1EEDB8EC3</code
+                        >
+                        <button class="copy-btn" data-copy="sha-win" data-label="copy-win-label" type="button">
+                          <svg class="copy-btn__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                            <rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15V5a1 1 0 0 1 1-1h10" />
+                          </svg>
+                          <span id="copy-win-label">复制</span>
+                        </button>
+                      </div>
+                    </div>
+                  </article>
+
+                  <article class="release">
+                    <div class="release__head">
+                      <p class="release__name">Android 安卓端</p>
+                      <span class="tag">暂未发布</span>
+                    </div>
+
+                    <dl class="meta">
+                      <div>
+                        <dt class="meta__key">状态</dt>
+                        <dd class="meta__value">开发中，暂不提供安装包</dd>
+                      </div>
+                      <div>
+                        <dt class="meta__key">平台</dt>
+                        <dd class="meta__value">Android 8.0+（arm64-v8a / armeabi-v7a）</dd>
+                      </div>
+                      <div>
+                        <dt class="meta__key">源码</dt>
+                        <dd class="meta__value">已在仓库中，可自行构建</dd>
+                      </div>
+                      <div>
+                        <dt class="meta__key">依赖</dt>
+                        <dd class="meta__value">需自备 jniLibs 下的 ffmpeg</dd>
+                      </div>
+                    </dl>
+
+                    <div class="actions">
+                      <a
+                        class="btn btn--alt"
+                        href="https://github.com/DUOFreedom/Insta-camera-tools/blob/main/docs/BUILD.md"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        <svg class="btn__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                          <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H19v18H6.5A2.5 2.5 0 0 1 4 18.5z" />
+                          <path d="M8 7h7" /><path d="M8 11h7" />
+                        </svg>
+                        查看构建说明
+                      </a>
+                    </div>
+
+                    <p class="section__lead">
+                      安卓端仍在打磨，真机导入链路与部分机型兼容性尚未验证完毕，因此暂不随 Release 分发 APK。
+                      仓库内的 Kotlin、Chaquopy Python 与 Gradle 配置是完整可构建的，愿意自己编译的话见构建说明。
+                    </p>
+                  </article>
+                </div>
+
+                <div class="notice mt-24">
+                  <svg class="notice__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                    <circle cx="12" cy="12" r="9" /><path d="M12 8v4.5" /><path d="M12 16h.01" />
+                  </svg>
+                  <div>
+                    <p class="notice__title">桌面端需要 ffmpeg（可自动安装）</p>
+                    <p class="notice__body">
+                      启动时若找不到 ffmpeg，界面上会出现一条提示，点按钮可自动下载安装：装到系统目录（需要管理员确认）或装到程序目录。也可以自己放 —— 把 ffmpeg.exe 与 ffprobe.exe 放进 exe 同目录的 bin\ 文件夹。程序按「环境变量 → 注册表登记 → 系统安装目录 → 系统 PATH → exe 目录 → 用户目录」顺序查找，都找不到才提示安装。
+                    </p>
+                    <p class="notice__body">
+                      两个文件都要：只放 ffmpeg.exe 不够，程序需要用 ffprobe.exe 读取源文件信息。
+                    </p>
+                  </div>
+                </div>
+
+                <p class="section__lead mt-24">
+                  从源码自行打包得到的哈希会与此不同——PyInstaller 与 Gradle 都会把构建时间写进产物，同样的代码每次构建结果都不一致。请以本页面公布的哈希为准核对 Release 下载的文件。
+                </p>
+              <h2 class="subhead" id="安装-ffmpeg">安装 ffmpeg</h2>
+              <div class="prose">
+                <p>程序自己不打包 ffmpeg（体积与许可都不合适），第一次运行会在界面上提示。两种装法：</p>
+                <ol>
+                  <li>点界面上的按钮让程序下载安装。装到系统目录需要一次管理员确认；也可以选「装到程序目录」，不需要提权。</li>
+                  <li>手动把 <code class="code code--inline">ffmpeg.exe</code> 与 <code class="code code--inline">ffprobe.exe</code> 放进 exe 同目录的
+                    <code class="code code--inline">bin\</code>，或者装进系统 PATH。</li>
+                </ol>
+                <p>两个文件都要：读源文件信息用的是 <code class="code code--inline">ffprobe.exe</code>，只放 ffmpeg 会在分析样本那一步就失败。</p>
+              </div>
+
+              <h2 class="subhead" id="校验下载">校验下载</h2>
+              <div class="prose">
+                <p>PowerShell 里算一次哈希，与页面上给出的 SHA256 逐字符比对：</p>
+              </div>
+              <div class="code code--wrap mt-16"><span class="code-label">PowerShell</span><pre><code>Get-FileHash .\instatools.exe -Algorithm SHA256</code></pre></div>
+              <p class="steps__note">
+                注意：同一份源码连编两次，exe 的哈希也会不同（嵌入时间戳与签名信息），所以校验值只在同一次发布的文件之间通用，以 Release 页标注为准。
+              </p>
+
+              <h2 class="subhead" id="从源码构建">从源码构建</h2>
+              <div class="prose">
+                <p>
+                  桌面端：Python 3.10+ 与 <code class="code code--inline">desktop/requirements.txt</code>（只有 PySide6），
+                  打包脚本是 <code class="code code--inline">desktop/build_qml.bat</code>。
+                  安卓端：JDK 21 + Android SDK，Chaquopy 指向本地 Python 3.11，
+                  完整环境变量与离线构建命令见
+                  <a class="link" href="https://github.com/DUOFreedom/Insta-camera-tools/blob/main/docs/BUILD.md" target="_blank" rel="noopener noreferrer">docs/BUILD.md</a>。
+                </p>
+                <p>版本演进见<a class="link" href="../changelog/">更新日志</a>，第三方依赖与许可证见<a class="link" href="../licenses/">开源声明</a>。</p>
+              </div>
+              </div>
+            </section>
     </main>
-
-    <footer class="footer" aria-label="页脚">
-      <div class="container">
-        <div class="footer__inner">
-          <div class="footer__brand">
-            <p class="footer__name">影石相机工具</p>
-            <p class="footer__meta">桌面端 v1.3.0 · GPL-3.0 · Windows 10 / 11 · 安卓端源码可构建</p>
-          </div>
-          <div class="footer__links">
-            <a class="btn btn--ghost" href="https://github.com/DUOFreedom/Insta-camera-tools" target="_blank" rel="noopener noreferrer">
-              <svg class="btn__icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false">
-                <path d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48l-.01-1.7c-2.78.6-3.37-1.34-3.37-1.34-.45-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.61.07-.61 1 .07 1.53 1.03 1.53 1.03.89 1.53 2.34 1.09 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.56-1.11-4.56-4.95 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02a9.5 9.5 0 0 1 5 0c1.91-1.29 2.75-1.02 2.75-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.59 1.03 2.68 0 3.85-2.35 4.7-4.57 4.94.36.31.68.92.68 1.86l-.01 2.75c0 .27.18.58.69.48A10 10 0 0 0 12 2z" />
-              </svg>
-              GitHub 仓库
-            </a>
-            <a class="btn btn--ghost" href="../">
-              <svg class="btn__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
-                <path d="M12 19V5" /><path d="M6 11l6-6 6 6" />
-              </svg>
-              回到顶部
-            </a>
-          </div>
+    <nav class="vp-pager" aria-label="上下页导航">
+      <a class="vp-pager__link" href="../faq/">
+        <span class="vp-pager__label">上一篇</span>
+        <span class="vp-pager__title">常见问题</span>
+      </a>
+      <a class="vp-pager__link vp-pager__link--next" href="../changelog/">
+        <span class="vp-pager__label">下一篇</span>
+        <span class="vp-pager__title">更新日志</span>
+      </a>
+    </nav>
+    <footer class="vp-footer">
+      <div class="footer__inner">
+        <div class="footer__brand">
+          <p class="footer__name">影石相机工具</p>
+          <p class="footer__meta">桌面端 v1.3.0 · GPL-3.0 · Windows 10 / 11 · 安卓端源码可构建</p>
+        </div>
+        <div class="footer__links">
+          <a class="btn btn--ghost" href="https://github.com/DUOFreedom/Insta-camera-tools" target="_blank" rel="noopener noreferrer"><svg class="btn__icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48l-.01-1.7c-2.78.6-3.37-1.34-3.37-1.34-.45-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.61.07-.61 1 .07 1.53 1.03 1.53 1.03.89 1.53 2.34 1.09 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.56-1.11-4.56-4.95 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02a9.5 9.5 0 0 1 5 0c1.91-1.29 2.75-1.02 2.75-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.59 1.03 2.68 0 3.85-2.35 4.7-4.57 4.94.36.31.68.92.68 1.86l-.01 2.75c0 .27.18.58.69.48A10 10 0 0 0 12 2z" /></svg>GitHub 仓库</a>
+          <a class="btn btn--ghost" href="../download/">下载与安装</a>
         </div>
         <nav class="footer__nav" aria-label="页脚导航">
-          <a class="footer__link" href="../features/">功能</a>
-          <a class="footer__link" href="../how-it-works/">技术原理</a>
+          <a class="footer__link" href="../sitemap/">站点地图</a>
+          <a class="footer__link" href="../changelog/">更新日志</a>
+          <a class="footer__link" href="../licenses/">开源许可</a>
           <a class="footer__link" href="../guide/">使用指南</a>
           <a class="footer__link" href="../faq/">常见问题</a>
-          <a class="footer__link" href="../download/">下载</a>
-          <a class="footer__link" href="../changelog/">更新日志</a>
-          <a class="footer__link" href="../licenses/">开源声明</a>
-          <a class="footer__link" href="../sitemap/">站点地图</a>
+          <a class="footer__link" href="../">回到首页</a>
         </nav>
         <p class="footer__note">第三方工具，与影石创新科技股份有限公司无任何关联，未获其授权或认可。</p>
       </div>
     </footer>
-
-    <script>
-      (function () {
-        "use strict";
-
-        var menuBtn = document.getElementById("menu-btn");
-        var menuPanel = document.getElementById("mobile-nav");
-
-        function setMenu(open) {
-          menuBtn.setAttribute("aria-expanded", String(open));
-          menuBtn.setAttribute("aria-label", open ? "关闭导航菜单" : "打开导航菜单");
-          if (open) menuPanel.removeAttribute("hidden");
-          else menuPanel.setAttribute("hidden", "");
-        }
-
-        menuBtn.addEventListener("click", function () {
-          setMenu(menuBtn.getAttribute("aria-expanded") !== "true");
-        });
-
-        menuPanel.addEventListener("click", function (event) {
-          if (event.target.closest("a")) setMenu(false);
-        });
-
-        document.addEventListener("keydown", function (event) {
-          if (event.key === "Escape" && menuBtn.getAttribute("aria-expanded") === "true") {
-            setMenu(false);
-            menuBtn.focus();
-          }
-        });
-
-        /* FAQ：<details> 自带状态，这里同步 aria-expanded */
-        Array.prototype.forEach.call(document.querySelectorAll(".faq__item"), function (item) {
-          var summary = item.querySelector("summary");
-          summary.setAttribute("aria-expanded", String(item.open));
-          summary.addEventListener("click", function () {
-            summary.setAttribute("aria-expanded", String(!item.open));
-          });
-          item.addEventListener("toggle", function () {
-            summary.setAttribute("aria-expanded", String(item.open));
-          });
-        });
-
-        /* 复制 SHA256：每个按钮通过 data-copy 指向自己的 <code> 元素 */
-        Array.prototype.forEach.call(document.querySelectorAll(".copy-btn[data-copy]"), function (btn) {
-          var target = document.getElementById(btn.getAttribute("data-copy"));
-          var label = document.getElementById(btn.getAttribute("data-label"));
-          if (!target) return;
-          if (!navigator.clipboard) {
-            btn.hidden = true;
-            return;
-          }
-          btn.addEventListener("click", function () {
-            navigator.clipboard.writeText(target.textContent.trim()).then(
-              function () {
-                label.textContent = "已复制";
-                window.setTimeout(function () {
-                  label.textContent = "复制";
-                }, 2000);
-              },
-              function () {
-                label.textContent = "复制失败";
-                window.setTimeout(function () {
-                  label.textContent = "复制";
-                }, 2000);
-              }
-            );
-          });
-        });
-      })();
-    </script>
-  </body>
+  </div>
+  <aside class="vp-aside" aria-label="本页目录">
+    <nav class="vp-toc">
+      <p class="vp-toc__title">本页目录</p>
+      <ul class="vp-toc__list"></ul>
+    </nav>
+  </aside>
+  </div>
+  <aside class="vp-drawer" id="vp-drawer" aria-label="导航菜单">
+      <p class="vp-sidebar__title">开始</p>
+      <a class="vp-sidebar__link" href="../">概览</a>
+      <a class="vp-sidebar__link" href="../features/">功能特性</a>
+      <a class="vp-sidebar__link" href="../how-it-works/">工作原理</a>
+      <a class="vp-sidebar__link" href="../guide/">使用指南</a>
+      <p class="vp-sidebar__title">参考</p>
+      <a class="vp-sidebar__link" href="../faq/">常见问题</a>
+      <a class="vp-sidebar__link" href="../download/" aria-current="page">下载与安装</a>
+      <a class="vp-sidebar__link" href="../changelog/">更新日志</a>
+      <p class="vp-sidebar__title">关于</p>
+      <a class="vp-sidebar__link" href="../licenses/">开源与许可</a>
+      <a class="vp-sidebar__link" href="../sitemap/">站点地图</a>
+  </aside>
+  <dialog class="vp-search-modal" aria-label="搜索文档">
+    <div class="vp-search__panel">
+      <div class="vp-search__field">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="6.5" /><path d="M16 16l4.5 4.5" /></svg>
+        <input type="search" placeholder="搜索标题与小节名，例如 GOP、索引、ffmpeg" aria-label="搜索关键词" autocomplete="off" />
+      </div>
+      <div class="vp-search__results"></div>
+    </div>
+  </dialog>
+  <script src="../assets/app.js" data-search-index="../assets/search-index.json" defer></script>
+</body>
 </html>
