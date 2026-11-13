@@ -547,7 +547,7 @@ Window {
                 text: bridge.tr("当前版本 %1，最新版本 %2。")
                     .arg(updater.currentVersion)
                     .arg(updater.latestTag !== "" ? updater.latestTag
-                        : (updateDemo ? "v1.2.0" : bridge.tr("未知")))
+                        : (updateDemo ? "v1.3.0" : bridge.tr("未知")))
                 wrapMode: Text.Wrap
                 color: Theme.textSecondary
                 font.family: Theme.fontFamily

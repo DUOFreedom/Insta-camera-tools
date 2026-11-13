@@ -284,7 +284,7 @@ Insta-camera-tools/
     ├── app/src/main/java/       （Kotlin，未改）
     ├── app/src/main/res/  AndroidManifest.xml（已补 INTERNET）
     ├── app/src/main/jniLibs/    （4 个 .so，约 92 MB）
-    ├── app/build.gradle.kts     （versionCode 14 / 1.2.0）
+    ├── app/build.gradle.kts     （versionCode 15 / 1.3.0）
     ├── build.gradle.kts  settings.gradle.kts  gradle.properties
     └── LICENSE
 ```

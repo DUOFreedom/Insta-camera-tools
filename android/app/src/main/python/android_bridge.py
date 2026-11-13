@@ -3,7 +3,7 @@
 
 思路
 ----
-`insta_core.py` 是桌面端 1.2.0 的完整实现（转码 → inst box 移植 → 索引登记），
+`insta_core.py` 是桌面端 1.3.0 的完整实现（转码 → inst box 移植 → 索引登记），
 只依赖标准库 + 外部 ffmpeg/ffprobe；这里只做三件 Android 适配：
 
 1. 把随包可执行文件路径写进 FFMPEG_PATH / FFPROBE_PATH（core 会优先读取）；
@@ -276,7 +276,7 @@ class _Updater:
         # Demo mode via env var (for testing)
         if os.environ.get("INSTA_UPDATE_DEMO") == "1":
             if callback:
-                callback("v1.2.0", _FALLBACK_URL)
+                callback("v1.3.0", _FALLBACK_URL)
             return
         self._checking = True
         threading.Thread(target=self._run, args=(callback,), daemon=True).start()

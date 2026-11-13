@@ -24,8 +24,8 @@ android {
         applicationId = "com.duofreedom.instatools"
         minSdk = 26
         targetSdk = 35
-        versionCode = 14
-        versionName = "1.2.0"
+        versionCode = 15
+        versionName = "1.3.0"
         resourceConfigurations += listOf("zh", "en")
 
         // 双 ABI：同时支持 64 位与 32 位 ARM。

@@ -201,7 +201,7 @@ ndk {
 
 - [ ] `.gitignore` 已排除 `build/`、`dist/`、`*.exe`、`*.apk`、`__pycache__/`、`local.properties`、`android/app/build/` 等构建产物
 - [ ] `desktop/LICENSE` 和 `android/LICENSE` 均为 GPL-3.0
-- [ ] `desktop/CHANGELOG.md` 已记录本次版本的全部修复（当前为 1.2.0）
+- [ ] `desktop/CHANGELOG.md` 已记录本次版本的全部修复（当前为 1.3.0）
 - [ ] 顶层 `README.md` 已说明仓库结构与构建步骤
 - [ ] 本目录 `BUILD.md` 已说明双端构建命令
 - [ ] 仓库内无真实设备序列号（`grep -r IBGLA` 应为 0 命中）

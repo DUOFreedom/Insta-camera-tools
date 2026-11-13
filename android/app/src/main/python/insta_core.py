@@ -39,7 +39,7 @@ from datetime import datetime, timedelta
 
 import i18n
 
-__version__ = "1.2.0"
+__version__ = "1.3.0"
 
 # 以下仅为【无真机模板时】的兜底值。
 # 有真机原片时，一律以 analyze_native() 实测结果为准（见 _build_spec_tasks）。

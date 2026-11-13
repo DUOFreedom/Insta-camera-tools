@@ -11,7 +11,7 @@
 
 [English](../README.en.md) · [中文](README.md)
 
-[![Version](https://img.shields.io/badge/version-1.2.0-blue?style=flat-square)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.3.0-blue?style=flat-square)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-GPL--3.0-green?style=flat-square)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-lightgrey?style=flat-square)]()
 [![Python](https://img.shields.io/badge/python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white)]()

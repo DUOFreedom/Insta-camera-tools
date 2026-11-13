@@ -64,7 +64,7 @@ class Updater(QObject):
             return
         if os.environ.get("INSTA_UPDATE_DEMO") == "1":
             self._available = True
-            self._tag = "v1.2.0"
+            self._tag = "v1.3.0"
             self._url = FALLBACK_URL
             self.stateChanged.emit()
             return
