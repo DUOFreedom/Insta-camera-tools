@@ -160,7 +160,9 @@ fun ImportActionCard(
         colors = CardDefaults.cardColors(
             containerColor = when (state) {
                 ImportCardState.Error -> MaterialTheme.colorScheme.errorContainer
-                else -> MaterialTheme.colorScheme.surfaceVariant
+                // 与首页、设置页的卡片统一走白底，浅蓝画布上靠圆角与留白分层，
+                //   不再用 surfaceVariant 那种偏灰的底色。
+                else -> MaterialTheme.colorScheme.surface
             }
         )
     ) {

@@ -18,8 +18,11 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Column
@@ -32,6 +35,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.PlaylistPlay
 import androidx.compose.material.icons.rounded.Add
@@ -44,8 +48,8 @@ import androidx.compose.material.icons.rounded.Movie
 import androidx.compose.material.icons.rounded.SdCard
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.AssistChipDefaults
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
@@ -59,8 +63,8 @@ import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
@@ -84,6 +88,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -104,6 +109,13 @@ private val TAB_TITLES = listOf(R.string.tab_card, R.string.tab_queue, R.string.
 private const val SOURCE_URL = "https://github.com/DUOFreedom/Insta-camera-tools"
 private const val PREFS_UPDATE = "update_prefs"
 private const val KEY_IGNORED_TAG = "ignored_update_tag"
+
+/** 界面统一间距，全部取 8dp 的整数倍，避免各处手写魔数。 */
+private object Gaps {
+    val x1 = 8.dp
+    val x2 = 16.dp
+    val x3 = 24.dp
+}
 
 @Composable
 fun instatoolsApp() {
@@ -251,12 +263,17 @@ fun instatoolsApp() {
                     )
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    titleContentColor = MaterialTheme.colorScheme.onSurface
                 )
             )
         },
         bottomBar = {
-            NavigationBar {
+            NavigationBar(
+                containerColor = MaterialTheme.colorScheme.surface,
+                contentColor = MaterialTheme.colorScheme.primary,
+                tonalElevation = 0.dp
+            ) {
                 TAB_TITLES.forEachIndexed { i, titleRes ->
                     NavigationBarItem(
                         selected = tab == i,
@@ -271,7 +288,14 @@ fun instatoolsApp() {
                                 contentDescription = null
                             )
                         },
-                        label = { Text(stringResource(titleRes)) }
+                        label = { Text(stringResource(titleRes)) },
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                            selectedTextColor = MaterialTheme.colorScheme.primary,
+                            indicatorColor = MaterialTheme.colorScheme.primaryContainer,
+                            unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     )
                 }
             }
@@ -368,150 +392,216 @@ fun instatoolsApp() {
 @Composable
 private fun CardScreen(state: AppState, onPick: () -> Unit, modifier: Modifier = Modifier) {
     LazyColumn(
-        modifier = modifier.fillMaxSize().padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        modifier = modifier.fillMaxSize(),
+        contentPadding = PaddingValues(
+            start = Gaps.x2,
+            end = Gaps.x2,
+            top = Gaps.x1,
+            bottom = Gaps.x2
+        ),
+        verticalArrangement = Arrangement.spacedBy(Gaps.x2)
     ) {
-        item { Spacer(Modifier.height(4.dp)) }
-
-        item {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer
-                )
-            ) {
-                Column(Modifier.padding(20.dp)) {
-                    Text(
-                        stringResource(R.string.card_section_title),
-                        style = MaterialTheme.typography.titleLarge,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
-                    Spacer(Modifier.height(6.dp))
-                    Text(
-                        state.cardLabel,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
-                    )
-                    Spacer(Modifier.height(16.dp))
-                    FilledTonalButton(onClick = onPick) {
-                        Icon(
-                            Icons.Rounded.SdCard,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(Modifier.size(8.dp))
-                        Text(
-                            stringResource(
-                                if (state.cardUri == null) R.string.pick_card
-                                else R.string.pick_card_again
-                            )
-                        )
-                    }
-                }
-            }
-        }
+        item { CardHero(state, onPick) }
 
         item {
             Text(
                 stringResource(R.string.preflight_title),
                 style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(top = 8.dp)
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.padding(start = Gaps.x1, top = Gaps.x1)
             )
         }
 
-        item {
-            OutlinedCard(Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        StatusChip(state.dcimFound, stringResource(R.string.preflight_dcim))
-                        StatusChip(state.camDirFound, "Camera01")
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        StatusChip(state.indexFound, stringResource(R.string.preflight_index))
-                        StatusChip(
-                            state.templatePairs > 0,
-                            stringResource(R.string.preflight_template)
-                        )
-                    }
-                    if (state.templateName.isNotBlank()) {
-                        Text(
-                            stringResource(R.string.preflight_template_name, state.templateName),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    HorizontalDivider(Modifier.padding(vertical = 4.dp))
-                    Text(
-                        stringResource(
-                            R.string.preflight_counts,
-                            state.vidCount,
-                            state.lrvCount,
-                            state.templatePairs
-                        ),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    if (state.camDirFound && state.templatePairs == 0) {
-                        Text(
-                            stringResource(R.string.preflight_need_template),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.error
-                        )
-                    }
-                    if (state.indexCount > 0 || state.indexError.isNotBlank() || state.indexEmptyMeta > 0) {
-                        val bad = state.indexError.isNotBlank() || state.indexEmptyMeta > 0
-                        Text(
-                            when {
-                                state.indexError.isNotBlank() -> stringResource(
-                                    R.string.preflight_index_error, state.indexError
-                                )
-                                state.indexEmptyMeta > 0 -> stringResource(
-                                    R.string.preflight_index_empty_meta,
-                                    state.indexCount,
-                                    state.indexEmptyMeta
-                                )
-                                else -> stringResource(
-                                    R.string.preflight_index_all_meta, state.indexCount
-                                )
-                            },
-                            style = MaterialTheme.typography.bodySmall,
-                            color = if (bad) MaterialTheme.colorScheme.error
-                            else MaterialTheme.colorScheme.primary
-                        )
-                    }
-                }
-            }
-        }
+        item { PreflightCard(state) }
 
         item {
             Text(
                 stringResource(R.string.card_how_it_works),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 4.dp, bottom = 16.dp)
+                modifier = Modifier.padding(horizontal = Gaps.x1)
             )
         }
     }
 }
 
+/** 首页主卡片：整块深蓝底 + 白字 + 白色主按钮，是这一屏唯一的强调色块。 */
 @Composable
-private fun StatusChip(ok: Boolean, label: String) {
-    val tint = if (ok) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
-    AssistChip(
-        onClick = {},
-        label = { Text("$label ${if (ok) "✓" else "✕"}") },
-        leadingIcon = {
-            Icon(
-                imageVector = if (ok) Icons.Rounded.CheckCircle else Icons.Rounded.ErrorOutline,
-                contentDescription = null,
-                modifier = Modifier.size(16.dp),
-                tint = tint
+private fun CardHero(state: AppState, onPick: () -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.extraLarge,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.primary,
+            contentColor = MaterialTheme.colorScheme.onPrimary
+        )
+    ) {
+        Column(
+            Modifier.padding(Gaps.x3),
+            verticalArrangement = Arrangement.spacedBy(Gaps.x1)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Gaps.x1)
+            ) {
+                Box(
+                    Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.16f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Rounded.SdCard,
+                        contentDescription = null,
+                        modifier = Modifier.size(22.dp),
+                        tint = MaterialTheme.colorScheme.onPrimary
+                    )
+                }
+                Text(
+                    stringResource(R.string.card_section_title),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+            Text(
+                state.cardLabel,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.85f)
             )
-        },
-        colors = AssistChipDefaults.assistChipColors(labelColor = tint)
-    )
+            Spacer(Modifier.height(Gaps.x1))
+            Button(
+                onClick = onPick,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.onPrimary,
+                    contentColor = MaterialTheme.colorScheme.primary
+                )
+            ) {
+                Text(
+                    stringResource(
+                        if (state.cardUri == null) R.string.pick_card
+                        else R.string.pick_card_again
+                    )
+                )
+            }
+        }
+    }
 }
 
+/** 预检卡片：2×2 网格 + 结论行；白底卡片衬在浅蓝背景上。 */
+@Composable
+private fun PreflightCard(state: AppState) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.large,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface,
+            contentColor = MaterialTheme.colorScheme.onSurface
+        )
+    ) {
+        Column(
+            Modifier.padding(Gaps.x3),
+            verticalArrangement = Arrangement.spacedBy(Gaps.x1)
+        ) {
+            Row(horizontalArrangement = Arrangement.spacedBy(Gaps.x1)) {
+                PreflightItem(
+                    state.dcimFound,
+                    stringResource(R.string.preflight_dcim),
+                    Modifier.weight(1f)
+                )
+                PreflightItem(state.camDirFound, "Camera01", Modifier.weight(1f))
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(Gaps.x1)) {
+                PreflightItem(
+                    state.indexFound,
+                    stringResource(R.string.preflight_index),
+                    Modifier.weight(1f)
+                )
+                PreflightItem(
+                    state.templatePairs > 0,
+                    stringResource(R.string.preflight_template),
+                    Modifier.weight(1f)
+                )
+            }
+            if (state.templateName.isNotBlank()) {
+                Text(
+                    stringResource(R.string.preflight_template_name, state.templateName),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            HorizontalDivider(
+                Modifier.padding(vertical = Gaps.x1),
+                color = MaterialTheme.colorScheme.outlineVariant
+            )
+            Text(
+                stringResource(
+                    R.string.preflight_counts,
+                    state.vidCount,
+                    state.lrvCount,
+                    state.templatePairs
+                ),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            if (state.camDirFound && state.templatePairs == 0) {
+                Text(
+                    stringResource(R.string.preflight_need_template),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
+            if (state.indexCount > 0 || state.indexError.isNotBlank() || state.indexEmptyMeta > 0) {
+                val bad = state.indexError.isNotBlank() || state.indexEmptyMeta > 0
+                Text(
+                    when {
+                        state.indexError.isNotBlank() -> stringResource(
+                            R.string.preflight_index_error, state.indexError
+                        )
+
+                        state.indexEmptyMeta > 0 -> stringResource(
+                            R.string.preflight_index_empty_meta,
+                            state.indexCount,
+                            state.indexEmptyMeta
+                        )
+
+                        else -> stringResource(
+                            R.string.preflight_index_all_meta, state.indexCount
+                        )
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (bad) MaterialTheme.colorScheme.error
+                    else MaterialTheme.colorScheme.primary
+                )
+            }
+        }
+    }
+}
+
+/** 单项预检：对勾或叉号 + 文案，失败时整项转成错误色，扫一眼就能看出缺哪一步。 */
+@Composable
+private fun PreflightItem(ok: Boolean, label: String, modifier: Modifier = Modifier) {
+    val tint = if (ok) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+    Row(
+        modifier,
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Icon(
+            imageVector = if (ok) Icons.Rounded.CheckCircle else Icons.Rounded.ErrorOutline,
+            contentDescription = null,
+            modifier = Modifier.size(18.dp),
+            tint = tint
+        )
+        Text(
+            label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = if (ok) MaterialTheme.colorScheme.onSurface else tint,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
 
 @Composable
 private fun QueueScreen(
@@ -522,9 +612,9 @@ private fun QueueScreen(
     modifier: Modifier = Modifier
 ) {
     val ctx = LocalContext.current
-    Column(modifier.fillMaxSize().padding(horizontal = 16.dp)) {
+    Column(modifier.fillMaxSize().padding(horizontal = Gaps.x2)) {
         Row(
-            Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 8.dp),
+            Modifier.fillMaxWidth().padding(top = Gaps.x1, bottom = Gaps.x1),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
@@ -542,11 +632,17 @@ private fun QueueScreen(
         if (state.queue.isEmpty()) {
             EmptyState(Modifier.weight(1f))
         } else {
-            LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            LazyColumn(
+                Modifier.weight(1f),
+                contentPadding = PaddingValues(bottom = Gaps.x1),
+                verticalArrangement = Arrangement.spacedBy(Gaps.x1)
+            ) {
                 items(state.queue, key = { it.uri.toString() }) { item ->
                     ListItem(
                         // animateItem 只在增删/重排时生效，不改布局尺寸，也不触发整表重组。
-                        modifier = Modifier.animateItem(),
+                        modifier = Modifier
+                            .animateItem()
+                            .clip(MaterialTheme.shapes.large),
                         leadingContent = {
                             Icon(
                                 Icons.Rounded.Movie,
@@ -570,8 +666,11 @@ private fun QueueScreen(
                             }
                         },
                         colors = ListItemDefaults.colors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant
-                                .copy(alpha = 0.35f)
+                            containerColor = MaterialTheme.colorScheme.surface,
+                            headlineColor = MaterialTheme.colorScheme.onSurface,
+                            supportingColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            leadingIconColor = MaterialTheme.colorScheme.primary,
+                            trailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     )
                 }
@@ -579,13 +678,19 @@ private fun QueueScreen(
         }
 
         if (state.outputSummary.isNotBlank()) {
-            OutlinedCard(Modifier.fillMaxWidth().padding(bottom = 12.dp)) {
-                Column(Modifier.padding(12.dp)) {
+            Card(
+                Modifier.fillMaxWidth().padding(bottom = Gaps.x1),
+                shape = MaterialTheme.shapes.large,
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                )
+            ) {
+                Column(Modifier.padding(Gaps.x2), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(
                         stringResource(R.string.import_summary_title),
-                        style = MaterialTheme.typography.labelMedium
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    Spacer(Modifier.height(4.dp))
                     Text(
                         state.outputSummary,
                         style = MaterialTheme.typography.bodySmall,
@@ -609,7 +714,7 @@ private fun QueueScreen(
             canceling = state.canceling,
             onStart = onStart,
             onCancel = onCancel,
-            modifier = Modifier.padding(bottom = 12.dp)
+            modifier = Modifier.padding(bottom = Gaps.x1)
         )
     }
 }
@@ -621,13 +726,21 @@ private fun EmptyState(modifier: Modifier = Modifier) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Icon(
-            Icons.Rounded.Movie,
-            contentDescription = null,
-            modifier = Modifier.size(48.dp),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-        )
-        Spacer(Modifier.height(12.dp))
+        Box(
+            Modifier
+                .size(80.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.primaryContainer),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                Icons.Rounded.Movie,
+                contentDescription = null,
+                modifier = Modifier.size(36.dp),
+                tint = MaterialTheme.colorScheme.onPrimaryContainer
+            )
+        }
+        Spacer(Modifier.height(Gaps.x2))
         Text(
             stringResource(R.string.empty_queue),
             style = MaterialTheme.typography.bodyMedium,
@@ -650,13 +763,19 @@ private fun SettingsScreen(
         modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+            .padding(horizontal = Gaps.x2, vertical = Gaps.x1),
+        verticalArrangement = Arrangement.spacedBy(Gaps.x1)
     ) {
         // 机型预设：与桌面端「输出与选项」里的同名下拉对应。
         //   auto = 跟随卡里的真机原片（旧行为），选定机型 = 用该机型的预设参数。
-        Card(Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(16.dp)) {
+        Card(
+            Modifier.fillMaxWidth(),
+            shape = MaterialTheme.shapes.large,
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surface
+            )
+        ) {
+            Column(Modifier.padding(Gaps.x2)) {
                 Text(
                     stringResource(R.string.settings_model_title),
                     style = MaterialTheme.typography.titleSmall
@@ -701,13 +820,19 @@ private fun SettingsScreen(
             }
         }
 
-        Card(Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(16.dp)) {
+        Card(
+            Modifier.fillMaxWidth(),
+            shape = MaterialTheme.shapes.large,
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surface
+            )
+        ) {
+            Column(Modifier.padding(Gaps.x2)) {
                 Text(
                     stringResource(R.string.settings_encoder_title),
                     style = MaterialTheme.typography.titleSmall
                 )
-                Spacer(Modifier.height(10.dp))
+                Spacer(Modifier.height(Gaps.x1))
                 val encoders = listOf(
                     AppState.ENCODER_AUTO to R.string.encoder_auto,
                     AppState.ENCODER_HW to R.string.encoder_hardware
@@ -742,7 +867,13 @@ private fun SettingsScreen(
             }
         }
 
-        Card(Modifier.fillMaxWidth()) {
+        Card(
+            Modifier.fillMaxWidth(),
+            shape = MaterialTheme.shapes.large,
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surface
+            )
+        ) {
             ListItem(
                 headlineContent = { Text(stringResource(R.string.settings_register_index)) },
                 supportingContent = {
@@ -757,8 +888,17 @@ private fun SettingsScreen(
             )
         }
 
-        Card(Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Card(
+            Modifier.fillMaxWidth(),
+            shape = MaterialTheme.shapes.large,
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surface
+            )
+        ) {
+            Column(
+                Modifier.padding(Gaps.x2),
+                verticalArrangement = Arrangement.spacedBy(Gaps.x1)
+            ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
                         Icons.Rounded.Info,

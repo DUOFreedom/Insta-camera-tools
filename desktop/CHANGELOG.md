@@ -1,5 +1,28 @@
 ## 1.3.0 — 2026-11-13
 
+### 优化（安卓界面蓝白化与布局重排）
+
+用户反馈「界面布局优化一下，配色协调一点，蓝白风格，UI 设计保持 MD3E 不变的前提下」。保持 `MaterialExpressiveTheme` + `MotionScheme.expressive()` 不动，只换色板、改布局。
+
+**配色不协调的根因**：旧的 `lightColorScheme()` 只赋了十来个角色（primary / background / surface / surfaceVariant / error 等），其余角色全部落回 Material 3 的基线紫 —— `Card` 取 `surfaceContainerLow`、`NavigationBar` 取 `surfaceContainer`、`Chip` 取 `outlineVariant`，于是蓝底里到处冒紫色块。深色方案更糟：`background` 与 `surface` 都是近黑 `#0A0E15`，而 `onBackground` / `onSurface` 却是 `#0E1620`，正文几乎读不出来。
+
+- `ui/theme/Color.kt` 重写为蓝白色板，浅色以 `#0B5FD0` 为主色、`#EEF3FA` 为画布、`#FFFFFF` 为卡面，深色以 `#A6C8FF` 为主色、`#0B1420` 为画布。
+- `ui/theme/Theme.kt` 把两套方案的全部角色写全（含 surfaceContainerLowest/Low/Container/High/Highest、surfaceBright/Dim/Tint、outline/outlineVariant、error 全家、inverse 三件、scrim），不再有角色落到基线色。同时补 `AppShapes`（extraSmall 8 / small 12 / medium 16 / large 22 / extraLarge 28 dp）并把 `shapes` 传进主题。
+- 删掉无人调用的 `currentScheme()` 与 `Accent` 对象 —— `Accent.brand` 的 getter 直接读 `MaterialTheme`，脱离 `@Composable` 上下文编译不过。
+
+**布局**：
+
+- 首页改成「hero + 预检卡」两段。原来是一个 `OutlinedCard` 里塞 `AssistChip` 拼状态，现在 hero 整块深蓝底白字（含 40dp 图标圆与主按钮），是全屏唯一的强色块；预检项改成 2×2 网格，每项「对勾/叉号 + 文案」，失败整项转 error 色。
+- 队列页列表项改白底卡片 + `clip(shapes.large)`；空状态从 48dp 灰图标换成 80dp 主色圆底 + 36dp 图标。
+- 设置页四个卡片统一 `shapes.large` + 白底。
+- 顶栏与底部导航从 `background` 改 `surface`（画布换成浅蓝后顶栏会被染成浅蓝），导航选中态的 indicator / icon / text 三色显式指定，不再落到基线紫。
+- 间距统一到 `Gaps.x1/x2/x3`（8 / 16 / 24 dp），替掉散落的手写 12 / 16 / 20 dp。
+- `ui/ImportActionCard.kt` 的非错误状态底色由 `surfaceVariant` 改 `surface`，与其余卡片统一。
+
+**验证**：`:app:compileReleaseKotlin --rerun-tasks` 零 error 零 warning；`:app:assembleRelease` BUILD SUCCESSFUL，APK **75,317,484 B**；`:app:testReleaseUnitTest` 全绿（IndexTest 7 skipped 缺真机样本 / PythonI18nTest 5 / ConsentLogicTest 5 / ImportCardStateTest 6，failures=0 errors=0）。
+
+**没能真机确认**：`adb devices` 为空，本轮改动只经过编译与代码核对，没有截图。深色模式的实际观感、hero 卡片在小屏（< 360dp 宽）下的换行、以及长机型名在设置页 radio 里的折行，都还需要插机验证。
+
 ### 修正（作者主页文案更新）
 
 用户要求把欢迎窗第三页「作者主页」的文字替换为新版说明：作者是高中生、开发时间可能不多、有 bug 请去 GitHub 提 Issue、感谢支持、附带哔哩哔哩账号链接、QQ 交流群号、后续会增加更多机型适配与功能、star 与关注是动力。按要求重新排版，中英双语均已补齐。
