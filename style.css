@@ -1132,6 +1132,22 @@ code {
   word-break: break-all;
 }
 
+/* 行内代码在 HTML 里写成 class="code code--inline"：两个类优先级相同，
+   而 .code（块级：16px 内边距、12px 圆角、下外边距）写在后面，于是行内
+   元素吃到了块级盒子——画出来比行高还高，上下压住相邻两行文字。
+   这里用 .vp-doc 提高优先级把行内形态钉死，块级样式让位。 */
+.vp-doc .code--inline {
+  display: inline;
+  margin: 0;
+  padding: 1px 6px;
+  border-radius: var(--vp-radius-sm);
+  background: var(--vp-c-bg-soft);
+  overflow: visible;
+  white-space: nowrap;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
 .sha-row {
   display: flex;
   flex-wrap: wrap;
