@@ -17,29 +17,29 @@
 
   /* 颜色 · 浅色 */
   --vp-c-bg: #ffffff;
-  --vp-c-bg-alt: #f6f6f7;
+  --vp-c-bg-alt: #fbfbfc;
   --vp-c-bg-soft: #f6f6f7;
   --vp-c-bg-elv: #ffffff;
-  --vp-c-border: #c2c2c4;
-  --vp-c-divider: #e2e2e3;
-  --vp-c-gutter: #e2e2e3;
+  --vp-c-border: #b4b4bb;
+  --vp-c-divider: #e5e5ea;
+  --vp-c-gutter: #e5e5ea;
   --vp-c-text-1: #3c3c43;
-  --vp-c-text-2: rgba(60, 60, 67, 0.78);
-  --vp-c-text-3: rgba(60, 60, 67, 0.56);
+  --vp-c-text-2: #6b6b73;
+  --vp-c-text-3: #9a9aa2;
 
   /* 颜色 · 品牌 */
   --vp-c-brand-1: #2563eb;
-  --vp-c-brand-2: #3b82f6;
-  --vp-c-brand-3: #1d4ed8;
-  --vp-c-brand-soft: rgba(59, 130, 246, 0.12);
+  --vp-c-brand-2: #1d4ed8;
+  --vp-c-brand-3: #1e40af;
+  --vp-c-brand-soft: #eff6ff;
   --vp-c-brand-contrast: #ffffff;
 
   /* 语义色 */
-  --vp-c-ok: #15803d;
-  --vp-c-ok-soft: rgba(21, 128, 61, 0.1);
+  --vp-c-ok: #0e7c4a;
+  --vp-c-ok-soft: #e7f7ee;
   --vp-c-warn: #b45309;
-  --vp-c-warn-soft: rgba(180, 83, 9, 0.1);
-  --vp-c-danger: #b91c1c;
+  --vp-c-warn-soft: #fdf3e7;
+  --vp-c-danger: #c62828;
 
   /* 字体 */
   --vp-font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI",
@@ -1934,6 +1934,216 @@ code {
   .table th,
   .table td {
     padding: 8px 12px;
+  }
+}
+
+/* ------------------------------------------- 24. 配色收尾（回退 MD3 令牌） */
+/* 卡片回到灰底 + 1px 描边：改造前那套的层次感靠底色，不靠阴影。 */
+.card {
+  background: var(--vp-c-bg-soft);
+}
+
+.card--link:hover {
+  border-color: var(--vp-c-brand-1);
+  background: var(--vp-c-bg-elv);
+}
+
+.card__icon {
+  color: var(--vp-c-brand-3);
+}
+
+.tag--soft {
+  color: var(--vp-c-brand-3);
+}
+
+/* 按钮回到 20px 圆角，主按钮用 primary 实底。 */
+.btn,
+.btn--lg {
+  border-radius: 20px;
+}
+
+.btn--alt {
+  border-color: var(--vp-c-border);
+  background: var(--vp-c-bg);
+}
+
+.btn--alt:hover {
+  border-color: var(--vp-c-brand-1);
+  color: var(--vp-c-brand-1);
+}
+
+.btn--filled:hover {
+  background: var(--vp-c-brand-2);
+}
+
+/* 侧栏与目录选中态用 primary-container 的浅蓝，而不是半透明品牌色。 */
+.vp-sidebar__link[aria-current="page"],
+.vp-drawer .vp-sidebar__link[aria-current="page"],
+.vp-menu__link[aria-current="page"] {
+  background: var(--vp-c-brand-soft);
+  color: var(--vp-c-brand-3);
+}
+
+/* ------------------------------------------------ 25. 响应式收尾（手机/平板） */
+
+/* 平板：正文居中限宽，别让 900px 宽的行长拉成一条横线。 */
+@media (max-width: 960px) {
+  .vp-doc,
+  .vp-pager,
+  .vp-footer {
+    max-width: 720px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .vp-search {
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    justify-content: center;
+    border-radius: var(--vp-radius-full);
+  }
+
+  .vp-search__icon {
+    width: 18px;
+    height: 18px;
+  }
+
+  .vp-nav__title {
+    max-width: 44vw;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* 抽屉要盖住正文：用超大 box-shadow 当遮罩，省一个 DOM 节点。 */
+  .vp-drawer {
+    box-shadow: 0 0 0 100vmax rgba(18, 18, 22, 0.42);
+  }
+
+  body:has(.vp-drawer[open]) {
+    overflow: hidden;
+  }
+
+  .code pre {
+    overflow-x: auto;
+  }
+}
+
+/* 平板竖屏 / 大手机 */
+@media (max-width: 768px) {
+  .vp-doc .hero__title {
+    font-size: 30px;
+  }
+
+  .spec-card__row {
+    grid-template-columns: 78px minmax(0, 1fr);
+  }
+
+  .vp-doc h2 {
+    margin-top: var(--vp-gap-6);
+  }
+
+  .vp-doc .steps,
+  .vp-doc .platform-grid {
+    gap: var(--vp-gap-4);
+  }
+}
+
+/* 手机 */
+@media (max-width: 560px) {
+  .vp-nav__inner {
+    padding: 0 12px;
+  }
+
+  .vp-doc h1 {
+    font-size: 26px;
+  }
+
+  .vp-doc .hero__title {
+    font-size: 25px;
+    line-height: 1.3;
+  }
+
+  .vp-doc .card {
+    padding: var(--vp-gap-4);
+  }
+
+  .vp-doc .dl__row {
+    grid-template-columns: 84px minmax(0, 1fr);
+  }
+
+  .vp-footer .footer__links {
+    gap: var(--vp-gap-2);
+  }
+
+  .vp-doc .hero__actions .btn {
+    flex: 1 1 auto;
+  }
+}
+
+/* ------------------------------------------------ 26. 窄屏细节修正 */
+/* dd 默认有 40px 的 margin-inline-start，栅格里会变成莫名其妙的缩进。 */
+.vp-doc dd {
+  margin: 0;
+}
+
+/* 行内代码在窄屏不能强制不换行，否则整行被推出卡片、和下一行叠在一起。 */
+@media (max-width: 560px) {
+  .vp-doc .code--inline {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .vp-doc .table {
+    font-size: 13px;
+  }
+
+  .vp-doc .table th,
+  .vp-doc .table td {
+    padding: 8px 10px;
+  }
+}
+
+/* 长命令与 SHA256：容器横向滚动，绝不裁掉尾部。 */
+.vp-doc .code {
+  overflow-x: auto;
+}
+
+.vp-doc .code pre {
+  margin: 0;
+}
+
+.sha-row code {
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+/* 哈希本身就是 .code，`.code--wrap code` 只作用于子元素，管不到它自己。 */
+.sha-row .code {
+  min-width: 0;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+/* 1280 以下右目录收起后，正文留在左半边会显得空，让它居中。 */
+@media (max-width: 1280px) {
+  .vp-doc,
+  .vp-pager,
+  .vp-footer {
+    margin-left: auto;
+    margin-right: auto;
+  }
+}
+
+/* 平板竖屏到小笔记本之间，上下页保持左右两栏，别退化成两条通栏。 */
+@media (min-width: 561px) and (max-width: 960px) {
+  .vp-pager {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .vp-pager__link--next {
+    grid-column: 2;
   }
 }
 

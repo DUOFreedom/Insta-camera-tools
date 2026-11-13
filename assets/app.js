@@ -69,6 +69,18 @@
     drawer.addEventListener("click", function (event) {
       if (event.target.closest("a")) setDrawer(false);
     });
+    // 点抽屉外面或按 Esc 收起：遮罩是 CSS 画的，接不到点击，只能在文档层判断。
+    document.addEventListener("click", function (event) {
+      if (drawer.getAttribute("open") === null) return;
+      if (drawer.contains(event.target) || hamburger.contains(event.target)) return;
+      setDrawer(false);
+    });
+    document.addEventListener("keydown", function (event) {
+      if (event.key === "Escape" && drawer.getAttribute("open") !== null) {
+        setDrawer(false);
+        hamburger.focus();
+      }
+    });
   }
 
   /* -------------------------------------------------------------- 3. 搜索 */
