@@ -129,7 +129,6 @@ def test_single_job_path_reports_failure(core, monkeypatch):
     with pytest.raises(core.FFmpegError):
         core.convert(src, out, cancel=threading.Event(), jobs=1)
 
-# --- 以下为 2026-11-09 修复的回归用例 -------------------------------------
 # 这三个缺陷都不会让旧用例变红：它们只是「日志里的错因是假的」「取消被
 # 报成成功」「每取消一次多跑一条注定失败的 ffmpeg」。所以下面的断言全部
 # 落在日志文本、异常类型和「是否真的发生了回退」上，而不是只看有没有抛异常。

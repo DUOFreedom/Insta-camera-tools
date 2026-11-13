@@ -304,7 +304,6 @@ def test_tray_created_with_qapplication():
         "否则「最小化到托盘」刚藏起窗口进程就结束了")
 
 
-# --- 封面 / 断点续跑 / 卡校验（QML 版补齐的三项） ---------------------------
 
 
 def test_add_files_pairs_sidecar_cover(bridge, tmp_path, monkeypatch):
@@ -749,7 +748,6 @@ def test_output_view_exposes_locate_and_remove():
     assert "bridge.removeFile(" in main
 
 
-# --- 硬件探测 / 样本摘要 / 下一序号 / 拖拽 --------------------------------
 
 
 def test_refresh_sequence_reports_next_number(bridge, tmp_path, monkeypatch):
