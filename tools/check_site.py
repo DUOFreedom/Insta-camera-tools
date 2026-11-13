@@ -312,6 +312,9 @@ def main() -> int:
         print("错误  %s" % e)
     print("-" * 60)
     print("结果：%d 个错误，%d 个警告" % (len(errors), len(warnings)))
+    # 站长后台提交的就是这一行。写成 sitemap.html 或拼错成 sitmap、写成 /sitemap/
+    # （那是给人看的页面）都会一直「无法抓取」——Bing 只认能解析的 XML。
+    print("提交到站长后台的站点地图地址：%ssitemap.xml" % SITE)
     if errors:
         return 1
     if "--ping-indexnow" in sys.argv:

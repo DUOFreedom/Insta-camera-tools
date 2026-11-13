@@ -13,6 +13,10 @@ Convert ordinary videos into native formats recognized by Insta360 camera albums
 </p>
 
 <p align="center">
+  Website · <a href="https://duofreedom.github.io/Insta-camera-tools/">Home</a> · <a href="https://duofreedom.github.io/Insta-camera-tools/guide/">Guide</a> · <a href="https://duofreedom.github.io/Insta-camera-tools/faq/">FAQ</a>
+</p>
+
+<p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0--or--later-blue?style=flat-square" alt="License"></a>
   <a href="desktop/CHANGELOG.md"><img src="https://img.shields.io/badge/version-1.3.0-success?style=flat-square" alt="Version"></a>
   <a href="desktop/requirements.txt"><img src="https://img.shields.io/badge/python-3.10%2B-3776ab?style=flat-square" alt="Python"></a>

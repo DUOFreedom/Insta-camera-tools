@@ -13,6 +13,10 @@
 </p>
 
 <p align="center">
+  官网 · <a href="https://duofreedom.github.io/Insta-camera-tools/">首页</a> · <a href="https://duofreedom.github.io/Insta-camera-tools/guide/">使用指南</a> · <a href="https://duofreedom.github.io/Insta-camera-tools/faq/">常见问题</a>
+</p>
+
+<p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0--or--later-blue?style=flat-square" alt="License"></a>
   <a href="desktop/CHANGELOG.md"><img src="https://img.shields.io/badge/version-1.3.0-success?style=flat-square" alt="Version"></a>
   <a href="desktop/requirements.txt"><img src="https://img.shields.io/badge/python-3.10%2B-3776ab?style=flat-square" alt="Python"></a>
