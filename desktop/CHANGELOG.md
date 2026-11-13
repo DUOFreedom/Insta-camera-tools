@@ -1,5 +1,20 @@
 ## 1.3.0 — 2026-11-13
 
+### 清理（多余注释）
+
+按「默认不写注释、只留解释为什么与非显而易见约束」的既有约定，清了 14 个文件共 63 行注释，无代码改动。
+
+- 分节横幅共 49 行：`desktop/i18n.py` 14、`android/app/src/main/python/i18n.py` 9、`desktop/tests/test_star.py` 6、`desktop/tests/test_i18n.py` 5、`desktop/qml/WelcomeDialog.qml` 4、`desktop/tests/test_welcome.py` 3、`ui/theme/Color.kt` 3、`shared/insta_index.py` 1、`android/app/src/main/python/insta_index.py` 1、`android/app/src/main/python/android_bridge.py` 1、`desktop/tests/test_bridge_cancel.py` 1。
+- 逐条冗余注释 6 行：`ui/theme/Theme.kt` 里解释已删除的 `currentScheme()` / `Accent` 的三行考古注释，`ui/InstaToolsApp.kt` 的三条同义复述。
+- `ui/ImportActionCard.kt` 的 5 处 `// ── xxx ────` 横幅：empty 那处合并成两行有信息量的说明（解释为什么不在这里画占位），其余四处直接删。
+- 顺带修掉一条错注释：`ui/theme/Color.kt` 原写白字对比度 4.6:1，按 WCAG 相对亮度实算是 **5.90:1**。同批把浅深两套方案的关键组合都算了一遍（主色/画布 5.29、正文/画布 15.62、次正文/画布 6.93、正文/白卡 17.41、深色主色对 7.75、深色正文对画布 15.54、深色次正文 11.37、深色正文对卡面 14.72），全部 ≥ 4.5。
+
+**密度复核**：清理前 `ui/theme/Color.kt` 17.6%、`ui/theme/Theme.kt` 21.9%、`ui/ImportActionCard.kt` 12.2% 都超了 10% 的约定线；清理后分别为 2.4%、0.0%、2.7%，`ui/InstaToolsApp.kt` 1.9%。
+
+**验证**：`git diff --stat` 为 14 files changed / 3 insertions / 64 deletions；`:app:compileReleaseKotlin --rerun-tasks` 零 error 零 warning；`python -m pytest desktop/tests/ -q` → 263 passed, 3 skipped；离屏加载全部 QML 无 `qml:` 报错。
+
+**产物未重建**：本轮只删注释，编译产物与运行时行为不变，`instatools.exe` 与 APK 仍是上一轮构建的那两个文件。
+
 ### 优化（安卓界面蓝白化与布局重排）
 
 用户反馈「界面布局优化一下，配色协调一点，蓝白风格，UI 设计保持 MD3E 不变的前提下」。保持 `MaterialExpressiveTheme` + `MotionScheme.expressive()` 不动，只换色板、改布局。

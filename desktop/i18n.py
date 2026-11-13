@@ -129,7 +129,6 @@ def t(text: str, _depth: int = 0) -> str:
 
 #   英文文案。占位符沿用中文原文里的 %s / %d / %1 顺序，调用方不用区分语言。
 EN_TEXT: dict[str, str] = {
-    # ---------- 产品名与通用 ----------
     "影石相机工具": _PRODUCT_EN,
     "就绪。添加视频后点击「开始转换」。": "Ready. Add videos, then click Start.",
     "剩余 --:--": "ETA --:--",
@@ -157,12 +156,10 @@ EN_TEXT: dict[str, str] = {
     "暂无待转换视频": "No videos yet",
     "浏览": "Browse",
     " 个": " files",
-    # ---------- 错误态（界面占位） ----------
     "无法访问所选文件，请检查路径是否存在。":
         "Cannot access the selected files. Check that the paths still exist.",
     "转换失败：无法访问输出目录，请检查路径权限。":
         "Conversion failed: cannot write to the output folder. Check its permissions.",
-    # ---------- 文件对话框 ----------
     "选择原生录制视频": "Select a camera-recorded video",
     "视频文件 (*.mp4 *.mov *.lrv *.insv *.ins)":
         "Video files (*.mp4 *.mov *.lrv *.insv *.ins)",
@@ -174,7 +171,6 @@ EN_TEXT: dict[str, str] = {
     "选择封面图片": "Select a cover image",
     "图片 (*.png *.jpg *.jpeg *.bmp *.webp)":
         "Images (*.png *.jpg *.jpeg *.bmp *.webp)",
-    # ---------- ffmpeg 横幅 ----------
     "正在下载 ffmpeg… ": "Downloading ffmpeg… ",
     "未找到 ffmpeg。它是转码必需组件，先选一个安装位置。":
         "ffmpeg is required for transcoding and was not found. Pick where to install it.",
@@ -189,7 +185,6 @@ EN_TEXT: dict[str, str] = {
     "ffmpeg 安装失败：%s": "ffmpeg installation failed: %s",
     "ffmpeg 不可用：%s": "ffmpeg is unavailable: %s",
     "已使用系统已安装的 ffmpeg：%s": "Using the ffmpeg already installed on this system: %s",
-    # ---------- 相机样本 ----------
     "未设置样本（回退到影石默认结构）":
         "No sample set (falling back to the built-in Insta360 layout)",
     "样本：": "Sample: ",
@@ -211,7 +206,6 @@ EN_TEXT: dict[str, str] = {
     "预览: %sx%s @%s %s": "Preview: %sx%s @%s %s",
     "色域: %s": "Colour: %s",
     "音频 %d 轨": "%d audio track(s)",
-    # ---------- 硬件编码器 ----------
     "正在检测硬件编码器…": "Detecting hardware encoders…",
     "未检测到": "none found",
     "未检测到可用硬件编码器": "No usable hardware encoder found",
@@ -221,7 +215,6 @@ EN_TEXT: dict[str, str] = {
     "，可选它加快约 1.5～2 倍（默认仍用软件，与相机已验证的路径一致）":
         " — choosing it is roughly 1.5–2× faster (software stays the default, "
         "which is the path already verified on the camera).",
-    # ---------- 输出选项 ----------
     "机型": "Camera model",
     "选机型后按预设参数生成；选「自动」时若有原片仍优先用原片":
         "Generation follows the preset of the selected model; with Automatic, "
@@ -244,12 +237,10 @@ EN_TEXT: dict[str, str] = {
     "封": "C",
     "从 000 开始": "Starting at 000",
     "自动续接，下一序号 %03d": "Auto-continue, next number %03d",
-    # ---------- 操作区 ----------
     "只跑未完成": "Only unfinished",
     "全部重跑": "Run all again",
     "清理异常条目": "Clean up broken entries",
     "清理失败：%s": "Clean-up failed: %s",
-    # ---------- 关窗 / 托盘 ----------
     "当前任务尚未完成。\n\n停止并退出：立刻中止，未完成的文件会留在输出目录，需要自行删除。\n最小化到托盘：窗口隐藏，转换继续跑完，跑完会弹提示。":
         "A task is still running.\n\nStop and exit: aborts right away. Unfinished files stay "
         "in the output folder and have to be deleted by hand.\nMinimise to tray: the window "
@@ -261,14 +252,12 @@ EN_TEXT: dict[str, str] = {
     "转换在后台继续，完成后会再提示一次。":
         "The conversion keeps running in the background; you will be notified when it finishes.",
     "继续转换": "Keep converting",
-    # ---------- 更新 ----------
     "发现新版本": "Update available",
     "当前版本 %1，最新版本 %2。": "Current version %1, latest %2.",
     "未知": "unknown",
     "前往下载": "Download",
     "稍后": "Later",
     "关闭": "Close",
-    # ---------- 封面 ----------
     "自动（源视频第 10 秒）": "Automatic (10 s into the source video)",
     "同名图自动配对（已配 %d/%d）": "Paired by file name (%d of %d)",
     "请先添加要转换的视频": "Add the videos to convert first",
@@ -281,7 +270,6 @@ EN_TEXT: dict[str, str] = {
         "paired automatically when added.",
     "封面已指定：%s → %s": "Cover set: %s → %s",
     "封面已恢复自动": "Cover reverted to automatic",
-    # ---------- 转换流程与结果 ----------
     "未知机型预设: %s": "Unknown camera preset: %s",
     "上次这个输出目录已完成 %d 条，还有 %d 条没跑完。":
         "This output folder already finished %d clip(s); %d still to go.",
@@ -579,13 +567,11 @@ EN_TEXT.update({
 })
 
 
-# ---------- 作者页：复制仓库地址 ----------
 EN_TEXT.update({
     "复制地址": "Copy link",
     "仓库地址已复制": "Repository address copied",
 })
 
-# ---------- 作者页：浏览器打开后收起主界面 ----------
 EN_TEXT.update({
     "已在浏览器里打开；没看见的话，主界面已经收起来了": "Opened in your browser; the main window has been tucked away in case you didn't see it",
 })

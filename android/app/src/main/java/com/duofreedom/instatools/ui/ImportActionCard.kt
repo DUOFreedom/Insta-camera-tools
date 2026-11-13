@@ -168,11 +168,8 @@ fun ImportActionCard(
     ) {
         Column(Modifier.padding(Space.s2), verticalArrangement = Arrangement.spacedBy(Space.s1)) {
 
-            // ── empty：队列为空。占位由调用方的列表区负责（大图标 + 引导文案），
-            //    这里只把主按钮标成「先添加视频」并禁用，避免同一句话出现两次。
-            // ──────────────────────────────────────────────────────────
-
-            // ── loading：进度 + 阶段文字 + 实时日志，逐项错峰入场 ────────
+            // empty 态不在这里画占位：列表区已有大图标 + 引导文案，
+            //   卡片只把主按钮标成「先添加视频」，避免同一句话出现两次。
             StaggeredIn(index = 0, visible = state == ImportCardState.Loading) {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Text(
@@ -205,7 +202,6 @@ fun ImportActionCard(
                 )
             }
 
-            // ── error：错误文案区 + 主按钮变成「重新导入」────────────────
             StaggeredIn(index = 0, visible = state == ImportCardState.Error) {
                 Row(verticalAlignment = Alignment.Top) {
                     Icon(
@@ -225,7 +221,6 @@ fun ImportActionCard(
 
             Spacer(Modifier.height(Space.s1))
 
-            // ── default / pressed / disabled / loading 共用这一颗主按钮 ──
             PrimaryAction(
                 state = state,
                 canceling = canceling,
@@ -355,8 +350,6 @@ private fun StaggeredIn(
         content()
     }
 }
-
-// ── 预览：五个数据态各一张 ────────────────────────────────────────────
 
 @Preview(name = "空状态", showBackground = true)
 @Composable

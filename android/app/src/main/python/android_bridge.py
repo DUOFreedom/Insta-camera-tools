@@ -239,7 +239,6 @@ def self_check():
         return False, "%s: %s" % (type(e).__name__, i18n.t(str(e)))
 
 
-# ============== 启动更新检查（与桌面端 updater.py 对齐） ==============
 _REPO = "duofreedom/Insta-camera-tools"
 _API_URL = "https://api.github.com/repos/%s/releases/latest" % _REPO
 _FALLBACK_URL = "https://github.com/%s/releases" % _REPO

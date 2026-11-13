@@ -213,7 +213,6 @@ def test_run_import_rejects_unusable_template_pair(bridge):
     assert fake.seen_template == "unset", "模板不可用时不应继续调用导入"
 
 
-# ============== 机型预设：run_import → import_with_inst 的透传 ==============
 #
 # 这一层最容易出的错是「参数加了但没往下传」——界面选得动、日志里也看不出，
 # 只有产物参数不对。所以断言落在 import_with_inst 实际收到的 kw 上。

@@ -151,7 +151,6 @@ fun instatoolsApp() {
                 consented = true
             },
             onDecline = {
-                // 不同意即退出应用（Activity.finish 会结束当前任务）
                 (ctx as? android.app.Activity)?.finish()
             }
         )
@@ -180,7 +179,6 @@ fun instatoolsApp() {
         if (!uris.isNullOrEmpty()) state.addVideos(ctx, uris)
     }
 
-    // 更新检查：启动后台检查 GitHub latest release
     var updateTag by remember { mutableStateOf<String?>(null) }
     var updateUrl by remember { mutableStateOf<String?>(null) }
     val prefs = remember { ctx.getSharedPreferences(PREFS_UPDATE, 0) }
@@ -951,7 +949,6 @@ private fun SettingsScreen(
                 )
                 HorizontalDivider(Modifier.padding(vertical = 4.dp))
 
-                // 开发者与源码入口
                 Text(
                     stringResource(R.string.settings_developer),
                     style = MaterialTheme.typography.labelMedium,

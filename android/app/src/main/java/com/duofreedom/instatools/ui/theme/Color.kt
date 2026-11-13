@@ -15,9 +15,8 @@ import androidx.compose.ui.graphics.Color
  * 「配色不协调」的根因。角色补齐后整屏才是一条冷色。
  */
 
-// ---------------------------------------------------------------- 浅色（主用）
 
-/** 品牌蓝：填充按钮底、选中态、链接。白字对比度 4.6:1。 */
+/** 品牌蓝：填充按钮底、选中态、链接。白字对比度 5.9:1。 */
 val BluePrimary = Color(0xFF0B5FD0)
 val BlueOnPrimary = Color(0xFFFFFFFF)
 
@@ -56,7 +55,6 @@ val OnErrorLight = Color(0xFFFFFFFF)
 val ErrorContainerLight = Color(0xFFFFDAD6)
 val OnErrorContainerLight = Color(0xFF410002)
 
-// ---------------------------------------------------------------- 深色
 
 val BluePrimaryDark = Color(0xFFA6C8FF)
 val BlueOnPrimaryDark = Color(0xFF00315B)
@@ -94,7 +92,6 @@ val OnErrorDark = Color(0xFF690005)
 val ErrorContainerDark = Color(0xFF93000A)
 val OnErrorContainerDark = Color(0xFFFFDAD6)
 
-// ---------------------------------------------------------------- 兼容旧引用
 // 此前界面层与 ImportActionCard 直接引用了这几个名字，保留同义常量，
 // 避免为改名去动一排无关文件。
 

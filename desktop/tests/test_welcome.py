@@ -40,7 +40,6 @@ def _read(name: str) -> str:
         return fh.read()
 
 
-# ---------- consent：什么时候该弹 ----------
 
 def test_shows_when_nothing_recorded(state_dir):
     assert not state_dir.exists()
@@ -96,7 +95,6 @@ def test_reset_makes_it_show_again(state_dir):
     consent.reset()  # 文件已经不在了也不能抛
 
 
-# ---------- Bridge：QML 看到的那几个属性 ----------
 
 @pytest.fixture()
 def bridge(state_dir):
@@ -128,7 +126,6 @@ def test_bridge_author_url_is_the_repo(bridge):
     assert bridge.authorUrl == "https://github.com/DUOFreedom/Insta-camera-tools"
 
 
-# ---------- QML：真的挂上了、真的三页 ----------
 
 def test_welcome_dialog_qml_exists():
     assert os.path.isfile(os.path.join(QML_DIR, "WelcomeDialog.qml"))

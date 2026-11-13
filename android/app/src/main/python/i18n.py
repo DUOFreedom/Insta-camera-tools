@@ -116,10 +116,8 @@ def t(text: str, _depth: int = 0) -> str:
 
 #   英文文案。占位符沿用中文原文里的 %s / %d 顺序，调用方不用区分语言。
 EN_TEXT: dict[str, str] = {
-    # ---------- 通用 ----------
     "已取消": "Canceled",
 
-    # ---------- 自检 / 设置页的 Python 核心状态 ----------
     "无法读取 ffmpeg 编码器列表": "Cannot read the ffmpeg encoder list",
     "ffmpeg 缺少编码器: %s": "ffmpeg is missing encoders: %s",
     "libx265 + libx264 就绪": "libx265 + libx264 ready",
@@ -129,14 +127,12 @@ EN_TEXT: dict[str, str] = {
     "ffprobe 不存在: %s": "ffprobe not found: %s",
     "inst 模块加载失败: %s": "Failed to load the inst modules: %s",
 
-    # ---------- 进度标签（ImportCallback.label） ----------
     "转码": "Transcoding",
     "移植 inst box": "Transferring inst box",
     "登记索引": "Registering in index",
     "VID (主视频)": "VID (main video)",
     "LRV (低清预览)": "LRV (low-res preview)",
 
-    # ---------- 失败原因（界面「失败：…」与条目明细） ----------
     "未找到 ffmpeg，无法构建转码命令": "ffmpeg not found; cannot build the transcode command",
     "未找到 ffmpeg，无法构建硬件转码命令":
         "ffmpeg not found; cannot build the hardware transcode command",
@@ -144,7 +140,6 @@ EN_TEXT: dict[str, str] = {
     "模板对不可用：%s / %s": "Template pair unavailable: %s / %s",
     "%s: 转码产物不存在": "%s: the transcoded output is missing",
 
-    # ---------- 卡结构 / 模板（装错目录或卡里没有真机原片） ----------
     "卡里找不到真机原片作模板。\n"
     "`.inst` 移植必须有一个真机视频提供 moov 骨架与 inst box。\n"
     "请先在 DCIM\\Camera01 放一对相机原生 VID_*.mp4 + LRV_*.lrv。":
@@ -163,7 +158,6 @@ EN_TEXT: dict[str, str] = {
         "ordinary directory.\n"
         "Point the output folder at the card's DCIM or DCIM\\Camera01.",
 
-    # ---------- 导入失败明细（界面的条目详情节选段） ----------
     #   这些是 insta_core 直接 raise 的异常正文，由 android_bridge 组装成
     #   error / inst_error / index_error 回给 Kotlin，最后原样显示在
     #   ImportResult.detail。不译就是英文界面里夹一段中文。
@@ -192,7 +186,6 @@ EN_TEXT: dict[str, str] = {
     "%s 缺少 VID_*.mp4 模板": "%s is missing a VID_*.mp4 template",
     "%s 缺少 LRV_*.lrv 模板": "%s is missing an LRV_*.lrv template",
 
-    # ---------- 导入途中卡被拔 / 路径变化 ----------
     "模板文件": "Template file",
     "生成文件": "Output file",
     "临时目录": "Temp folder",
@@ -206,10 +199,8 @@ EN_TEXT: dict[str, str] = {
         "%s(%s) vs %s(%s); use a camera-native "
         "VID_YYYYMMDD_HHMMSS_NNN.mp4 as the template.",
 
-    # ---------- 机型预设 ----------
     "未知机型预设: %s": "Unknown camera model preset: %s",
 
-    # ---------- 索引写入失败 ----------
     "无法写入索引 %s：权限被拒。\n"
     "    路径: %s\n"
     "    请确认：1) 卡的写保护开关没打开；"

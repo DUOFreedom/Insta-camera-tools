@@ -169,7 +169,6 @@ class MediaInfo:
     # 原始字段序列（保持真机顺序与重复次数），用于字节级回写
     _order: list = field(default_factory=list, repr=False)
 
-    # ---- 兼容旧属性名 ----
     @property
     def datetime_num(self) -> int:
         return self.timestamp_digits

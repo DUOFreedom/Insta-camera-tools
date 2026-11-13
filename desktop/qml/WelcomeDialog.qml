@@ -191,7 +191,6 @@ Item {
             }
         }
 
-        // ---- 第 1 页：使用协议 ----
         Flickable {
             id: pageTerms
             anchors.top: hint.bottom
@@ -280,7 +279,6 @@ Item {
             }
         }
 
-        // ---- 第 2 页：使用须知 ----
         Flickable {
             id: pageNotes
             anchors.top: hint.bottom
@@ -380,7 +378,6 @@ Item {
             }
         }
 
-        // ---- 第 3 页：作者主页 ----
         Column {
             id: pageAuthor
             anchors.top: hint.bottom
@@ -587,7 +584,6 @@ Item {
             }
         }
 
-        // ---- 底部：翻页点 + 按钮 ----
         Item {
             id: footer
             anchors.left: parent.left

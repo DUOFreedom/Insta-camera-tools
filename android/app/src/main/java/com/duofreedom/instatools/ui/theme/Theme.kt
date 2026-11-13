@@ -141,6 +141,3 @@ fun instatoolsTheme(
     )
 }
 
-// 此前的 `currentScheme()` 与 `Accent` 对象没有任何调用点，且 `Accent` 的
-// getter 直接读 MaterialTheme（非 @Composable 上下文编译不过）。配色一律从
-// MaterialTheme.colorScheme 取，删掉这两个入口。

@@ -36,7 +36,6 @@ def _reset_lang():
     i18n.set_lang("")
 
 
-# ---------------------------------------------------------------- 语言判定
 
 def test_env_overrides_detection(monkeypatch):
     monkeypatch.setenv("INSTA_LANG", "en")
@@ -78,7 +77,6 @@ def test_detection_falls_back_to_english(monkeypatch):
     assert i18n.lang() == "en"
 
 
-# ---------------------------------------------------------------- 产品名
 
 def test_app_name_english_is_all_lowercase():
     i18n.set_lang("en")
@@ -97,7 +95,6 @@ def test_app_name_never_says_importer():
         assert "导入器" not in i18n.app_name()
 
 
-# ---------------------------------------------------------------- 翻译
 
 def test_chinese_returns_text_untouched():
     i18n.set_lang("zh")
@@ -162,7 +159,6 @@ def test_no_recursion_explosion_on_weird_input():
     i18n.t("剩余 剩余 剩余 剩余 剩余 00:01")
 
 
-# ------------------------------------------------ 覆盖率：界面文案不能漏译
 
 _QML_TR = re.compile(r"bridge\.tr\(")
 _LITERAL = re.compile(r'"((?:[^"\\]|\\.)*)"')
@@ -371,7 +367,6 @@ def test_main_py_does_not_hardcode_the_product_name():
     assert "影石相机工具" not in src
 
 
-# ---------- 覆盖率：模板遮蔽与安装流程文案 ----------
 
 _CJK = re.compile(r"[\u4e00-\u9fff]")
 

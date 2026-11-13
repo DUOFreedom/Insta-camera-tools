@@ -48,7 +48,6 @@ def _wait_state(obj, wanted, timeout=3.0):
     return obj.starState
 
 
-# ---------------------------------------------------------------- 接口解析
 
 
 def test_fetch_stars_returns_count(monkeypatch):
@@ -91,7 +90,6 @@ def test_fetch_stars_swallows_urlopen_failure(monkeypatch):
     assert star.fetch_stars() is None
 
 
-# ---------------------------------------------------------------- 本地记录
 
 
 def test_starred_state_roundtrip(state_dir):
@@ -119,7 +117,6 @@ def test_broken_star_file_is_treated_as_unstarred(state_dir):
     assert star.is_starred() is True
 
 
-# ---------------------------------------------------------------- 状态机
 
 
 def test_avatar_file_is_shipped_with_desktop(bridge):
@@ -218,7 +215,6 @@ def test_open_url_prefers_startfile_on_windows(bridge, monkeypatch):
     assert opened == [bridge.authorUrl]
 
 
-# ---------------------------------------------------------------- QML 守卫
 
 
 def _read(name):
@@ -301,7 +297,6 @@ def test_titlebar_drag_limits_and_settles():
     assert "pointerY <= area.y + 1" in src
 
 
-# ---------------------------------------------------------------- 应用内阻尼
 
 
 def _flickables():
@@ -337,7 +332,6 @@ def test_main_content_area_is_a_plain_flickable():
     assert "contentHeight: pageColumn.height" in src
 
 
-# ------------------------------------------------- 浏览器到底出没出来
 
 
 def _pump(app, seconds):
