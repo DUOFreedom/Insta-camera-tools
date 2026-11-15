@@ -41,19 +41,17 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.PlaylistPlay
 import androidx.compose.material.icons.rounded.Add
-import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Code
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Movie
-import androidx.compose.material.icons.rounded.PhotoCamera
 import androidx.compose.material.icons.rounded.RadioButtonChecked
 import androidx.compose.material.icons.rounded.RadioButtonUnchecked
 import androidx.compose.material.icons.rounded.SdCard
 import androidx.compose.material.icons.rounded.Settings
-import androidx.compose.material.icons.rounded.Videocam
+import androidx.compose.ui.res.painterResource
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -516,7 +514,7 @@ private fun ModelPicker(state: AppState) {
             ModelCard(
                 label = stringResource(option.labelRes),
                 detail = stringResource(option.detailRes),
-                icon = option.icon,
+                iconRes = option.iconRes,
                 selected = state.modelOverride == option.code,
                 onClick = { state.modelOverride = option.code }
             )
@@ -528,7 +526,7 @@ private class ModelOption(
     val code: String,
     val labelRes: Int,
     val detailRes: Int,
-    val icon: ImageVector
+    val iconRes: Int
 )
 
 private val MODEL_OPTIONS = listOf(
@@ -536,19 +534,19 @@ private val MODEL_OPTIONS = listOf(
         AppState.MODEL_AUTO,
         R.string.model_auto,
         R.string.model_auto_detail,
-        Icons.Rounded.AutoAwesome
+        R.drawable.ic_auto_camera
     ),
     ModelOption(
         AppState.MODEL_ACE_PRO_2,
         R.string.model_ace_pro_2,
         R.string.model_ace_pro_2_detail,
-        Icons.Rounded.PhotoCamera
+        R.drawable.ic_ace_pro2_camera
     ),
     ModelOption(
         AppState.MODEL_GO_ULTRA,
         R.string.model_go_ultra,
         R.string.model_go_ultra_detail,
-        Icons.Rounded.Videocam
+        R.drawable.ic_go_ultra_camera
     )
 )
 
@@ -556,7 +554,7 @@ private val MODEL_OPTIONS = listOf(
 private fun ModelCard(
     label: String,
     detail: String,
-    icon: ImageVector,
+    iconRes: Int,
     selected: Boolean,
     onClick: () -> Unit
 ) {
@@ -604,7 +602,7 @@ private fun ModelCard(
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    icon,
+                    painter = painterResource(id = iconRes),
                     contentDescription = null,
                     modifier = Modifier.size(24.dp),
                     tint = iconFg
