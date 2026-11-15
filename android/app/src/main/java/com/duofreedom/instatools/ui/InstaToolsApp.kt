@@ -13,11 +13,13 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -39,14 +41,19 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.PlaylistPlay
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Code
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Movie
+import androidx.compose.material.icons.rounded.PhotoCamera
+import androidx.compose.material.icons.rounded.RadioButtonChecked
+import androidx.compose.material.icons.rounded.RadioButtonUnchecked
 import androidx.compose.material.icons.rounded.SdCard
 import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.Videocam
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -65,7 +72,6 @@ import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
@@ -89,6 +95,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -103,6 +110,7 @@ import com.duofreedom.instatools.ui.theme.Motion
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+
 
 /** 底部导航的标题资源，顺序与图标一一对应。 */
 private val TAB_TITLES = listOf(R.string.tab_card, R.string.tab_queue, R.string.tab_settings)
@@ -401,6 +409,8 @@ private fun CardScreen(state: AppState, onPick: () -> Unit, modifier: Modifier =
     ) {
         item { CardHero(state, onPick) }
 
+        item { ModelPicker(state) }
+
         item {
             Text(
                 stringResource(R.string.preflight_title),
@@ -482,6 +492,147 @@ private fun CardHero(state: AppState, onPick: () -> Unit) {
                     )
                 )
             }
+        }
+    }
+}
+
+/** 机型卡片列表：等高、整卡可点、右侧单选圈 + 选中描边，首页直接换机型。 */
+@Composable
+private fun ModelPicker(state: AppState) {
+    Column(verticalArrangement = Arrangement.spacedBy(Gaps.x1)) {
+        Text(
+            stringResource(R.string.home_model_title),
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.padding(start = Gaps.x1)
+        )
+        Text(
+            stringResource(R.string.home_model_desc),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(start = Gaps.x1, bottom = Gaps.x1)
+        )
+        MODEL_OPTIONS.forEach { option ->
+            ModelCard(
+                label = stringResource(option.labelRes),
+                detail = stringResource(option.detailRes),
+                icon = option.icon,
+                selected = state.modelOverride == option.code,
+                onClick = { state.modelOverride = option.code }
+            )
+        }
+    }
+}
+
+private class ModelOption(
+    val code: String,
+    val labelRes: Int,
+    val detailRes: Int,
+    val icon: ImageVector
+)
+
+private val MODEL_OPTIONS = listOf(
+    ModelOption(
+        AppState.MODEL_AUTO,
+        R.string.model_auto,
+        R.string.model_auto_detail,
+        Icons.Rounded.AutoAwesome
+    ),
+    ModelOption(
+        AppState.MODEL_ACE_PRO_2,
+        R.string.model_ace_pro_2,
+        R.string.model_ace_pro_2_detail,
+        Icons.Rounded.PhotoCamera
+    ),
+    ModelOption(
+        AppState.MODEL_GO_ULTRA,
+        R.string.model_go_ultra,
+        R.string.model_go_ultra_detail,
+        Icons.Rounded.Videocam
+    )
+)
+
+@Composable
+private fun ModelCard(
+    label: String,
+    detail: String,
+    icon: ImageVector,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    val scheme = MaterialTheme.colorScheme
+    val container by animateColorAsState(
+        targetValue = if (selected) scheme.primaryContainer else scheme.surface,
+        animationSpec = Motion.effectsFast(),
+        label = "modelContainer"
+    )
+    val stroke by animateColorAsState(
+        targetValue = if (selected) scheme.primary else scheme.outlineVariant,
+        animationSpec = Motion.effectsFast(),
+        label = "modelStroke"
+    )
+    val iconBg by animateColorAsState(
+        targetValue = if (selected) scheme.primary else scheme.primaryContainer,
+        animationSpec = Motion.effectsFast(),
+        label = "modelIconBg"
+    )
+    val iconFg by animateColorAsState(
+        targetValue = if (selected) scheme.onPrimary else scheme.onPrimaryContainer,
+        animationSpec = Motion.effectsFast(),
+        label = "modelIconFg"
+    )
+    Card(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.large,
+        colors = CardDefaults.cardColors(
+            containerColor = container,
+            contentColor = scheme.onSurface
+        ),
+        border = BorderStroke(if (selected) 2.dp else 1.dp, stroke)
+    ) {
+        Row(
+            Modifier.padding(horizontal = Gaps.x2, vertical = Gaps.x2),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Gaps.x2)
+        ) {
+            Box(
+                Modifier
+                    .size(44.dp)
+                    .clip(MaterialTheme.shapes.medium)
+                    .background(iconBg),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    icon,
+                    contentDescription = null,
+                    modifier = Modifier.size(24.dp),
+                    tint = iconFg
+                )
+            }
+            Column(Modifier.weight(1f)) {
+                Text(
+                    label,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    detail,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = scheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            Icon(
+                imageVector = if (selected) Icons.Rounded.RadioButtonChecked
+                else Icons.Rounded.RadioButtonUnchecked,
+                contentDescription = null,
+                modifier = Modifier.size(24.dp),
+                tint = if (selected) scheme.primary else scheme.outline
+            )
         }
     }
 }
@@ -764,60 +915,6 @@ private fun SettingsScreen(
             .padding(horizontal = Gaps.x2, vertical = Gaps.x1),
         verticalArrangement = Arrangement.spacedBy(Gaps.x1)
     ) {
-        // 机型预设：与桌面端「输出与选项」里的同名下拉对应。
-        //   auto = 跟随卡里的真机原片（旧行为），选定机型 = 用该机型的预设参数。
-        Card(
-            Modifier.fillMaxWidth(),
-            shape = MaterialTheme.shapes.large,
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surface
-            )
-        ) {
-            Column(Modifier.padding(Gaps.x2)) {
-                Text(
-                    stringResource(R.string.settings_model_title),
-                    style = MaterialTheme.typography.titleSmall
-                )
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    stringResource(R.string.settings_model_desc),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(Modifier.height(8.dp))
-                val models = listOf(
-                    AppState.MODEL_AUTO to R.string.model_auto,
-                    AppState.MODEL_ACE_PRO_2 to R.string.model_ace_pro_2,
-                    AppState.MODEL_GO_ULTRA to R.string.model_go_ultra
-                )
-                models.forEach { (code, labelRes) ->
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .clickable { state.modelOverride = code }
-                            .padding(vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        // 整行可点，命中区域比单独点圆钮大得多。
-                        RadioButton(
-                            selected = state.modelOverride == code,
-                            onClick = { state.modelOverride = code }
-                        )
-                        Text(
-                            stringResource(labelRes),
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    }
-                }
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    stringResource(R.string.settings_model_hint),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-
         Card(
             Modifier.fillMaxWidth(),
             shape = MaterialTheme.shapes.large,

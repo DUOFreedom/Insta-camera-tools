@@ -1,5 +1,18 @@
 ## 1.3.0 — 2026-11-13
 
+### 新增（安卓首页机型切换卡片）
+
+机型选择从设置页搬到首页，做成等高、整卡可点的设备列表。用户给了一张 DJI 风格的参考截图：三张等高卡片、左图右文、主标题粗体副标题浅色小字、整卡可点。
+
+- `ui/InstaToolsApp.kt` 新增 `ModelPicker` / `ModelCard` / `ModelOption` 与 `MODEL_OPTIONS`，插在 `CardHero` 与预检区之间。每张卡片：44dp 圆角图标底 + 24dp 设备图标（`AutoAwesome` / `PhotoCamera` / `Videocam`）、主标题 titleMedium/SemiBold、副标题 bodySmall/onSurfaceVariant、右侧 24dp 单选圈。
+- 选中态靠四个 `animateColorAsState`（`Motion.effectsFast()`）：容器 `primaryContainer`、描边 `primary` 2dp（未选 1dp `outlineVariant`）、图标底 `primary`、图标前景 `onPrimary`。整张卡片用 `Card(onClick = …)`，点任何位置都能切；卡间用 `Gaps.x1` 留距。
+- 设置页删掉整张机型卡片（原 `RadioButton` 列表），现在首卡直接是编码器；`RadioButton` 的 import 也一并去掉。
+- 两套 `strings.xml`（各 132 键，键集合一致）：删 `settings_model_title` / `settings_model_desc` / `settings_model_hint`，新增 `home_model_title`、`home_model_desc`与三条 `model_*_detail`。副标题写的是真实差异：自动“从卡里的真机原片量出参数”、Ace Pro 2 “1080p60 · 双音轨 · LRV 用 H.264”、GO Ultra “1080p60 · 单音轨 · LRV 用 H.265”。
+
+**没改的部分**：`AppState.modelOverride` 的开跑时固化、`CAMERA_PRESETS` 三档参数、`PythonI18nTest.modelPresetCodesMatchPython()` 都原样，本轮只动了入口位置与外观。
+
+**验证**：`:app:compileReleaseKotlin --rerun-tasks` 零 error 零 warning；`:app:assembleRelease` + `:app:testReleaseUnitTest` BUILD SUCCESSFUL，IndexTest 7 skipped、PythonI18nTest 5、ConsentLogicTest 5、ImportCardStateTest 6，失败与错误均为 0；APK 75,319,622 B，`aapt2` 显示 `versionCode='15' versionName='1.3.0'`。**无真机**（`adb devices` 为空），选中态描边与弹性变色的实际手感未经眼睛验收。
+
 ### 清理（多余注释）
 
 按「默认不写注释、只留解释为什么与非显而易见约束」的既有约定，清了 14 个文件共 63 行注释，无代码改动。
