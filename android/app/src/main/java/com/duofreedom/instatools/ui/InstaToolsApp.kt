@@ -591,7 +591,7 @@ private fun ModelCard(
             Image(
                 painter = painterResource(id = iconRes),
                 contentDescription = null,
-                modifier = Modifier.size(44.dp),
+                modifier = Modifier.size(width = 60.dp, height = 44.dp),
                 contentScale = ContentScale.Fit
             )
             Column(Modifier.weight(1f)) {

@@ -1,5 +1,21 @@
 ﻿## 1.3.0 — 2026-11-13
 
+### 修复（Ace Pro 设备图被压窄）
+
+用户反馈「acepro 的图片比例不对，被压窄了」。问题不在 Compose 渲染——`Image` + `ContentScale.Fit` 本身保比例——而是图标文件在更早的一次处理里就被拉伸成了正方形。
+
+三张源图实测 alpha 内容框：`2641_2.png`（Ace Pro）1499×1077、宽高比 1.392；`314_4f871063-…png`（GO Ultra）843×652、1.293；`23088800_sn8.jpg`（Ace Pro 2，去白底后）230×160、1.438。都是横向机身。但磁盘上 Ace Pro 与 GO Ultra 两张的内容框当时已经是 126×126 正方形，横向机身被按正方形铺满，看上去就是变窄。
+
+- 三张图重做：按 alpha 内容框紧裁切后**按长边归一到 126，长宽比原样保留**，居中合成到 144×144 透明画布。结果内容分别 126×88（1.432）、126×90（1.400）、126×97（1.299），与源图比例一致。
+- 图片容器 `Modifier.size(44.dp)` → `Modifier.size(width = 60.dp, height = 44.dp)`：横向机身塞进 44dp 正方形只有 31–33dp 高，太小；60×44 下渲染约 60×43，三台机器高度接近、比例正常。
+
+验证：`:app:assembleRelease` + `:app:testReleaseUnitTest` BUILD SUCCESSFUL，`IndexTest` 7 skipped、`PythonI18nTest` 5、`ConsentLogicTest` 5、`ImportCardStateTest` 6，失败与错误均为 0。APK **75,376,431 B**，sha256 `e84a1e0688f4028c995bbbf5f54af54b41d8c62b2c7101fe8426ae3d5cbfc17f`，`aapt2` 显示 `versionCode='15' versionName='1.3.0'`。
+
+构建中 `mergeDexRelease` 报过一次 `classes2.dex: 另一个程序正在使用此文件，进程无法访问`，是上一次 gradle daemon 未退干净持有的句柄；`gradle --stop` 后删掉 `app/build/intermediates/dex/release` 重跑即通过。
+
+仍无真机（`adb devices` 为空），观感只靠本地 3× 密度合成预览（白卡、`primaryContainer` 选中底、2dp `primary` 描边、60×44 图标槽）核对。
+
+
 ### 调整（机型卡片按参考图对齐）
 
 用户再发一次参考图（DJI 的「设备选择」区）要求照它对齐。参考图里未选中的卡片右侧是空的，没有常驻单选圈，选中靠卡片底色与描边区分。
