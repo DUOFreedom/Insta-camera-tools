@@ -531,16 +531,16 @@ private class ModelOption(
 
 private val MODEL_OPTIONS = listOf(
     ModelOption(
-        AppState.MODEL_AUTO,
-        R.string.model_auto,
-        R.string.model_auto_detail,
-        R.drawable.ic_auto_camera
-    ),
-    ModelOption(
         AppState.MODEL_ACE_PRO_2,
         R.string.model_ace_pro_2,
         R.string.model_ace_pro_2_detail,
         R.drawable.ic_ace_pro2_camera
+    ),
+    ModelOption(
+        AppState.MODEL_ACE_PRO,
+        R.string.model_ace_pro,
+        R.string.model_ace_pro_detail,
+        R.drawable.ic_ace_pro_camera
     ),
     ModelOption(
         AppState.MODEL_GO_ULTRA,

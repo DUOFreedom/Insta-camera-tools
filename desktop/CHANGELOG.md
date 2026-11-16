@@ -1,4 +1,24 @@
-## 1.3.0 — 2026-11-13
+﻿## 1.3.0 — 2026-11-13
+
+### 变更（机型预设去掉「自动」，新增 Ace Pro 一代）
+
+首页机型卡片成型后，用户指出两件事：「自动」那一档没有意义（卡里有原片时本来就会优先用原片，选不选自动结果一样），并且他提供的前两张设备照分别是 Ace Pro 2 与 Ace Pro 一代。于是把预设表从 `auto / ace_pro_2 / go_ultra` 改成 `ace_pro_2 / ace_pro / go_ultra`，默认落到 `ace_pro_2`。
+
+- `desktop/core.py` 与 `android/app/src/main/python/insta_core.py` 的 `CAMERA_PRESETS` 同步删 `"auto"`、加 `"ace_pro"`（两处 `ast.literal_eval` 比对完全一致，键序 `ace_pro_2` → `ace_pro` → `go_ultra`）。
+- 预设应用分支原本是 `if model_override != "auto" and (not spec or not spec.get("video"))`——`auto` 这一档的语义靠「不等于 auto」表达；删掉 auto 键后直接写成 `if not spec or not spec.get("video")`，行为不变（卡里有原片实测值时不覆盖）。
+- `_build_spec_tasks` / `convert` / `batch_convert` / `import_with_inst` 的 `model_override` 默认值 `"auto"` → `"ace_pro_2"`（两端各四处）；`desktop/bridge.py` 与 `android_bridge.py` 的白名单同步为三档，`android_bridge.py` 里「auto 不校验」的外层条件去掉，四档全部走同一个白名单。
+- `desktop/qml/OutputOptionView.qml`：`models` 与 `modelLabels` 改成三档（不再用 `bridge.tr` 取「自动」译文），默认 `"ace_pro_2"`；说明文案改成「选机型后按预设参数生成；卡里有原片时仍以原片实测值为准」。
+- `desktop/i18n.py`：删「自动（从卡里原片量出）」条目，改写机型说明与欢迎窗里「机型不在列表里就选自动」那句（改成「选最接近的一档，或者放一对真机原片让程序量」），英文同步。`WelcomeDialog.qml` 里对应的 `bridge.tr(...)` 一并改。
+- 安卓 `AppState` 常量、`MODEL_OPTIONS`、两套 `strings.xml`（`model_auto*` 全删，新增 `model_ace_pro` / `model_ace_pro_detail`）与 `PythonI18nTest.modelPresetCodesMatchPython()` 的断言列表同步。
+- 设备图标按用户指认的对应关系重排：`23088800_sn8.jpg` → `ic_ace_pro2_camera.png`（Ace Pro 2）、`2641_2.png` → `ic_ace_pro_camera.png`（Ace Pro 一代）、`ic_go_ultra_camera.png` 不变；`ic_auto_camera.png` 删除。
+
+**Ace Pro 一代的参数没有实测依据。** 仓库里没有一代原片，也没有任何文档记过它的规格，因此 `ace_pro` 这一块目前是 `ace_pro_2` 的整块复制（1080p60、libx265/hvc1 main L153 gop16、双音轨 INS.AAC + INS.TimeCode、LRV 用 H.264 gop16），副标题也照实写成 1080p60，不写成估计值。拿到一代真机原片后只需改这一块并两端同步；`CAMERA_PRESETS` 上方留了两行注释说明这件事。预设只决定编码参数，inst 移植仍然要求卡里有模板。
+
+**测试**：`test_insta.py` 的键集合断言改为三档，原 `test_build_spec_tasks_auto_keeps_defaults` 改名 `test_build_spec_tasks_unknown_model_keeps_defaults`（用不存在的 `"nope"` 验证回落），预设应用测试补一段 `ace_pro`（断言主轨 `libx265`/`hvc1` 且结果与 `ace_pro_2` 相等）；`test_bridge_cancel.py` 与 `test_qml_bridge.py` 的假核心、白名单用例、默认值断言同步。`python -m pytest desktop/tests/test_insta.py -q` → 83 passed, 3 skipped；全量 → 262 passed, 3 skipped, 1 failed，唯一失败是已知 flaky 的 `test_star.py::test_open_author_page_minimizes_only_after_browser_shows_up`（单独跑 1 passed in 3.72s，全套并发时与后台线程抢 3 秒窗口）。
+
+**文档**：`README.md` / `README.en.md` 的机型预设表与安卓设置表去掉「自动」、改成三档，并补一段说明 Ace Pro 一代参数暂按二代生成。
+
+**产物**：`:app:assembleRelease` + `:app:testReleaseUnitTest` BUILD SUCCESSFUL；单测 `IndexTest` 7 skipped、`PythonI18nTest` 5、`ConsentLogicTest` 5、`ImportCardStateTest` 6，失败与错误均为 0；APK 75,359,977 B，sha256 `b8585d40…e112d5`，`aapt2` 显示 `versionCode='15' versionName='1.3.0'`。解包 `assets/chaquopy/app.imy` 里的 `insta_core.pyc`，字节层面 `ace_pro` 命中 6 次、`auto` 命中 0 次，确认打进去的是新预设表而不是源码目录那份。**仍无真机**（`adb devices` 为空）。
 
 ### 新增（安卓首页机型切换卡片）
 

@@ -367,7 +367,7 @@ Item {
 
                 Text {
                     width: parent.width
-                    text: bridge.tr("• 机型不在列表里就选「自动」，程序会从卡里的原片把参数量出来。")
+                    text: bridge.tr("• 机型不在列表里就选最接近的一档，或者放一对真机原片，程序会从卡里的原片把参数量出来。")
                     wrapMode: Text.Wrap
                     color: Theme.textSecondary
                     font.family: Theme.fontFamily

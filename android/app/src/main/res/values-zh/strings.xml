@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <!--
     简体中文（zh）。用 values-zh 而不是 values-zh-rCN：
     一份文件同时覆盖 zh-CN / zh-HK / zh-TW / zh-SG；繁体系用户看到简体中文，
@@ -8,7 +8,7 @@
 <resources>
     <!-- 应用名与副标题 -->
     <string name="app_name">影石相机工具</string>
-    <string name="app_subtitle">影石 Ace Pro 2 · 素材导入</string>
+    <string name="app_subtitle">影石 Ace Pro 2 &#183; 素材导入</string>
 
     <!-- 底部导航 -->
     <string name="tab_card">存储卡</string>
@@ -24,12 +24,12 @@
     <string name="preflight_index">索引文件</string>
     <string name="preflight_template">真机模板</string>
     <string name="preflight_template_name">模板：%1$s</string>
-    <string name="preflight_counts">VID %1$d 个 · LRV %2$d 个 · 可作模板 %3$d 对</string>
+    <string name="preflight_counts">VID %1$d 个 &#183; LRV %2$d 个 &#183; 可作模板 %3$d 对</string>
     <string name="preflight_need_template">卡里缺一对相机原生录制的 VID_/LRV_，缺它无法生成可识别的文件。先用相机录一小段。</string>
     <string name="preflight_index_error">索引读取失败：%1$s</string>
-    <string name="preflight_index_empty_meta">索引 %1$d 条，其中 %2$d 条 meta 为空——相机会显示 0KB 且打不开</string>
+    <string name="preflight_index_empty_meta">索引 %1$d 条，其中 %2$d 条 meta 为空&#8212;&#8212;相机会显示 0KB 且打不开</string>
     <string name="preflight_index_all_meta">索引 %1$d 条，全部带 meta</string>
-    <string name="card_how_it_works">手机通过 USB-C 读卡器挂载相机卡；导入时会在这里的三层条件都满足后执行：转码 → inst box 移植 → 索引登记 → 写回 DCIM\\Camera01。</string>
+    <string name="card_how_it_works">手机通过 USB-C 读卡器挂载相机卡；导入时会在这里的三层条件都满足后执行：转码 &#8594; inst box 移植 &#8594; 索引登记 &#8594; 写回 DCIM\\Camera01。</string>
     <string name="card_none_selected">未选择存储卡</string>
     <string name="label_storage_card">存储卡</string>
     <string name="card_read_failed">读取失败：%1$s</string>
@@ -38,7 +38,7 @@
     <string name="queue_pending_count">待导入（%1$d）</string>
     <string name="add_videos">添加视频</string>
     <string name="start_import">开始导入</string>
-    <string name="importing">导入中…</string>
+    <string name="importing">导入中&#8230;</string>
     <string name="need_card">请先选择存储卡</string>
     <string name="empty_queue">还没有添加视频\n支持从「文件」里多选，或从相册选</string>
     <string name="action_remove">移除</string>
@@ -51,30 +51,30 @@
     <string name="action_add_first">先添加视频</string>
     <string name="action_retry_import">重新导入</string>
     <string name="action_cancel_import">取消导入</string>
-    <string name="action_canceling">正在取消…</string>
+    <string name="action_canceling">正在取消&#8230;</string>
     <string name="import_failed_see_log">导入失败，详情见下方日志</string>
 
     <!-- 导入阶段状态（StageKind 的显示文案） -->
     <string name="status_idle">待开始</string>
-    <string name="status_detecting">检测中…</string>
+    <string name="status_detecting">检测中&#8230;</string>
     <string name="status_not_checked">未检测</string>
-    <string name="status_preparing">准备中…</string>
-    <string name="status_preparing_mirror">准备卡镜像（模板 + 索引）…</string>
+    <string name="status_preparing">准备中&#8230;</string>
+    <string name="status_preparing_mirror">准备卡镜像（模板 + 索引）&#8230;</string>
     <string name="status_item_read">第 %1$d/%2$d 条：读取源文件</string>
-    <string name="status_item_stage">第 %1$d/%2$d 条 · %3$s</string>
+    <string name="status_item_stage">第 %1$d/%2$d 条 &#183; %3$s</string>
     <string name="stage_label_transcode">转码</string>
     <string name="status_cancel_failed">取消失败：请重试</string>
     <string name="status_queue_empty">队列为空</string>
     <string name="status_no_card">请先选择相机存储卡</string>
     <string name="status_engine_unavailable">引擎不可用：找不到可执行的 libffmpeg.so</string>
-    <string name="status_canceled_writeback">已取消，写回已完成的部分…</string>
-    <string name="status_writeback">写回相机卡…</string>
+    <string name="status_canceled_writeback">已取消，写回已完成的部分&#8230;</string>
+    <string name="status_writeback">写回相机卡&#8230;</string>
     <string name="status_canceled">已取消</string>
     <string name="status_canceled_partial">已取消（已完成的 %1$d 条已写回卡）</string>
     <string name="status_all_done">全部完成</string>
     <string name="status_partial">部分完成（见下方明细）</string>
     <string name="status_failed">失败：%1$s</string>
-    <string name="result_inst_ok">inst 已移植 · 索引已登记</string>
+    <string name="result_inst_ok">inst 已移植 &#183; 索引已登记</string>
     <string name="summary_writeback_failed">写回失败：%1$s</string>
     <string name="summary_canceled_nothing">已取消，没有需要写回的条目</string>
     <string name="summary_written">已写回相机卡（%1$d 个文件 + 索引）</string>
@@ -115,7 +115,7 @@
     <!-- 首次启动协议 -->
     <string name="consent_read_failed">无法读取协议全文：%1$s</string>
     <string name="consent_summary">本应用的转码与索引处理全部在你的手机上本地完成，不收集、不上传任何数据。</string>
-    <string name="consent_points">开始使用前，请阅读并同意《使用协议与隐私政策》。要点：\n· 不申请任何危险权限\n· 唯一的联网行为是启动时查一次新版本（不下载、不上传）\n· 存储访问需你在系统目录选择器中亲自授权，随时可撤销\n· 导入会改写相机卡的索引文件，导入前建议备份 DCIM 目录\n· 请确保你对导入的视频内容拥有合法权利</string>
+    <string name="consent_points">开始使用前，请阅读并同意《使用协议与隐私政策》。要点：\n&#183; 不申请任何危险权限\n&#183; 唯一的联网行为是启动时查一次新版本（不下载、不上传）\n&#183; 存储访问需你在系统目录选择器中亲自授权，随时可撤销\n&#183; 导入会改写相机卡的索引文件，导入前建议备份 DCIM 目录\n&#183; 请确保你对导入的视频内容拥有合法权利</string>
     <string name="consent_checkbox">我已阅读并同意《使用协议与隐私政策》</string>
     <string name="consent_view_full">查看完整协议原文</string>
     <string name="consent_agree_continue">同意并继续</string>
@@ -130,25 +130,25 @@
     <string name="settings_encoder_current_auto">当前：自动（软件编码，识别最稳）</string>
     <string name="settings_encoder_diff_body">自动 = 软件编码（libx265 + libx264，与桌面端一致，相机识别最稳）。\n硬件 = MediaCodec 硬件编码，速度快很多，但关键帧间隔受系统限制只能 1 秒（相机要求 16 帧），若导入后相机不显示缩略图或无法识别，请切回「自动」。</string>
     <string name="home_model_title">机型</string>
-    <string name="home_model_desc">选定机型后按该机型的预设参数生成；自动 = 从卡里的真机原片量出。</string>
-    <string name="model_auto">自动</string>
-    <string name="model_auto_detail">从卡里的真机原片量出参数</string>
+    <string name="home_model_desc">选定机型后按该机型的预设参数生成。</string>
+    <string name="model_ace_pro">Ace Pro</string>
+    <string name="model_ace_pro_detail">1080p60 &#183; 双音轨 &#183; LRV 用 H.264</string>
     <string name="model_ace_pro_2">Ace Pro 2</string>
-    <string name="model_ace_pro_2_detail">1080p60 · 双音轨 · LRV 用 H.264</string>
+    <string name="model_ace_pro_2_detail">1080p60 &#183; 双音轨 &#183; LRV 用 H.264</string>
     <string name="model_go_ultra">GO Ultra</string>
-    <string name="model_go_ultra_detail">1080p60 · 单音轨 · LRV 用 H.265</string>
+    <string name="model_go_ultra_detail">1080p60 &#183; 单音轨 &#183; LRV 用 H.265</string>
     <string name="settings_register_index">登记相机索引</string>
     <string name="settings_register_index_desc">写入 DCIM 下的 fileinfo / editinfo，相册才会出现</string>
     <string name="settings_about">关于</string>
     <string name="settings_version">版本 %1$s</string>
     <string name="settings_ffmpeg">ffmpeg：%1$s</string>
     <string name="settings_import_core">导入核心：%1$s</string>
-    <string name="settings_built_in">已内置：选卡扫描与索引体检、aarch64 ffmpeg 7.1、内嵌 CPython 运行桌面端已验证的导入核心（转码 → inst box 移植 → 索引登记 → 写回相机卡）。</string>
+    <string name="settings_built_in">已内置：选卡扫描与索引体检、aarch64 ffmpeg 7.1、内嵌 CPython 运行桌面端已验证的导入核心（转码 &#8594; inst box 移植 &#8594; 索引登记 &#8594; 写回相机卡）。</string>
     <string name="settings_developer">开发者</string>
-    <string name="settings_developer_bili">B站 @铎DUOFreedom</string>
+    <string name="settings_developer_bili">B站 @&#38094;DUOFreedom</string>
     <string name="settings_source_code">源代码</string>
     <string name="settings_open_repo">在浏览器中打开源代码仓库</string>
-    <string name="settings_license">GPL-3.0 · 与桌面端同源</string>
+    <string name="settings_license">GPL-3.0 &#183; 与桌面端同源</string>
     <string name="settings_open_privacy">使用协议与隐私</string>
     <string name="settings_open_notices">开源合规声明</string>
     <string name="settings_permissions">权限：无危险权限。仅申请 INTERNET 用于启动时检查新版本（单次 GET，不下载、不上传、无遥测）；存储访问通过系统目录选择器按需授权，随时可撤销。</string>

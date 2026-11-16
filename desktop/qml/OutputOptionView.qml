@@ -12,7 +12,7 @@ Rectangle {
     property string sequenceHint: ""
     property string coverSummary: ""
     property string coverImage: ""
-    property string modelOverride: "auto"
+    property string modelOverride: "ace_pro_2"
 
     signal browseOutput()
     signal locateCard()
@@ -26,8 +26,8 @@ Rectangle {
     readonly property var encoderLabels: [bridge.tr("自动"), "AMD", "NVIDIA", "Intel",
                                           bridge.tr("软件 (CPU)")]
     readonly property string encoderLabel: encoderLabels[Math.max(0, encoderValues.indexOf(encoder))]
-    readonly property var models: ["auto", "ace_pro_2", "go_ultra"]
-    readonly property var modelLabels: [bridge.tr("自动（从卡里原片量出）"), "Ace Pro 2", "GO Ultra"]
+    readonly property var models: ["ace_pro_2", "ace_pro", "go_ultra"]
+    readonly property var modelLabels: ["Ace Pro 2", "Ace Pro", "GO Ultra"]
 
     // 标签列宽度按实际语言量：中文「机型」两个字 32 就够，英文 "Output folder" 要 90 多。
     // 写死 64 在英文界面会把标签挤到右边一列的文字上。
@@ -93,7 +93,7 @@ Rectangle {
             Text {
                 Layout.alignment: Qt.AlignVCenter
                 Layout.fillWidth: true
-                text: bridge.tr("选机型后按预设参数生成；选「自动」时若有原片仍优先用原片")
+                text: bridge.tr("选机型后按预设参数生成；卡里有原片时仍以原片实测值为准")
                 color: Theme.textSecondary
                 font.family: Theme.fontFamily
                 font.pixelSize: Theme.fontAuxSize

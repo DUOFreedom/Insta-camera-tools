@@ -1,4 +1,4 @@
-package com.duofreedom.instatools.engine
+﻿package com.duofreedom.instatools.engine
 
 import com.duofreedom.instatools.ui.AppState
 import org.junit.Assert.assertEquals
@@ -162,8 +162,8 @@ class PythonI18nTest {
         assertEquals(
             "Kotlin 的 MODEL_* 常量与 Python CAMERA_PRESETS 的键不一致",
             listOf(
-                AppState.MODEL_AUTO,
                 AppState.MODEL_ACE_PRO_2,
+                AppState.MODEL_ACE_PRO,
                 AppState.MODEL_GO_ULTRA,
             ).sorted(),
             keys,

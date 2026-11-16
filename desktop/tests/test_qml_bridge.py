@@ -882,11 +882,11 @@ def test_set_model_override_accepts_known_presets(bridge):
     assert bridge.modelOverride == "go_ultra"
     bridge.setModelOverride("ace_pro_2")
     assert bridge.modelOverride == "ace_pro_2"
+    bridge.setModelOverride("ace_pro")
+    assert bridge.modelOverride == "ace_pro"
     bridge.setModelOverride("nope")
-    assert bridge.modelOverride == "ace_pro_2", "非法值不该改动当前选择"
+    assert bridge.modelOverride == "ace_pro", "非法值不该改动当前选择"
     assert "nope" in bridge.lastError
-    bridge.setModelOverride("auto")
-    assert bridge.modelOverride == "auto"
 
 
 def test_run_forwards_model_override_into_core(bridge, tmp_path, monkeypatch):
@@ -919,9 +919,9 @@ def test_run_forwards_model_override_into_core(bridge, tmp_path, monkeypatch):
     assert seen == ["go_ultra"], f"core.convert 收到 {seen!r}"
 
     seen.clear()
-    bridge.setModelOverride("auto")
+    bridge.setModelOverride("ace_pro")
     bridge._run([str(src)], str(out), False, True, ("", "", "software"))
-    assert seen == ["auto"], seen
+    assert seen == ["ace_pro"], seen
 
 
 def test_output_view_model_dropdown_is_wired_to_bridge():

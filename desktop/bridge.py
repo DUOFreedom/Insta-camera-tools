@@ -134,7 +134,7 @@ class Bridge(QObject):
         self._hw = ""
         self._hw_checked = False
         self._seq_text = ""
-        self._model_override = "auto"  # "auto" / "ace_pro_2" / "go_ultra"
+        self._model_override = "ace_pro_2"  # "ace_pro_2" / "ace_pro" / "go_ultra"
         #   启动时只读一次 `consent` 的记录：看完这一版就不该再弹，
         #   所以不看文件就判断的事（比如界面刷新）不能重新读盘。
         self._welcome = consent.should_show()
@@ -460,13 +460,13 @@ class Bridge(QObject):
 
     @Property(str, notify=seqChanged)
     def modelOverride(self) -> str:
-        """当前选择的机型预设："auto" / "ace_pro_2" / "go_ultra"。"""
+        """当前选择的机型预设："ace_pro_2" / "ace_pro" / "go_ultra"。"""
         return self._model_override
 
     @Slot(str)
     def setModelOverride(self, value: str) -> None:
-        val = str(value or "auto")
-        if val not in ("auto", "ace_pro_2", "go_ultra"):
+        val = str(value or "ace_pro_2")
+        if val not in ("ace_pro_2", "ace_pro", "go_ultra"):
             self._set_error(i18n.t("未知机型预设: %s") % val)
             return
         if val == self._model_override:

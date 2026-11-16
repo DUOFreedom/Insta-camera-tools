@@ -1,4 +1,4 @@
-package com.duofreedom.instatools.ui
+﻿package com.duofreedom.instatools.ui
 
 import android.content.Context
 import android.net.Uri
@@ -108,12 +108,14 @@ class AppState(context: Context) {
         /**
          * 机型预设的稳定标识，必须与 Python 侧 `CAMERA_PRESETS` 的键一致。
          *
-         * auto      = 卡里有真机原片就按它量出参数（默认，与旧行为完全相同）
-         * ace_pro_2 = 按 Ace Pro 2 的预设参数生成
+         * ace_pro_2 = 按 Ace Pro 2 的预设参数生成（默认）
+         * ace_pro   = 按 Ace Pro 的预设参数生成
          * go_ultra  = 按 GO Ultra 的预设参数生成
+         *
+         * 卡里放有真机原片时，原片实测值优先于这三档预设。
          */
-        const val MODEL_AUTO = "auto"
         const val MODEL_ACE_PRO_2 = "ace_pro_2"
+        const val MODEL_ACE_PRO = "ace_pro"
         const val MODEL_GO_ULTRA = "go_ultra"
     }
 
@@ -156,13 +158,12 @@ class AppState(context: Context) {
     var encoder by mutableStateOf(ENCODER_AUTO)
 
     /**
-     * 机型预设，取值 [MODEL_AUTO] / [MODEL_ACE_PRO_2] / [MODEL_GO_ULTRA]。
+     * 机型预设，取值 [MODEL_ACE_PRO_2] / [MODEL_ACE_PRO] / [MODEL_GO_ULTRA]。
      *
-     * 选 auto 时参数从卡里的真机原片量出来（与旧版本行为完全一致）；
      * 选定机型则改用该机型的预设参数，不看卡里有什么。
      * 注意：`.inst` 移植仍然需要一对真机原片当模板，这里只影响编码参数。
      */
-    var modelOverride by mutableStateOf(MODEL_AUTO)
+    var modelOverride by mutableStateOf(MODEL_ACE_PRO_2)
 
     var registerIndex by mutableStateOf(true)
 

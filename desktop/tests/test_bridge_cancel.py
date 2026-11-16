@@ -33,7 +33,7 @@ class _FakeCore:
     __version__ = "test"
     CanceledError = ic.CanceledError
     # run_import 用它做机型白名单校验，真核心里有这张表。
-    CAMERA_PRESETS = {"auto": {"spec": None}, "ace_pro_2": {"spec": None},
+    CAMERA_PRESETS = {"ace_pro_2": {"spec": None}, "ace_pro": {"spec": None},
                       "go_ultra": {"spec": None}}
 
     def __init__(self, behaviour, template_ok=True):
@@ -57,7 +57,7 @@ class _FakeCore:
 
     def import_with_inst(self, source, card_root, template=None, log=None,
                          progress=None, cover=None, cancel=None,
-                         model_override="auto"):
+                         model_override="ace_pro_2"):
         self.seen_cancel = cancel
         self.seen_template = template
         self.seen_model = model_override
@@ -227,13 +227,13 @@ def test_run_import_forwards_model_override(bridge):
     assert fake.seen_model == "go_ultra"
 
 
-def test_run_import_defaults_to_auto(bridge):
-    """不传时保持旧行为：auto（跟着卡里的真机原片量参数）。"""
+def test_run_import_defaults_to_ace_pro_2(bridge):
+    """不传机型时用 Ace Pro 2 预设——界面已没有「自动」这一档。"""
     fake = bridge(lambda _cancel: _ok_result())
 
     br.run_import("in.mp4", "/card")
 
-    assert fake.seen_model == "auto"
+    assert fake.seen_model == "ace_pro_2"
 
 
 def test_run_import_rejects_unknown_model(bridge):
@@ -242,7 +242,7 @@ def test_run_import_rejects_unknown_model(bridge):
     静默回落到 auto 会让用户以为选了机型、其实没有。
     """
     fake = bridge(lambda _cancel: _ok_result())
-    fake.CAMERA_PRESETS = {"auto": {}, "ace_pro_2": {}, "go_ultra": {}}
+    fake.CAMERA_PRESETS = {"ace_pro_2": {}, "ace_pro": {}, "go_ultra": {}}
 
     out = json.loads(br.run_import("in.mp4", "/card", model_override="nope"))
 
@@ -253,11 +253,11 @@ def test_run_import_rejects_unknown_model(bridge):
 
 
 def test_run_import_accepts_known_models(bridge):
-    """白名单里的三个值必须都能过——包括 auto 不查表也不报错。"""
+    """白名单里的三个值必须都能过。"""
     fake = bridge(lambda _cancel: _ok_result())
-    fake.CAMERA_PRESETS = {"auto": {}, "ace_pro_2": {}, "go_ultra": {}}
+    fake.CAMERA_PRESETS = {"ace_pro_2": {}, "ace_pro": {}, "go_ultra": {}}
 
-    for code in ("auto", "ace_pro_2", "go_ultra"):
+    for code in ("ace_pro_2", "ace_pro", "go_ultra"):
         out = json.loads(br.run_import("in.mp4", "/card", model_override=code))
         assert out["ok"] is True, code
         assert fake.seen_model == code

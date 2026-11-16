@@ -1,4 +1,4 @@
-"""界面文案的中英双语文案表。
+﻿"""界面文案的中英双语文案表。
 
 键是中文原文，值是英文译文。查不到的键原样返回中文：漏译时界面显示中文，
 既不崩也不会露出内部键名，可以增量补齐。
@@ -216,10 +216,9 @@ EN_TEXT: dict[str, str] = {
         " — choosing it is roughly 1.5–2× faster (software stays the default, "
         "which is the path already verified on the camera).",
     "机型": "Camera model",
-    "选机型后按预设参数生成；选「自动」时若有原片仍优先用原片":
-        "Generation follows the preset of the selected model; with Automatic, "
-        "a native recording on the card still wins when one is found.",
-    "自动（从卡里原片量出）": "Automatic (measured from the card)",
+    "选机型后按预设参数生成；卡里有原片时仍以原片实测值为准":
+        "Generation follows the preset of the selected model; a native "
+        "recording on the card still wins when one is found.",
     "输出目录": "Output folder",
     "建议存储卡 DCIM\\Camera01": "Card's DCIM\\Camera01 recommended",
     "定位 SD 卡": "Locate the SD card",
@@ -522,9 +521,9 @@ EN_TEXT.update({
     "• 需要 ffmpeg。没装的话程序会在顶部提示，可以一键装到系统目录或程序目录。":
         "• ffmpeg is required. If it is missing, a banner at the top offers a "
         "one-click install into the system folder or the program folder.",
-    "• 机型不在列表里就选「自动」，程序会从卡里的原片把参数量出来。":
-        "• If your model is not in the list, pick Automatic — the parameters are "
-        "measured from the camera originals on the card.",
+    "• 机型不在列表里就选最接近的一档，或者放一对真机原片，程序会从卡里的原片把参数量出来。":
+        "• If your model is not in the list, pick the closest preset, or put a pair "
+        "of camera originals on the card and the parameters get measured from them.",
     "一个普通高中生": "A regular high school student",
     "这个工具最初只是不想每次手动折腾视频元数据。后来越补越多，桌面端、安卓端，还有现在这个欢迎页。":
         "This started as a way to stop hand-editing video metadata every time. It "

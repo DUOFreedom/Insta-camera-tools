@@ -1,4 +1,4 @@
-<p align="center">
+﻿<p align="center">
   <img src="desktop/assets/app.svg" width="112" alt="instatools">
 </p>
 
@@ -187,17 +187,19 @@ A missing translation falls back to the Chinese original — no crash, and no in
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| Model preset | `Auto` | `Auto` = measure the spec from the native clip on the card; `Ace Pro 2` / `GO Ultra` = use the built-in preset |
+| Model preset | `Ace Pro 2` | `Ace Pro 2` / `Ace Pro` / `GO Ultra` = use that model's built-in preset |
 
 Only needed when the card has no native clip to use as a template: the spec then comes from `CAMERA_PRESETS` instead of the template. When a native clip is present it always wins, preset or not.
 
-Desktop picks it under "Output & options", Android picks it on the settings screen; the two preset tables hold the same values. The preset only decides encoding parameters: the inst transplant still requires a native pair on the card as a template, so picking a model does not make transplant possible without one.
+Desktop picks it under "Output & options", Android picks it from the model cards on the home screen; the two preset tables hold the same values. The preset only decides encoding parameters: the inst transplant still requires a native pair on the card as a template, so picking a model does not make transplant possible without one.
+
+`Ace Pro` (first generation) has no measured original yet, so its preset currently generates the `Ace Pro 2` spec (1080p60, two audio tracks, LRV in H.264). Once a first-gen original is available, change that one block in `CAMERA_PRESETS` and mirror it on both sides.
 
 ### Android Settings
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| Model preset | `Auto` | Same as desktop, uses the built-in preset when the card has no native clip |
+| Model preset | `Ace Pro 2` | Picked from the model cards on the home screen; uses the built-in preset when the card has no native clip |
 | Encoder | `Auto` | `Auto` = software libx265 + libx264 |
 | Register camera index | On | Writes fileinfo / editinfo under DCIM, required for album appearance |
 

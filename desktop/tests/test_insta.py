@@ -1,4 +1,4 @@
-# 影石相机工具 --- 影石 Ace Pro 2 第三方视频导入工具
+﻿# 影石相机工具 --- 影石 Ace Pro 2 第三方视频导入工具
 # Copyright (C) 2026  影石相机工具 contributors
 #
 # This program is free software: you can redistribute it and/or modify
@@ -1516,7 +1516,7 @@ def test_camera_presets_match_android():
     assert desktop == android, (
         "CAMERA_PRESETS 在 desktop/core.py 与 android insta_core.py 里已漂移："
         "改一处必须同时改另一处")
-    assert set(desktop) == {"auto", "ace_pro_2", "go_ultra"}, set(desktop)
+    assert set(desktop) == {"ace_pro_2", "ace_pro", "go_ultra"}, set(desktop)
 
 
 def test_build_spec_tasks_applies_preset_without_template():
@@ -1545,6 +1545,15 @@ def test_build_spec_tasks_applies_preset_without_template():
     assert lrv_t[14] == 16, lrv_t[14]
     assert len(main_t[11]) == 2, "Ace Pro 2 有 INS.AAC + INS.TimeCode 两条音轨"
 
+    tasks, _extra = core._build_spec_tasks(
+        "a.mp4", "out", 0, "20240101_000000", False, None,
+        model_override="ace_pro")
+    main_t, lrv_t = tasks
+    assert main_t[2] == "libx265" and main_t[3] == "hvc1", main_t[:4]
+    assert tasks == core._build_spec_tasks(
+        "a.mp4", "out", 0, "20240101_000000", False, None,
+        model_override="ace_pro_2")[0], "Ace Pro 暂时沿用 Ace Pro 2 的参数"
+
 
 def test_build_spec_tasks_prefers_real_template_over_preset():
     """卡里有真机原片时，原片实测值优先于机型预设。
@@ -1562,11 +1571,11 @@ def test_build_spec_tasks_prefers_real_template_over_preset():
     assert tasks[1][14] == 7, "原片的预览 GOP 被预设覆盖了"
 
 
-def test_build_spec_tasks_auto_keeps_defaults():
-    """「自动」档不能因为加了预设就改变老行为。"""
+def test_build_spec_tasks_unknown_model_keeps_defaults():
+    """机型不在表里时退回默认值，不能 IndexError。"""
     tasks, _extra = core._build_spec_tasks(
         "a.mp4", "out", 0, "20240101_000000", False, None,
-        model_override="auto")
+        model_override="nope")
     assert tasks[0][4] == core.VID_WIDTH and tasks[0][5] == core.VID_HEIGHT
     assert tasks[0][14] == 0, "无模板无预设时 GOP 应为 0（跟随模板）"
 
