@@ -1,4 +1,4 @@
-"""QML 桥接层的回归测试：路径还原与关窗拦截。
+﻿"""QML 桥接层的回归测试：路径还原与关窗拦截。
 
 这两条都是「只有 QML 版才会踩、而且踩了没人知道」的缺陷：
 
@@ -924,20 +924,29 @@ def test_run_forwards_model_override_into_core(bridge, tmp_path, monkeypatch):
     assert seen == ["ace_pro"], seen
 
 
-def test_output_view_model_dropdown_is_wired_to_bridge():
-    """机型下拉必须双向接线。
+def test_output_view_model_picker_is_wired_to_bridge():
+    """机型二级界面必须双向接线。
 
-    只绑 `modelOverride` 不接 `onModelOverrideSelected`，选完只有 QML
-    本地属性变、bridge 仍是 auto；只接 signal 不绑属性，重开界面又跳回
-    「自动」。两个方向都要有。
+    只绑 `modelOverride` 不接面板的 `onSelected`，选完只有 QML 本地属性变、
+    bridge 还是旧值；只接信号不绑属性，重开面板又跳回默认那档。两个方向都要有，
+    而且按钮打开的必须是新面板，不能残留已经删掉的下拉。
     """
     main = open(os.path.join(DESKTOP, "qml", "main.qml"), encoding="utf-8").read()
-    start = main.index("OutputOptionView {")
-    block = main[start:main.index("onVerifyCard:", start)]
+    head = main.index("OutputOptionView {")
+    block = main[head:main.index("onVerifyCard:", head)]
     assert "modelOverride: bridge.modelOverride" in block, "缺 modelOverride 绑定"
-    assert "onModelOverrideSelected:" in block, "缺 onModelOverrideSelected 处理"
-    assert "bridge.setModelOverride(" in block, "处理函数里没调 setModelOverride"
+    assert "onModelPickerRequested: modelDialog.open = true" in block, "按钮没接到面板"
+
+    dialog = main[main.index("ModelPickerDialog {"):]
+    assert "onSelected: function (value)" in dialog, "面板没接 onSelected"
+    assert "bridge.setModelOverride(value)" in dialog, "选中后没调 setModelOverride"
 
     view = open(os.path.join(DESKTOP, "qml", "OutputOptionView.qml"),
                 encoding="utf-8").read()
-    assert "root.modelOverrideSelected(modelData)" in view, "下拉点击没有发射信号"
+    assert "root.modelPickerRequested()" in view, "机型按钮没有请求面板"
+    assert "id: modelPopover" not in view, "旧下拉还留着"
+
+    picker = open(os.path.join(DESKTOP, "qml", "ModelPickerDialog.qml"),
+                  encoding="utf-8").read()
+    assert "root.selected(value)" in picker, "面板点击没有发射 selected"
+    assert "bridge.modelOverride" in picker, "面板没读当前选择"

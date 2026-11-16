@@ -328,6 +328,7 @@ Window {
                         onModelOverrideSelected: function (value) {
                             bridge.setModelOverride(value)
                         }
+                        onModelPickerRequested: modelDialog.open = true
                         onBrowseOutput: outputDialog.open()
                         onLocateCard: bridge.locateCard()
                         onPickCover: coverDialog.open()
@@ -612,6 +613,14 @@ Window {
         onClosed: {
             welcome.open = false
             bridge.markWelcomeSeen()
+        }
+    }
+
+    ModelPickerDialog {
+        id: modelDialog
+        anchors.fill: parent
+        onSelected: function (value) {
+            bridge.setModelOverride(value)
         }
     }
 }

@@ -20,3 +20,4 @@ InputFileView InputFileView.qml
 OutputOptionView OutputOptionView.qml
 ProgressView ProgressView.qml
 ActionView ActionView.qml
+ModelPickerDialog ModelPickerDialog.qml

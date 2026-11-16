@@ -219,6 +219,10 @@ EN_TEXT: dict[str, str] = {
     "选机型后按预设参数生成；卡里有原片时仍以原片实测值为准":
         "Generation follows the preset of the selected model; a native "
         "recording on the card still wins when one is found.",
+    "选定机型后按该机型的预设参数生成。":
+        "Generation follows the preset of the chosen model.",
+    "1080p60 · 双音轨 · LRV 用 H.264": "1080p60 · two audio tracks · LRV in H.264",
+    "1080p60 · 单音轨 · LRV 用 H.265": "1080p60 · single audio track · LRV in H.265",
     "输出目录": "Output folder",
     "建议存储卡 DCIM\\Camera01": "Card's DCIM\\Camera01 recommended",
     "定位 SD 卡": "Locate the SD card",

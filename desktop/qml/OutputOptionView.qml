@@ -21,6 +21,7 @@ Rectangle {
     signal verifyCard()
     signal encoderSelected(string value)
     signal modelOverrideSelected(string value)
+    signal modelPickerRequested()
 
     readonly property var encoderValues: ["auto", "AMD", "NVIDIA", "Intel", "software"]
     readonly property var encoderLabels: [bridge.tr("自动"), "AMD", "NVIDIA", "Intel",
@@ -87,7 +88,7 @@ Rectangle {
                 text: root.modelLabels[root.models.indexOf(root.modelOverride)]
                 btnHeight: 36
                 accent: false
-                onClicked: modelPopover.open = !modelPopover.open
+                onClicked: root.modelPickerRequested()
             }
 
             Text {
@@ -323,56 +324,6 @@ Rectangle {
                     onClicked: {
                         root.encoder = modelData
                         encoderPopover.open = false
-                    }
-                }
-            }
-        }
-    }
-
-    Popover {
-        id: modelPopover
-        parent: modelTrigger
-        width: modelTrigger.width
-
-        readonly property real winY: modelTrigger.mapToItem(null, 0, 0).y
-        readonly property real winH: modelTrigger.Window ? modelTrigger.Window.height : 720
-        readonly property bool flipUp: winY + modelTrigger.height + 8 + height > winH
-
-        x: 0
-        y: flipUp ? -height - 4 : modelTrigger.height + 4
-
-        Repeater {
-            model: root.models
-
-            delegate: Item {
-                width: modelPopover.width - 16
-                height: 32
-
-                Rectangle {
-                    anchors.fill: parent
-                    radius: 8
-                    color: hover.containsMouse ? Theme.divider : "transparent"
-                }
-
-                Text {
-                    anchors.left: parent.left
-                    anchors.leftMargin: 8
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: root.modelLabels[index]
-                    color: Theme.textPrimary
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontBodySize
-                    font.weight: Font.Normal
-                }
-
-                MouseArea {
-                    id: hover
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    onClicked: {
-                        root.modelOverride = modelData
-                        modelPopover.open = false
-                        root.modelOverrideSelected(modelData)
                     }
                 }
             }

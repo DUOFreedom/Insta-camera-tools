@@ -1,5 +1,18 @@
 ﻿## 1.3.0 — 2026-11-13
 
+### 新增（桌面端机型选择改为卡片式二级界面）
+
+原来机型是一个 `AppButton` + 贴着的 `Popover` 下拉列表，只能看名字。安卓端首页改成了带设备正面照的卡片选择后，桌面这边同步：点按钮弹出独立的二级面板，一屏看到三台机器长什么样、各自生成什么规格。
+
+- 新增 `desktop/qml/ModelPickerDialog.qml`：遮罩 + 居中面板（`Math.min(420, parent.width - 48)` 宽，高度随内容），标题「机型」+ 说明「选定机型后按该机型的预设参数生成。」+ 三张 68px 高卡片。卡片左侧 60×44 放设备正面照（`Image.PreserveAspectFit`，不加 tint），中间机型名与规格，右侧 20dp 圆形勾选只在当前项出现。选中项用 `accent` 10% 透明底 + 2dp `accent` 描边，`ColorAnimation` 走 `Theme.durFast`。点遮罩或按 Esc 关闭，点卡片直接生效。
+- `desktop/qml/OutputOptionView.qml` 删掉原来的 `Popover { id: modelPopover }`（381 → 332 行），改发 `signal modelPickerRequested()`；编码器的 `encoderPopover` 不动。
+- `desktop/qml/main.qml` 接 `onModelPickerRequested: modelDialog.open = true`，并挂 `ModelPickerDialog`，选中后调 `bridge.setModelOverride(value)`；`qmldir` 登记新组件。
+- 三张设备图从安卓资源拷到 `desktop/assets/models/`（`ace_pro_2.png`、`ace_pro.png`、`go_ultra.png`，144×144 透明画布）。`instatools.spec` 的 `datas` 已整目录打包 `assets`，无需改打包脚本。
+- `desktop/i18n.py` 补三条英文：说明句与两条规格行。
+
+验证：`pytest desktop/tests/` → 262 passed, 3 skipped, 1 failed（唯一失败是既有的 flaky `test_open_author_page_minimizes_only_after_browser_shows_up`，单独跑通过）；`main.py --self-test` → `QML_OK roots=1`；离屏渲染截图确认三张卡片、选中态描边与勾选、设备图比例正常。桌面端 exe **未重建**（本轮只改 QML 与文案，下次打包一并带出）。
+
+
 ### 修复（Ace Pro 设备图被压窄）
 
 用户反馈「acepro 的图片比例不对，被压窄了」。问题不在 Compose 渲染——`Image` + `ContentScale.Fit` 本身保比例——而是图标文件在更早的一次处理里就被拉伸成了正方形。
