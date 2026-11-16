@@ -13,6 +13,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -48,8 +49,6 @@ import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Movie
-import androidx.compose.material.icons.rounded.RadioButtonChecked
-import androidx.compose.material.icons.rounded.RadioButtonUnchecked
 import androidx.compose.material.icons.rounded.SdCard
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.ui.res.painterResource
@@ -496,22 +495,25 @@ private fun CardHero(state: AppState, onPick: () -> Unit) {
     }
 }
 
-/** 机型卡片列表：等高、整卡可点、右侧单选圈 + 选中描边，首页直接换机型。 */
+/** 机型卡片列表：等高、整卡可点、选中卡片右侧打勾，首页直接换机型。 */
 @Composable
 private fun ModelPicker(state: AppState) {
-    Column(verticalArrangement = Arrangement.spacedBy(Gaps.x1)) {
-        Text(
-            stringResource(R.string.home_model_title),
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.padding(start = Gaps.x1)
-        )
-        Text(
-            stringResource(R.string.home_model_desc),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(start = Gaps.x1, bottom = Gaps.x1)
-        )
+    Column(verticalArrangement = Arrangement.spacedBy(Gaps.x2)) {
+        Column(
+            Modifier.padding(start = Gaps.x1),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Text(
+                stringResource(R.string.home_model_title),
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                stringResource(R.string.home_model_desc),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
         MODEL_OPTIONS.forEach { option ->
             ModelCard(
                 label = stringResource(option.labelRes),
@@ -608,12 +610,24 @@ private fun ModelCard(
                     overflow = TextOverflow.Ellipsis
                 )
             }
+            ModelSelectedMark(selected)
+        }
+    }
+}
+
+@Composable
+private fun ModelSelectedMark(selected: Boolean) {
+    Box(Modifier.size(24.dp), contentAlignment = Alignment.Center) {
+        AnimatedVisibility(
+            visible = selected,
+            enter = fadeIn(Motion.effectsFast()),
+            exit = fadeOut(Motion.effectsFast())
+        ) {
             Icon(
-                imageVector = if (selected) Icons.Rounded.RadioButtonChecked
-                else Icons.Rounded.RadioButtonUnchecked,
+                imageVector = Icons.Rounded.CheckCircle,
                 contentDescription = null,
-                modifier = Modifier.size(24.dp),
-                tint = if (selected) scheme.primary else scheme.outline
+                modifier = Modifier.size(22.dp),
+                tint = MaterialTheme.colorScheme.primary
             )
         }
     }

@@ -1,5 +1,17 @@
 ﻿## 1.3.0 — 2026-11-13
 
+### 调整（机型卡片按参考图对齐）
+
+用户再发一次参考图（DJI 的「设备选择」区）要求照它对齐。参考图里未选中的卡片右侧是空的，没有常驻单选圈，选中靠卡片底色与描边区分。
+
+- `ModelCard` 去掉常驻的 `RadioButtonChecked` / `RadioButtonUnchecked`，改成 `ModelSelectedMark`：外层固定 24dp `Box` 占位（避免选中态切换时标题行宽度跳动），里面 `AnimatedVisibility` + `fadeIn/fadeOut(Motion.effectsFast())` 只在选中时显示 22dp `CheckCircle`。
+- 三张设备图统一成 144×144 画布、内容长边占 126/144（≈87.5%），按 alpha bbox 裁切后居中合成。此前 Ace Pro 2 那张只有 96×96 且内容 89×66、另两张铺满 96×96，三台机器在列表里视觉大小不一致；现在统一按长边归一，比例差异只反映机身本身的宽高比。
+- 卡片间距 `Gaps.x1`（8dp）→ `Gaps.x2`（16dp），标题与说明之间固定 4dp，说明文字不再额外吃 `bottom` 内边距。整块从「标题、说明、三张卡都按 8dp 平铺」变成「标题组紧贴 + 卡片之间 16dp」。
+
+验证：`:app:compileReleaseKotlin` BUILD SUCCESSFUL（零 `e:` 零 `w:`）；`:app:assembleRelease` + `:app:testReleaseUnitTest` BUILD SUCCESSFUL，`IndexTest` 7 skipped、`PythonI18nTest` 5、`ConsentLogicTest` 5、`ImportCardStateTest` 6，失败与错误均为 0。APK **75,388,198 B**，sha256 `4666c131925d1157bfde990bd403cb9a291d721511593070094732288b871344`，`aapt2` 显示 `versionCode='15' versionName='1.3.0'`。
+
+无真机（`adb devices` 为空），列表的实际观感未在人眼验收；本地按 3× 密度合成了一张等价预览（白卡、`primaryContainer` 选中底、2dp `primary` 描边、44dp 图标、16dp 内边距）核对图标可辨与三张卡视觉重量一致。
+
 ### 修复（机型卡片设备图标显示不出来）
 
 用户反馈首页机型卡片左侧只剩一个纯色方块，看不到设备。两个原因叠加：
