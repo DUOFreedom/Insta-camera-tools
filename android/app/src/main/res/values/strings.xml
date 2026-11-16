@@ -114,12 +114,43 @@
 
     <!-- 首次启动协议 -->
     <string name="consent_read_failed">Cannot read the full policy: %1$s</string>
-    <string name="consent_summary">All transcoding and index handling happen locally on your phone. Nothing is collected and nothing is uploaded.</string>
-    <string name="consent_points">Before you start, please read and accept the Terms &amp; Privacy Policy. Highlights:\n&#183; No dangerous permissions are requested\n&#183; The only network use is one version check at launch (no download, no upload)\n&#183; Storage access is granted by you in the system folder picker and can be revoked at any time\n&#183; Import rewrites the index file on the camera card; back up DCIM before importing\n&#183; Make sure you have the legal right to the videos you import</string>
     <string name="consent_checkbox">I have read and accept the Terms &amp; Privacy Policy</string>
     <string name="consent_view_full">View the full policy</string>
     <string name="consent_agree_continue">Agree and continue</string>
     <string name="consent_decline">Decline and exit</string>
+
+    <!-- 欢迎窗三页 · 协议 / 须知 / 作者页 -->
+    <string name="welcome_step">Page %1$d of 3 · %2$s</string>
+    <string name="welcome_hint_legal">Please read before you start</string>
+    <string name="welcome_hint_notice">A few things that bite</string>
+    <string name="welcome_hint_author">About that star</string>
+    <string name="welcome_title_legal">Terms of use</string>
+    <string name="welcome_title_notice">Before you start</string>
+    <string name="welcome_title_author">About the author</string>
+    <string name="legal_p1">Released under GPL-3.0-or-later: the source is public, you may use, modify and redistribute it; redistributions must keep the same licence and say where the source came from.</string>
+    <string name="legal_p2">Only process footage you shot yourself or that you are authorised to handle. Repackaging someone else material as footage from your own camera is outside that authorisation.</string>
+    <string name="legal_p3">Importing rewrites the video container metadata and writes an index file onto the camera card. Writing to a card carries risk, so back up the originals first.</string>
+    <string name="legal_p4">The software is provided as is, without warranty of any kind. The author is not liable for damaged media, a camera that refuses the files, or lost data.</string>
+    <string name="legal_p5">Everything runs on your device. No video, path or personal data is uploaded. The only network access is a public GitHub API call when checking for updates.</string>
+    <string name="notice_p1">• Inst box transplant needs a pair of camera originals (VID_*.mp4 and LRV_*.lrv) on the card as a template. Without a template the output is a plain transcode and the camera will not accept it.</string>
+    <string name="notice_p2">• The model preset only sets encoding parameters (resolution, frame rate, codec, keyframe interval, audio track count). It does not remove the requirement above.</string>
+    <string name="notice_p3">• On the first run, walk through one short clip: import, put the card back, and check that the camera album plays it and can download it to the phone.</string>
+    <string name="notice_p4">• Do not unplug the card or the reader while converting. Closing the app midway asks you first whether to abort.</string>
+    <string name="notice_p5">• ffmpeg is required. When it is missing the app says so at the top and can install it into the system or app directory in one tap.</string>
+    <string name="notice_p6">• If your model is not listed, pick the closest preset, or drop a pair of camera originals on the card and the parameters are measured from them.</string>
+    <string name="welcome_prev">Back</string>
+    <string name="welcome_next">Next</string>
+    <string name="welcome_star">Star the repo</string>
+    <string name="welcome_skip">Skip</string>
+    <string name="author_subtitle">A high school developer with limited time; bug reports are welcome on GitHub Issues</string>
+    <string name="author_body">Since the author is a high school student, development time can be short. If you hit a bug, please open a GitHub issue. Thank you.</string>
+    <string name="author_bili">While you are here, give my Bilibili account a follow: https://m.bilibili.com/space/2140206381</string>
+    <string name="author_qq">QQ group: 440319270</string>
+    <string name="author_future">More camera models and more features are coming. Your stars and follows are what keep this going.</string>
+    <string name="author_star_ok">The repo has %1$d stars</string>
+    <string name="author_star_loading">Reading the star count…</string>
+    <string name="author_star_unknown">Could not read the star count (probably no network). It does not affect usage.</string>
+    <string name="author_open_repo">Open repo</string>
 
     <!-- 设置页 -->
     <string name="settings_encoder_title">Encoder</string>

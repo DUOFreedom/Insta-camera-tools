@@ -148,11 +148,7 @@ fun instatoolsApp() {
     BackHandler(enabled = !consented) { /* 拦截：必须先同意协议 */ }
 
     if (!consented) {
-        ConsentGate(
-            onOpenFullPolicy = {
-                docName = "privacy-policy.md"
-                docTitle = ctx.getString(R.string.doc_privacy_title)
-            },
+        WelcomeGate(
             onAgree = {
                 Consent.setAgreed(ctx)
                 consented = true

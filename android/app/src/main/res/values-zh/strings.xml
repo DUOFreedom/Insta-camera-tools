@@ -114,12 +114,43 @@
 
     <!-- 首次启动协议 -->
     <string name="consent_read_failed">无法读取协议全文：%1$s</string>
-    <string name="consent_summary">本应用的转码与索引处理全部在你的手机上本地完成，不收集、不上传任何数据。</string>
-    <string name="consent_points">开始使用前，请阅读并同意《使用协议与隐私政策》。要点：\n&#183; 不申请任何危险权限\n&#183; 唯一的联网行为是启动时查一次新版本（不下载、不上传）\n&#183; 存储访问需你在系统目录选择器中亲自授权，随时可撤销\n&#183; 导入会改写相机卡的索引文件，导入前建议备份 DCIM 目录\n&#183; 请确保你对导入的视频内容拥有合法权利</string>
     <string name="consent_checkbox">我已阅读并同意《使用协议与隐私政策》</string>
     <string name="consent_view_full">查看完整协议原文</string>
     <string name="consent_agree_continue">同意并继续</string>
     <string name="consent_decline">不同意，退出</string>
+
+    <!-- 欢迎窗三页 · 协议 / 须知 / 作者页 -->
+    <string name="welcome_step">第 %1$d 页 / 共 3 页 · %2$s</string>
+    <string name="welcome_hint_legal">用之前请先看完</string>
+    <string name="welcome_hint_notice">几条容易踩的坑</string>
+    <string name="welcome_hint_author">关于这颗 star</string>
+    <string name="welcome_title_legal">使用协议</string>
+    <string name="welcome_title_notice">使用须知</string>
+    <string name="welcome_title_author">作者主页</string>
+    <string name="legal_p1">本程序按 GPL-3.0-or-later 发布：源码公开，可以自由使用、修改、再分发；再分发时要保留同一许可证，并说明源码从哪拿。</string>
+    <string name="legal_p2">只处理本人拍的或已获授权的素材。把别人的片子包装成自己相机拍的不在授权范围内。</string>
+    <string name="legal_p3">导入会改写视频容器的元数据，并在相机卡里写索引文件。写卡有风险，动手之前请自己备份原片。</string>
+    <string name="legal_p4">软件按「现状」提供，不附带任何担保。素材损坏、相机不识别、数据丢失这类后果，作者不承担责任。</string>
+    <string name="legal_p5">程序完全在本机跑，不上传视频、路径或任何个人信息。只有检查更新的时候会访问 GitHub 的公开接口。</string>
+    <string name="notice_p1">• 移植 inst box 要求卡里已经有一对真机原片（VID_*.mp4 和 LRV_*.lrv）当模板。没有模板只能纯转码，相机不会认。</string>
+    <string name="notice_p2">• 机型预设只决定编码参数（分辨率、帧率、编码器、关键帧间隔、音轨数），不会解除上面那条。</string>
+    <string name="notice_p3">• 第一次用，先拿一段短片走一遍：导入，插回相机，看相册能不能播、能不能下载到手机。</string>
+    <string name="notice_p4">• 转换期间不要拔卡、不要拔读卡器。中途关窗程序会先问你要不要中止。</string>
+    <string name="notice_p5">• 需要 ffmpeg。没装的话程序会在顶部提示，可以一键装到系统目录或程序目录。</string>
+    <string name="notice_p6">• 机型不在列表里就选最接近的一档，或者放一对真机原片，程序会从卡里的原片把参数量出来。</string>
+    <string name="welcome_prev">上一步</string>
+    <string name="welcome_next">下一步</string>
+    <string name="welcome_star">去点个 star</string>
+    <string name="welcome_skip">算了</string>
+    <string name="author_subtitle">高中生开发者，时间有限，Bug 欢迎去 GitHub 提 Issue</string>
+    <string name="author_body">由于作者是高中生，开发时间可能不多，有 bug 请去 GitHub 提 Issue，感谢。</string>
+    <string name="author_bili">来都来了，关注一下我的哔哩哔哩账号再走吧：https://m.bilibili.com/space/2140206381</string>
+    <string name="author_qq">QQ 交流群：440319270</string>
+    <string name="author_future">作者后续会增加更多机型的适配和更多功能，你的 Star 和关注就是我更新下去的动力。</string>
+    <string name="author_star_ok">仓库现在有 %1$d 颗星</string>
+    <string name="author_star_loading">正在读星标数…</string>
+    <string name="author_star_unknown">没读到星标数（大概网络不通）。不影响使用。</string>
+    <string name="author_open_repo">打开仓库</string>
 
     <!-- 设置页 -->
     <string name="settings_encoder_title">编码器</string>

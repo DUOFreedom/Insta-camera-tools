@@ -1,5 +1,22 @@
 ﻿## 1.3.0 — 2026-11-13
 
+### 新增（安卓三页欢迎窗，与桌面端对齐）
+
+桌面端启动时的三页欢迎窗（使用协议 / 使用须知 / 作者主页）移植到安卓，替掉原来那个只有一个 `AlertDialog` 的协议弹窗。
+
+- 新增 `android/app/src/main/java/com/duofreedom/instatools/ui/WelcomeDialog.kt`：`WelcomeGate(onAgree, onDecline)` 用 `Dialog(usePlatformDefaultWidth = false, dismissOnBackPress = false, dismissOnClickOutside = false)` 承载，面板 `widthIn(max = 460.dp)`、`heightIn(max = 620.dp)`、圆角 16dp。三页共用标题 + 「第 N 页 / 共 3 页 · 提示」小字 + 可滚正文 + 三个圆点（当前页 16×6，其余 6×6）+ 分隔线 + 按钮行。
+- 第 0 页「使用协议」五段（GPL-3.0 与再分发、只处理授权素材、写卡有风险先备份、按现状提供不担保、全本机跑只查更新），底部是勾选框 + 「查看完整协议原文」+「不同意，退出」+「同意并继续」（未勾选时禁用）。**协议页不可退**，系统返回键由既有的 `BackHandler(enabled = !consented)` 拦住。
+- 第 1 页「使用须知」六条，按钮「上一步」/「下一步」。
+- 第 2 页「作者主页」：48dp 圆形头像（`res/drawable-nodpi/welcome_avatar.png`，取自桌面端 `desktop/assets/avatar.png`）+ DUOFreedom + 副标题 + 四段正文（B 站地址、QQ 群、后续计划）+ star 数一行。按钮「上一步」/「算了」/「去点个 star」；两者都算同意并关闭。
+- star 数由 `fetchStarCount()` 在 `Dispatchers.IO` 上请求 `https://api.github.com/repos/DUOFreedom/Insta-camera-tools` 读 `stargazers_count`，6 秒超时，读不到就显示「没读到星标数（大概网络不通）。不影响使用。」。只在进到第 2 页时拉一次。
+- `ui/Consent.kt` 只保留 `Consent` 对象（`agreed()` / `setAgreed()` / `POLICY_VERSION = "1.0"`），原来的 `ConsentGate` 整段删除——它已被 `WelcomeGate` 取代，留着就是两套协议界面。
+- `values/strings.xml` 与 `values-zh/strings.xml` 各增 31 键（`welcome_*`、`legal_p1..p5`、`notice_p1..p6`、`author_*`），并删掉不再被引用的 `consent_summary`、`consent_points`（内容已并入 `legal_p5` 与作者页）。两份文件键集合一致，各 161 条。
+- 英文文案全程避开撇号（aapt2 对 XML 里字面 `'` 报 `Invalid unicode escape sequence in string`）。
+
+**验证**：`:app:compileReleaseKotlin` 与 `:app:assembleRelease` BUILD SUCCESSFUL，零 `e:` 零 `w:`；`:app:testReleaseUnitTest` 全过（`IndexTest` 7 skipped、`PythonI18nTest` 5、`ConsentLogicTest` 5、`ImportCardStateTest` 6，failures=0 errors=0）。APK **75,401,691 B**，sha256 `12e3391d661c73a0cfb5118a8d58b68a7c6056c67bd939a970c0abfbc64d0dc2`，`aapt2 dump badging` → `versionCode='15' versionName='1.3.0'`、`minSdkVersion:'26'`、`targetSdkVersion:'35'`。
+
+**没有验证的部分**：`adb devices` 为空，没有真机也没有模拟器，三页的排版、圆点动效、头像裁切、star 数读取都只有编译与代码层面的确认，没有截图。装到机器上如果第 2 页正文太长，正文区是可滚动的（`Modifier.weight(1f, fill = false)` + `verticalScroll`），但按钮行会不会被挤出去没有实测。
+
 ### 新增（桌面端机型选择改为卡片式二级界面）
 
 原来机型是一个 `AppButton` + 贴着的 `Popover` 下拉列表，只能看名字。安卓端首页改成了带设备正面照的卡片选择后，桌面这边同步：点按钮弹出独立的二级面板，一屏看到三台机器长什么样、各自生成什么规格。
