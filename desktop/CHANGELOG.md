@@ -1,5 +1,15 @@
 ﻿## 1.3.0 — 2026-11-13
 
+### 修复（机型卡片设备图标显示不出来）
+
+用户反馈首页机型卡片左侧只剩一个纯色方块，看不到设备。两个原因叠加：
+
+- `InstaToolsApp.kt` 的 `ModelCard` 用 `Icon(painter = painterResource(...), tint = iconFg)` 画照片。`Icon` 会把任何 drawable 按 `tint` 单色化，照片直接被压成一块纯色，形状细节全丢。改成 `Image(painter = ..., contentScale = ContentScale.Fit)`，不加 `tint`。
+- `ic_ace_pro2_camera.png` 是从 `23088800_sn8.jpg` 放大来的，原图白底（四角 `#FFFFFF`，整图 24176 个纯白像素），在浅色卡片上等于和背景融成一片。重新处理：白底转透明（各通道 ≥246 直接 alpha=0，228–246 之间线性过渡防锯齿），按内容 bbox `(26,23,256,183)` 裁切后居中补边到正方形，再缩到 96×96。
+- 同时去掉图标外面那层 44dp 色块底（`Box + background(iconBg)`）与 `iconBg`/`iconFg` 两组 `animateColorAsState`——照片自带背景色，再套一层蓝底既挡图又脏。现在 `Image` 直接占 44dp，`ContentScale.Fit` 保比例。
+
+验证：`:app:compileReleaseKotlin` BUILD SUCCESSFUL（零 `e:` 零 `w:`）；`:app:assembleRelease` + `:app:testReleaseUnitTest` BUILD SUCCESSFUL，`IndexTest` 7 skipped、`PythonI18nTest` 5、`ConsentLogicTest` 5、`ImportCardStateTest` 6，失败与错误均为 0。APK **75,360,149 B**，sha256 `ef0e5e4523f2c9e1be9003ff2b6bec7a852f6f122c0e290e355bcc4baf756325`，`aapt2` 显示 `versionCode='15' versionName='1.3.0'`，已覆盖 `D:\instatools-artifacts\instatools-android-1.3.0.apk`。仍无真机（`adb devices` 为空），三张图在真实屏幕上的观感未经人眼验收，只在本地按 140px 放大合成预览确认过轮廓可辨。
+
 ### 产物（桌面 exe 重建，预设改动才真正进包）
 
 上一节改的是 `desktop/core.py`、`bridge.py`、`i18n.py` 与两个 QML，桌面端源码变了但 exe 还是 11-13 那份，所以重建了一次。
@@ -28,7 +38,7 @@
 
 **文档**：`README.md` / `README.en.md` 的机型预设表与安卓设置表去掉「自动」、改成三档，并补一段说明 Ace Pro 一代参数暂按二代生成。
 
-**产物**：`:app:assembleRelease` + `:app:testReleaseUnitTest` BUILD SUCCESSFUL；单测 `IndexTest` 7 skipped、`PythonI18nTest` 5、`ConsentLogicTest` 5、`ImportCardStateTest` 6，失败与错误均为 0；APK 75,359,977 B，sha256 `b8585d40…e112d5`，`aapt2` 显示 `versionCode='15' versionName='1.3.0'`。解包 `assets/chaquopy/app.imy` 里的 `insta_core.pyc`，字节层面 `ace_pro` 命中 6 次、`auto` 命中 0 次，确认打进去的是新预设表而不是源码目录那份。**仍无真机**（`adb devices` 为空）。
+**产物**：`:app:assembleRelease` + `:app:testReleaseUnitTest` BUILD SUCCESSFUL；单测 `IndexTest` 7 skipped、`PythonI18nTest` 5、`ConsentLogicTest` 5、`ImportCardStateTest` 6，失败与错误均为 0；APK 75,359,977 B，sha256 `b8585d40…e112d5`（该包随后因图标修复重建，见上节「修复（机型卡片设备图标显示不出来）」），`aapt2` 显示 `versionCode='15' versionName='1.3.0'`。解包 `assets/chaquopy/app.imy` 里的 `insta_core.pyc`，字节层面 `ace_pro` 命中 6 次、`auto` 命中 0 次，确认打进去的是新预设表而不是源码目录那份。**仍无真机**（`adb devices` 为空）。
 
 ### 新增（安卓首页机型切换卡片）
 

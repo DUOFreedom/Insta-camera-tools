@@ -20,6 +20,7 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -94,6 +95,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -569,16 +571,6 @@ private fun ModelCard(
         animationSpec = Motion.effectsFast(),
         label = "modelStroke"
     )
-    val iconBg by animateColorAsState(
-        targetValue = if (selected) scheme.primary else scheme.primaryContainer,
-        animationSpec = Motion.effectsFast(),
-        label = "modelIconBg"
-    )
-    val iconFg by animateColorAsState(
-        targetValue = if (selected) scheme.onPrimary else scheme.onPrimaryContainer,
-        animationSpec = Motion.effectsFast(),
-        label = "modelIconFg"
-    )
     Card(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
@@ -594,20 +586,12 @@ private fun ModelCard(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Gaps.x2)
         ) {
-            Box(
-                Modifier
-                    .size(44.dp)
-                    .clip(MaterialTheme.shapes.medium)
-                    .background(iconBg),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    painter = painterResource(id = iconRes),
-                    contentDescription = null,
-                    modifier = Modifier.size(24.dp),
-                    tint = iconFg
-                )
-            }
+            Image(
+                painter = painterResource(id = iconRes),
+                contentDescription = null,
+                modifier = Modifier.size(44.dp),
+                contentScale = ContentScale.Fit
+            )
             Column(Modifier.weight(1f)) {
                 Text(
                     label,
