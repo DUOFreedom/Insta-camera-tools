@@ -32,9 +32,9 @@ build_qml.bat
 
 | 文件 | 说明 |
 |------|------|
-| `desktop/dist/instatools.exe` | PySide6，单文件（约 79 MB） |
+| `desktop/dist/instatools.exe` | PySide6，单文件（约 80 MB） |
 
-> QML 版为 onefile 单文件：首次启动需把约 79 MB 内容解压到 `%TEMP%`，
+> QML 版为 onefile 单文件：首次启动需把约 80 MB 内容解压到 `%TEMP%`，
 > 冷启动约 2-5 秒，之后由系统缓存加速。若更在意启动速度，可把 spec 末尾改回
 > `COLLECT`（onedir）并分发整个文件夹。spec 里已排除 WebEngine / Quick3D 等
 > 用不到的 Qt6 模块以控制体积。

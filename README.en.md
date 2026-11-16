@@ -40,7 +40,7 @@ pip install -r requirements.txt
 
 `requirements.txt` only installs `PySide6>=6.5`. Requires Python 3.10+.
 
-Desktop entry: `desktop/run_qml.bat` (`pythonw main.py`), build script: `desktop/build_qml.bat` → `desktop/dist/instatools.exe` (single file, ~79 MB).
+Desktop entry: `desktop/run_qml.bat` (`pythonw main.py`), build script: `desktop/build_qml.bat` → `desktop/dist/instatools.exe` (single file, ~80 MB).
 
 <details>
 <summary>Desktop Feature Matrix</summary>

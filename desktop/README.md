@@ -43,7 +43,7 @@
 从 [**Releases**](../../releases/latest) 下载 `instatools.exe`，双击运行，无需安装。
 
 ```text
-instatools.exe   约 79 MB（单文件，免安装）
+instatools.exe   约 80 MB（单文件，免安装）
 ```
 
 > 校验方法：`Get-FileHash .\instatools.exe -Algorithm SHA256`

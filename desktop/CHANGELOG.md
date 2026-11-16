@@ -1,5 +1,15 @@
 ﻿## 1.3.0 — 2026-11-13
 
+### 产物（桌面 exe 重建，预设改动才真正进包）
+
+上一节改的是 `desktop/core.py`、`bridge.py`、`i18n.py` 与两个 QML，桌面端源码变了但 exe 还是 11-13 那份，所以重建了一次。
+
+- `python -m PyInstaller --noconfirm instatools.spec` → `desktop/dist/instatools.exe` **80,567,039 B**（上一版 80,567,564 B，只差 525 B，因为改的是常量与文案），sha256 `51325E3C7A4A6CD644CFDE3AF80B0716D9D62946D8CFA90B2ADE688BED2373BD`。
+- `INSTA_LANG=zh` 与 `INSTA_LANG=en` 下 `--self-test` 均输出 `QML_OK roots=1`、退出码 0。
+- 解包 `PYZ.pyz` 递归取字符串常量核对：`core` 里 `ace_pro` 命中 6 次、`go_ultra` 3 次、字面量 `"auto"` 命中 0 次；`bridge` 里 `ace_pro` 4 次、字面量 `"auto"` 0 次。确认打进包的是三档预设表，不是旧的四档。
+- 站点同步：`download/index.html` 的大小改 80,567,039 B、SHA256 换成新值；`changelog/index.html` 的产物表大小同步。`README.md` / `README.en.md` / `desktop/README.md` / `docs/BUILD.md` 里「约 79 MB」统一改成「约 80 MB」（早先写 79 是上一轮体积口径，实际已到 80）。
+- 交付副本 `D:\instatools-artifacts\instatools.exe` 已用新包覆盖，sha256 与仓库内一致。
+
 ### 变更（机型预设去掉「自动」，新增 Ace Pro 一代）
 
 首页机型卡片成型后，用户指出两件事：「自动」那一档没有意义（卡里有原片时本来就会优先用原片，选不选自动结果一样），并且他提供的前两张设备照分别是 Ace Pro 2 与 Ace Pro 一代。于是把预设表从 `auto / ace_pro_2 / go_ultra` 改成 `ace_pro_2 / ace_pro / go_ultra`，默认落到 `ace_pro_2`。
