@@ -215,6 +215,51 @@ def extract_udta(path: Path) -> bytes:
     return data[udta_offset : udta_offset + udta_size]
 
 
+def video_gop_uniform(path: Path) -> tuple[int, bool]:
+    """读出视频轨的关键帧间隔，并判断整片是否恒定。
+
+    video_gop() 只比较前两个 sync sample：硬件编码器若在场景切换处额外
+    插入 IDR，那一个值就代表不了整条码流。这里读全部 sync sample 判断。
+
+    返回 (间隔, 是否恒定)。间隔取第一个差值，语义与 video_gop 一致；
+    无法判断时返回 (0, False)，由调用方决定怎么处理。
+    """
+    data = Path(path).read_bytes()
+    try:
+        moov = next(box for box in mp4_boxes(data) if box[2] == b"moov")
+    except StopIteration:
+        return 0, False
+    for trak in (b for b in child_boxes(data, moov[0] + 8, moov[0] + moov[1]) if b[2] == b"trak"):
+        try:
+            mdia = direct_child(data, trak, b"mdia")
+            hdlr = direct_child(data, mdia, b"hdlr")
+        except ValueError:
+            continue
+        if data[hdlr[0] + 16:hdlr[0] + 20] != b"vide":
+            continue
+        try:
+            stbl = direct_child(data, direct_child(data, mdia, b"minf"), b"stbl")
+            stss = direct_child(data, stbl, b"stss")
+        except ValueError:
+            # 没有 stss = 每一帧都是关键帧，间隔恒为 1。
+            return 1, True
+        count = struct.unpack_from(">I", data, stss[0] + 12)[0]
+        if count < 2:
+            return 0, False
+        # entry_count 是 box 自称的值，可能与盒内实际长度不符（截断或损坏的
+        #   文件）。按 box 自身长度封顶，否则会越界读到后面的 box 而不报错。
+        room = (stss[1] - 16) // 4
+        if room < 2:
+            return 0, False
+        # 长片的全 I 帧码流可能有几万条，只校验前 4096 条：
+        #   场景切换插 IDR 通常出现在开头几秒，够用且不会把内存吃光。
+        n = min(count, 4096, room)
+        entries = struct.unpack_from(">%dI" % n, data, stss[0] + 16)
+        gaps = {int(b - a) for a, b in zip(entries, entries[1:])}
+        return int(entries[1] - entries[0]), len(gaps) == 1
+    return 0, False
+
+
 def media_stats(path: Path) -> dict[str, int]:
     command = [
         _tool("ffprobe"), "-v", "error", "-show_entries",

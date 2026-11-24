@@ -187,6 +187,13 @@ def test_refresh_ignores_second_call_while_loading(bridge, monkeypatch):
 def test_open_author_page_opens_and_marks(bridge, monkeypatch):
     seen = []
     monkeypatch.setattr(bridge, "_open_url", lambda url: seen.append(url) or True)
+    #  openAuthorPage() 会起一个后台线程盯 3.5 秒等浏览器窗口。这条用例只关心
+    #  「打开 + 落盘」，线程留着会活到后面的用例里，把别人 patch 的 _browser_windows
+    #  序列先吃掉一个，于是 test_open_author_page_minimizes_* 偶发失败。这里把线程体
+    #  换成空操作：线程照旧会起，但一次都不查窗口，立刻结束。
+    monkeypatch.setattr(
+        sys.modules["bridge"].Bridge, "_watch_browser",
+        lambda self, before: None)
 
     assert bridge.openAuthorPage() is True
     assert seen == [bridge.authorUrl]
@@ -367,6 +374,9 @@ def test_open_author_page_minimizes_only_after_browser_shows_up(bridge, monkeypa
     收主界面，会把用户丢在空桌面上。
     """
     bridge_mod = sys.modules["bridge"]
+    # 不挡 _open_url 就会真的 os.startfile，每跑一次测试弹一个浏览器窗口。
+    # 这条用例只关心「窗口起来之后」的时序，打开动作本身用桩。
+    monkeypatch.setattr(bridge, "_open_url", lambda _url: True)
     # 第一次是点之前的快照（只有一个本来就是 Electron 的窗口），之后多出一个，
     # 只有「新增句柄」才算浏览器真的起来了。
     seq = [({1},), ({1, 2},)]
@@ -391,6 +401,8 @@ def test_open_author_page_minimizes_only_after_browser_shows_up(bridge, monkeypa
 def test_open_author_page_reports_missed_browser(bridge, monkeypatch):
     """一个浏览器窗口都没有的时候要说清楚，别让主界面自己收起来。"""
     bridge_mod = sys.modules["bridge"]
+    # 同上：别让这条用例真的去开浏览器。
+    monkeypatch.setattr(bridge, "_open_url", lambda _url: True)
     # 句柄集合一直没变：系统里那些 Chrome_WidgetWin_1 都是别人的 Electron 窗口。
     monkeypatch.setattr(bridge_mod, "_browser_windows", lambda: {1})
     monkeypatch.setattr(bridge_mod, "BROWSER_WATCH_SECONDS", 0.2)

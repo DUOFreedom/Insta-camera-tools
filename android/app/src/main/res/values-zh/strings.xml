@@ -157,9 +157,9 @@
     <string name="encoder_auto">自动</string>
     <string name="encoder_hardware">硬件</string>
     <string name="settings_encoder_diff_title">两种编码器的区别</string>
-    <string name="settings_encoder_current_hw">当前：硬件（快，但关键帧间隔受限）</string>
+    <string name="settings_encoder_current_hw">当前：硬件（快，关键帧间隔可能对不上模板）</string>
     <string name="settings_encoder_current_auto">当前：自动（软件编码，识别最稳）</string>
-    <string name="settings_encoder_diff_body">自动 = 软件编码（libx265 + libx264，与桌面端一致，相机识别最稳）。\n硬件 = MediaCodec 硬件编码，速度快很多，但关键帧间隔受系统限制只能 1 秒（相机要求 16 帧），若导入后相机不显示缩略图或无法识别，请切回「自动」。</string>
+    <string name="settings_encoder_diff_body">自动 = 软件编码（libx265 + libx264，与桌面端一致，相机识别最稳）。\n硬件 = MediaCodec 硬件编码，速度快很多，但关键帧间隔只能是整数秒，达不到 Ace Pro 2 要求的 16 帧。编码完会量一遍实际间隔：不恒定（厂商编码器在场景切换额外插 IDR）就整条改软编重跑，这条片子会连着吃两遍编码时间；恒定但和模板不同只提示、不重跑。相机不显示缩略图就切回「自动」。</string>
     <string name="home_model_title">机型</string>
     <string name="home_model_desc">选定机型后按该机型的预设参数生成。</string>
     <string name="model_ace_pro">Ace Pro</string>

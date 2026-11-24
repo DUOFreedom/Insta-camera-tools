@@ -120,7 +120,8 @@ def run_import(source, card_root, callback=None, cover=None, prefer_hardware=Fal
     source            已暂存到本地的源视频
     card_root         镜像卡根（内含 DCIM/Camera01 + 索引 + 一对真机模板）
     callback          Kotlin 对象，含 onProgress(frac:float, text:str) / onLog(text:str)
-    prefer_hardware   True = 优先 MediaCodec 硬件编码（快，但关键帧间隔只能 1 秒）；
+    prefer_hardware   True = 优先 MediaCodec 硬件编码（快，但关键帧间隔只能整数秒，
+                      达不到 Ace Pro 2 要求的 16 帧；产出后会实测，不恒定自动回退软编）；
                       False = libx265/libx264 软件编码（与桌面端一致，相机识别最稳）
     cancel            可选 threading.Event；由 new_cancel_event() 创建、Kotlin 侧置位。
                       置位后 ffmpeg 子进程会被 kill，返回的 JSON 带 canceled=True。

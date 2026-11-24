@@ -741,6 +741,41 @@ def test_video_gop_returns_one_without_stss(tmp_path):
     assert tf.video_gop(p) == 1
 
 
+def test_video_gop_uniform_true_when_all_gaps_equal(tmp_path):
+    """整片间隔一致时 uniform=True，间隔与 video_gop 同值。"""
+    p = _make_gop_mp4(tmp_path, [1, 121, 241, 361])
+    assert tf.video_gop_uniform(p) == (120, True)
+
+
+def test_video_gop_uniform_false_when_encoder_inserts_extra_idr(tmp_path):
+    """厂商编码器在场景切换处插 IDR 时，间隔不恒定，必须报 False。"""
+    # 前段 1 秒一个关键帧，场景切换后变成 2 秒一个 —— 这正是硬编的典型产物。
+    p = _make_gop_mp4(tmp_path, [1, 61, 121, 241])
+    gop, uniform = tf.video_gop_uniform(p)
+    assert gop == 60
+    assert uniform is False
+
+
+def test_video_gop_uniform_falls_back_to_video_gop_when_unknown(tmp_path):
+    """量不出来时返回 (0, False)，交给调用方决定，不能谎报恒定。"""
+    assert tf.video_gop_uniform(_make_gop_mp4(tmp_path, [1])) == (0, False)
+
+
+def test_video_gop_uniform_without_stss_is_constant_one(tmp_path):
+    """没有 stss = 每帧都是关键帧，间隔恒为 1，属于恒定。"""
+    ftyp = struct.pack(">I4s4s", 16, b"ftyp", b"isom") + b"\x00\x00\x02\x00"
+    stbl = struct.pack(">I4s", 8, b"stbl")
+    minf = struct.pack(">I4s", 8 + len(stbl), b"minf") + stbl
+    hdlr_body = b"\x00" * 8 + b"vide" + b"\x00" * 12
+    hdlr = struct.pack(">I4s", 8 + len(hdlr_body), b"hdlr") + hdlr_body
+    mdia = struct.pack(">I4s", 8 + len(hdlr) + len(minf), b"mdia") + hdlr + minf
+    trak = struct.pack(">I4s", 8 + len(mdia), b"trak") + mdia
+    moov = struct.pack(">I4s", 8 + len(trak), b"moov") + trak
+    p = tmp_path / "all_i_uniform.mp4"
+    p.write_bytes(ftyp + moov)
+    assert tf.video_gop_uniform(p) == (1, True)
+
+
 def test_camera_udta_writes_real_gop_into_amba(tmp_path):
     """传了 gop 就必须原样写进 AMBA[53]，而不是写死 16。"""
     template = _make_template(tmp_path)
@@ -1209,7 +1244,7 @@ def test_rewrap_and_transplant_copies_do_not_drift():
          ("visual_entry", "filter_avc1_children")),
         ("shared/instbox/inst_transplant.py",
          "android/app/src/main/python/insta360_tf_import.py",
-         ("tailor_metadata", "video_profile")),
+         ("tailor_metadata", "video_profile", "video_gop_uniform")),
     ]
     repo = os.path.dirname(SHARED)
     drifted = []

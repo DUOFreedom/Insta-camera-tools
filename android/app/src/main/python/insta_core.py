@@ -324,7 +324,8 @@ def ffmpeg_install_dir() -> str:
 #     与桌面端验证过的流水线完全一致，输出参数可精确控制，相机识别最可靠。
 #   - 桌面端才使用硬件编码器（AMF/NVENC/QSV）加速。
 #   - MediaCodec 硬件编码不参与默认路径：它无法精确控制 GOP/SEI/色彩元数据，
-#     且各机型行为不一，是此前一连串 bug 的来源。
+#     且各机型行为不一，是此前一连串 bug 的来源。仅在用户显式选「硬件」时启用，
+#     且产出后会用 _gop_uniform_of() 校验实际关键帧间隔，见 _run_one 里的回退块。
 _HW_ENCODERS = [
     ("hevc_amf", "h264_amf", "AMD"),
     ("hevc_nvenc", "h264_nvenc", "NVIDIA"),
@@ -332,9 +333,10 @@ _HW_ENCODERS = [
 ]
 
 # Android MediaCodec 硬件编码器：仅在用户显式开启「硬件编码」时使用。
-#   ffmpeg 会算 gop = round(g / fps)，所以拿不到相机要求的 16 帧密集关键帧
-#   （30fps 下最小 1 秒 = 30 帧）。输出参数其余部分（profile/level/色彩/无 B 帧）
-#   可控。若相机不认，请切回「自动」用软件编码。
+#   mediacodecenc.c 里 gop = round(gop_size / fps) 且 i-frame-interval 只收整数秒，
+#   所以 -g 16 在 60fps 下退化成 1 秒（60 帧），拿不到相机要求的密集关键帧。
+#   输出参数其余部分（profile/level/色彩/无 B 帧）可控。
+#   产出后会实测关键帧间隔：不恒定 → 自动回退软编重跑；恒定但 ≠ 模板 → 只告警。
 _ANDROID_HW_ENCODERS = [
     ("hevc_mediacodec", "h264_mediacodec", "MediaCodec"),
 ]
@@ -657,6 +659,20 @@ def _gop_of(filepath: str) -> int:
         return int(tf.video_gop(filepath))
     except Exception:  # noqa: BLE001
         return 0
+
+
+def _gop_uniform_of(filepath: str) -> tuple[int, bool]:
+    """量出关键帧间隔并判断整片是否恒定；量不出来返回 (0, False)。
+
+    AMBA[53] 只能写一个 GOP 值，相机按它抽帧。硬件编码器在场景切换处
+    额外插 IDR 时，整片的实际间隔就不止一个值，写进去的那个必然有偏差。
+    """
+    try:
+        tf, _ = _load_inst_modules()
+        gop, uniform = tf.video_gop_uniform(filepath)
+        return int(gop), bool(uniform)
+    except Exception:  # noqa: BLE001
+        return 0, False
 
 
 def analyze_native(filepath: str) -> dict:
@@ -1394,6 +1410,49 @@ def convert(input_path: str, output_dir: str, start_number: int | None = None,
                         cancel if cancel_evt is None else cancel_evt,
                         procs, procs_lock)
 
+        # 是否已经因为硬编失败回退过软编。回退过就不再校验关键帧间隔：
+        #   dst 已经是 libx265/libx264 写的，GOP 是精确帧数，再读一遍整个文件
+        #   只是白花 IO；而且拿软编产物去判「硬编产物不合格」会把日志写反。
+        sw_retried = False
+
+        def _run_sw_retry():
+            """用 libx265/libx264 重跑本任务，覆盖已有的半成品。
+
+            硬编失败、或硬编产物关键帧间隔不恒定，都走这里。
+            """
+            nonlocal sw_retried
+            sw_retried = True
+            fallback_vc = "libx265" if ("265" in str(vc) or "hevc" in str(vc)) else "libx264"
+            fallback_tag = "hvc1" if fallback_vc == "libx265" else "avc1"
+            if is_lrv:
+                enc_params = (f"keyint={keyint}:min-keyint={keyint}:"
+                              f"scenecut=0:bframes=0")
+            else:
+                enc_params = (f"keyint={keyint}:min-keyint={keyint}:"
+                              f"scenecut=0:bframes=0:range=full:info=0")
+            cmd_sw = _build_transcode_cmd(input_path, dst, fallback_vc,
+                                          fallback_tag, vf, enc_params,
+                                          vh, ve, audio, cr,
+                                          src_audio_count,
+                                          is_lrv=is_lrv, fps=fps,
+                                          level=level, gop=keyint)
+            try:
+                _exec(cmd_sw)
+            except CanceledError:
+                # 软编阶段被取消同样不是编码器故障，别记进 first_error，
+                #   否则会顶掉兄弟任务真实的 ffmpeg 报错。
+                raise
+            except BaseException as _e2:
+                # 重跑靠 -y 覆盖，失败时 dst 是被截断的半成品。删掉它，
+                #   别在输出目录里留一个没注入 udta/inst 的坏 mp4。
+                try:
+                    if os.path.exists(dst):
+                        os.remove(dst)
+                except OSError as rm_err:
+                    say(f"[回退] 清理失败产物出错（{rm_err}）")
+                _fail(_e2)
+                raise
+
         def _run_transcode(cmd_builder, defer_fail: bool = False):
             """执行一次转码；MediaCodec 硬件【编码】失败时回退软件编码。
 
@@ -1411,29 +1470,7 @@ def convert(input_path: str, output_dir: str, start_number: int | None = None,
                 # 16 帧密集关键帧；失败时用 libx265/libx264 软编重试。
                 if "mediacodec" in str(vc):
                     say(f"[回退] {vc} 编码失败（{e}），改用软件编码重试")
-                    fallback_vc = "libx265" if ("265" in str(vc) or "hevc" in str(vc)) else "libx264"
-                    fallback_tag = "hvc1" if fallback_vc == "libx265" else "avc1"
-                    if is_lrv:
-                        enc_params = (f"keyint={keyint}:min-keyint={keyint}:"
-                                      f"scenecut=0:bframes=0")
-                    else:
-                        enc_params = (f"keyint={keyint}:min-keyint={keyint}:"
-                                      f"scenecut=0:bframes=0:range=full:info=0")
-                    cmd_sw = _build_transcode_cmd(input_path, dst, fallback_vc,
-                                                  fallback_tag, vf, enc_params,
-                                                  vh, ve, audio, cr,
-                                                  src_audio_count,
-                                                  is_lrv=is_lrv, fps=fps,
-                                                  level=level, gop=keyint)
-                    try:
-                        _exec(cmd_sw)
-                    except CanceledError:
-                        # 软编阶段被取消同样不是编码器故障，别记进 first_error，
-                        #   否则会顶掉兄弟任务真实的 ffmpeg 报错。
-                        raise
-                    except BaseException as _e2:
-                        _fail(_e2)
-                        raise
+                    _run_sw_retry()
                 else:
                     if defer_fail:
                         # 只把错误抛给调用方，不在这里记 first_error：
@@ -1465,6 +1502,34 @@ def convert(input_path: str, output_dir: str, start_number: int | None = None,
             mark_hw_decoder_failed(hwdec)
             say(f"[回退] {hwdec} 硬件解码失败（{e}），本次改用软件解码重试")
             _run_transcode(lambda: _build_cmd(""))
+        # 硬件编码的 i-frame-interval 只能整数秒，且不认 -sc_threshold 0：
+        #   场景切换时厂商编码器可能额外插 IDR，整片间隔就不止一个值，
+        #   而 AMBA[53] 只能写一个数。写进去的值对不上，相机抽帧就会失败
+        #   （表现为有文件但缩略图/播放异常）。量一下，不恒定就改软编重跑。
+        # 只校验真正由硬编写出来的产物：vc 以 lib 开头说明本来就是软编，
+        #   sw_retried 说明硬编已经失败过、dst 是软编重跑的结果。
+        if hw and not str(vc).startswith("lib") and not sw_retried:
+            if cancel is not None and cancel.is_set():
+                # 校验要整文件读一遍，取消了就别再花这个时间。
+                raise CanceledError(i18n.t("已取消"))
+            _real_gop, _uniform = _gop_uniform_of(dst)
+            if not _real_gop:
+                # 量不出来（只有一个关键帧，或文件解析不了）。不能当成通过：
+                #   AMBA[53] 随后会按 16 写入，与真实码流对不对得上无从判断。
+                say(f"[警告] 无法量出 {vc} 产出的关键帧间隔，AMBA[53] 会按 16 "
+                    f"写入，相机是否接受未经验证")
+            elif not _uniform:
+                say(f"[回退] {vc} 产出的关键帧间隔不恒定（首个间隔 {_real_gop}，"
+                    f"模板要求 {keyint}），改用软件编码重试")
+                _run_sw_retry()
+            elif _real_gop != keyint:
+                # 间隔恒定但与模板不同：ace_pro_2 要求 16 帧，MediaCodec 只能给
+                # 1 秒（60fps 下 60 帧）。AMBA[53] 写的是实测值，文件本身自洽，
+                # 但相机是否接受非模板间隔没有验证过。整数秒是 MediaCodec 的接口
+                # 约束，改不了，只能如实告诉用户，想完全对齐就用「自动」软编。
+                say(f"[警告] {vc} 产出的关键帧间隔为 {_real_gop}，与模板要求的 "
+                    f"{keyint} 不同（AMBA[53] 将写入实测值 {_real_gop}）。"
+                    f"需要与模板完全一致请把编码器切回「自动」")
         if cancel is not None and cancel.is_set():
             raise CanceledError(i18n.t("已取消"))
         with lock:

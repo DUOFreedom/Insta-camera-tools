@@ -157,9 +157,9 @@
     <string name="encoder_auto">Auto</string>
     <string name="encoder_hardware">Hardware</string>
     <string name="settings_encoder_diff_title">How the two encoders differ</string>
-    <string name="settings_encoder_current_hw">Current: Hardware (fast, limited keyframe interval)</string>
+    <string name="settings_encoder_current_hw">Current: Hardware (fast; keyframe interval may not match the template)</string>
     <string name="settings_encoder_current_auto">Current: Auto (software encoding, most reliable recognition)</string>
-    <string name="settings_encoder_diff_body">Auto = software encoding (libx265 + libx264, same as the desktop app; the camera recognizes it most reliably).\nHardware = MediaCodec hardware encoding. Much faster, but the system limits the keyframe interval to 1 second (the camera wants 16 frames); if the camera shows no thumbnails or does not recognize the import, switch back to Auto.</string>
+    <string name="settings_encoder_diff_body">Auto = software encoding (libx265 + libx264, same as the desktop app; the camera recognizes it most reliably).\nHardware = MediaCodec hardware encoding. Much faster, but the keyframe interval can only be whole seconds, which falls short of the 16 frames Ace Pro 2 wants. The actual interval is measured after encoding: if it is not constant (vendor encoders insert extra IDRs at scene cuts) the clip is re-encoded in software, so that one pays for both passes; if it is constant but differs from the template you only get a warning. If the camera shows no thumbnails, switch back to Auto.</string>
     <string name="home_model_title">Camera model</string>
     <string name="home_model_desc">Picking a model generates with the preset for that model.</string>
     <string name="model_ace_pro_2">Ace Pro 2</string>

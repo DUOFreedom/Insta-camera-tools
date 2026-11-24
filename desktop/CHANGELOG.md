@@ -1,5 +1,51 @@
 ﻿## 1.3.0 — 2026-11-13
 
+### 新增（安卓端硬件编码 + 关键帧间隔自动校验与回退）
+
+安卓端「设置 → 编码器」的「硬件」选项以前只把 `-g 16` 传给 MediaCodec。实际拿不到 16 帧间隔，编码失败或产物不合规时也看不到原因。现在这条路能跑，跑不通会把原因写进日志。
+
+源码依据在 `ffmpeg-7.1/libavcodec/mediacodecenc.c`：`gop = round(avctx->gop_size / s->fps)`，`s->fps` 声明为 `int`（`:64`），60fps 下 `16/60` 得 0，被强制成 1 秒；`-keyint_min` 与 `-sc_threshold` 在这个文件里一次都没被读。硬编的间隔只能是整数秒，Ace Pro 2 要的 16 帧（0.27 秒）给不出来。GO Ultra 主轨要 120 帧（2 秒），硬编的 1 秒反而更密。
+
+- `inst_transplant.py` 与 `insta360_tf_import.py` 各增 `video_gop_uniform(path) -> (gop, uniform)`，读 `stss` 的 sync sample 列表，返回首个间隔与「整片间隔是否只有一个值」。`video_gop()` 只看前两个 sync sample，量不出场景切换处多插的 IDR，那正是「AMBA[53] 写了实测值但相机仍不认」的盲区。条目数取 `min(entry_count, 4096, (box 长度 - 16) / 4)`。长片几万条 sync sample 不稀奇，而多插的 IDR 在开头几秒就露头，4096 条足够；最后一项按 box 自身长度封顶，免得 `entry_count` 撒谎时读到后面的 box 还不报错。函数名已加进 `test_rewrap_and_transplant_copies_do_not_drift` 的守卫列表。
+- `insta_core.py` 增 `_gop_uniform_of()`。`_run_transcode` 里内联的软编回退抽成 `_run_sw_retry()`，硬编失败和间隔不恒定共用同一条回退路径。
+- `_run_one` 在硬编产出后实测间隔，三种情况分开处理。不恒定：打日志并整条软编重跑。恒定但与模板不同：只告警，因为整数秒是接口约束，回退也拿不到 16，而 AMBA[53] 写的是实测值、文件自身自洽。量不出来（只有一个关键帧或文件解析不了）：告警，并说明 AMBA[53] 会按 16 写入、相机是否接受未经验证。
+- 只校验硬编产物。`vc` 以 `lib` 开头说明本来就走软编，`sw_retried` 说明硬编已经失败、`dst` 是软编重跑的结果，两种都跳过。跳过第二种的理由：软编的 `keyint` 是精确帧数，再读一遍整个文件是白花 IO，日志还会反过来说成「硬编产物不合格」。
+- 量间隔要整文件读一遍，所以在读之前查一次取消状态。取消的片子不必再花这个时间。读的是整个文件，两路并行（主视频 + LRV）时峰值内存约为两份输出之和；这是沿用 `video_gop()` 已有的读法，不是新增开销，但并行会把它叠起来。
+- 软编重跑失败时删掉 `dst`。重跑靠 `-y` 覆盖，失败留下的是截断文件，留在输出目录里就是一个没注入 udta/inst 的坏 mp4。
+- `strings.xml` 与 `values-zh/strings.xml` 的 `settings_encoder_diff_body` 改写：说明只能整数秒、会实测、不恒定会重跑（这条片子要吃两遍编码时间）、恒定但不同只提示。
+
+**测试**：`test_insta.py` 增 4 条（间隔全等 → `(120, True)`；场景切换插 IDR → `(60, False)`；单关键帧 → `(0, False)`；无 stss → `(1, True)`）。`test_android_fallback.py` 增 7 条（不恒定回退、恒定保留、软编不校验、不匹配只告警、匹配时无多余告警、量不出来必须告警、已回退软编后跳过校验）。全量 `pytest desktop/tests -q` → **279 passed, 3 skipped**。
+
+**未验证**：真机。`adb devices` 为空，也没有相机卡，硬编产物能否被相机识别只能上机试。「相机接受非模板间隔」这一条没有任何证据。
+
+### 修复（站点公布的产物信息落后于实际 exe）
+
+站点 `download/index.html` 与 `changelog/index.html` 公布的是 80,567,039 字节、sha256 `51325E3C…`。但 `3416484`（机型卡片二级界面）改完桌面代码后，`desktop/dist/instatools.exe` 在 11-16 20:09 重建过一次，实际是 **80,627,706 字节**、sha256 `77D2F48D026632F72230D0CFDB41022175315785EEF536E97F4ED505CDEAB2D9`。站点停在 `07c2dd8` 时那批数字上，用户照着页面核对哈希会失败。
+
+- `download/index.html` 三处：大小 `80.5 MB（80,567,039 字节）` → `80.6 MB（80,627,706 字节）`；`id="sha-win"` 的哈希换成新值；meta description、og、twitter、JSON-LD `fileSize` 里的 `80.5 MB` 与 `80.5MB` 一并改。
+- `changelog/index.html` 产物表大小同步；`index.html` 的 JSON-LD `fileSize` 同步。
+- `README.md` / `README.en.md` 的测试徽章与正文预期数字改成实测的 279 passed / 3 skipped（徽章原来停在 215）。
+- 展示值统一按 `"%.1f" % (字节数 / 1e6)` 推出，不再手写。
+
+**新增 `desktop/tests/test_release_consistency.py`（5 条）**，守「站点公布值 == 实际产物」。`tools/check_site.py` 只查链接与结构，不看这些数字；`desktop/tests/` 与 `tools/` 里也没有相关断言。站点和产物能连着两个版本对不上而没人发现，就是因为缺这一层。断言 SHA256、字节数、changelog 与 download 两处一致、版本号等于 `core.__version__`、「X.Y MB」由字节数算出。exe 不存在时（干净克隆、CI）跳过而不是失败。
+
+**一个坑**：改 HTML 时用 Python 以文本模式写回，`\n` 全变成 `\r\n`，`git diff` 显示整个文件被重写（`1318 insertions(+), 1318 deletions(-)`）。仓库没有 `.gitattributes`，`core.autocrlf` 也没设，索引里是 LF。用二进制模式 `b.replace(b'\r\n', b'\n')` 逐文件转回后，diff 缩到预期的 8 行。以后用脚本改这个仓库的文本文件，二进制按 `\n` 写，或者改完立刻 `git diff --stat` 确认没有整文件重写。
+
+### 修复（flaky 测试的真因是线程泄漏，不是「抢 3 秒窗口」）
+
+`test_star.py::test_open_author_page_minimizes_only_after_browser_shows_up` 偶发失败，此前几处记录都归因为「全套并发时与后台线程抢 3 秒窗口」。实际是线程泄漏：
+
+- `bridge.openAuthorPage()` 会起一个 `_watch_browser` 线程，盯 `BROWSER_WATCH_SECONDS = 3.5` 秒等浏览器窗口出现。
+- 前一条用例 `test_open_author_page_opens_and_marks` 只 patch 了 `_open_url`，没 patch `_browser_windows`，于是真起了一个 3.5 秒的线程。
+- 它活到下一条用例执行期间。下一条把 `_browser_windows` 换成 `seq.pop(0)` 序列（先 `{1}` 后 `{1, 2}`），残留线程先吃掉 `{1}`，被测线程拿到 `before = {1, 2}`，此后永远等不到「新增句柄」，`_pump(app, 3.0)` 结束时 `seen == []`。
+- 触发与否看残留线程是否还在窗口内，所以是 flaky。
+
+修法只动测试：在 `test_open_author_page_opens_and_marks` 里把 `bridge.Bridge._watch_browser` 换成空操作。线程照旧会起，但一次都不查窗口，立刻结束，不再留到后面的用例里。
+
+**对照验证**：回退该修改，`test_star.py` 单跑 8 次，8/8 失败（`assert [] == ['opened']`）；恢复后 8 次 8/8 通过。
+
+**顺带发现**：另外两条用例 `test_open_author_page_minimizes_only_after_browser_shows_up` 与 `test_open_author_page_reports_missed_browser` 没有 patch `_open_url`。跑测试会真的走 `os.startfile`，在这台机器上每跑一次就弹出一个浏览器窗口。两条都补了桩，现在整轮测试不再启动任何浏览器。
+
 ### 新增（安卓三页欢迎窗，与桌面端对齐）
 
 桌面端启动时的三页欢迎窗（使用协议 / 使用须知 / 作者主页）移植到安卓，替掉原来那个只有一个 `AlertDialog` 的协议弹窗。
